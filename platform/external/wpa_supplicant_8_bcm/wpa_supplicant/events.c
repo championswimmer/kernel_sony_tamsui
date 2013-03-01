@@ -236,10 +236,8 @@ int wpa_supplicant_scard_init(struct wpa_supplicant *wpa_s,
 #ifdef IEEE8021X_EAPOL
 	int aka = 0, sim = 0, type;
 
-	if (ssid->eap.pcsc == NULL || wpa_s->scard != NULL) {
-		wpa_dbg(wpa_s, MSG_WARNING, "SD card already init");
+	if (ssid->eap.pcsc == NULL || wpa_s->scard != NULL)
 		return 0;
-	}
 
 	if (ssid->eap.eap_methods == NULL) {
 		sim = 1;
@@ -899,7 +897,6 @@ void wpa_supplicant_connect(struct wpa_supplicant *wpa_s,
 	       wpa_s->wpa_state != WPA_AUTHENTICATING) ||
 	      os_memcmp(selected->bssid, wpa_s->pending_bssid, ETH_ALEN) !=
 	      0))) {
-	    wpa_dbg(wpa_s, MSG_WARNING, "init SD card");
 		if (wpa_supplicant_scard_init(wpa_s, ssid)) {
 			wpa_supplicant_req_new_scan(wpa_s, 10, 0);
 #ifdef ANDROID_BRCM_P2P_PATCH
@@ -908,7 +905,7 @@ void wpa_supplicant_connect(struct wpa_supplicant *wpa_s,
 			return;
 #endif
 		}
-		wpa_msg(wpa_s, MSG_DEBUG, "Request association_: "
+		wpa_msg(wpa_s, MSG_DEBUG, "Request association: "
 			"reassociate: %d  selected: "MACSTR "  bssid: " MACSTR
 			"  pending: " MACSTR "  wpa_state: %s",
 			wpa_s->reassociate, MAC2STR(selected->bssid),

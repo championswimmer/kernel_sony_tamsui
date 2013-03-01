@@ -622,8 +622,6 @@ static struct wpabuf * eap_sim_process_challenge(struct eap_sm *sm,
 		
 	if (eap_sim_gsm_auth(sm, data)) {
 		wpa_printf(MSG_WARNING, "EAP-SIM: GSM authentication failed");
-		wpa_printf(MSG_ERROR, "EAP-SIM: No more data send to APDU server");
-		//SCardDisconnect(0,0);
 		return eap_sim_client_error(data, id,
 					    EAP_SIM_UNABLE_TO_PROCESS_PACKET);
 	}

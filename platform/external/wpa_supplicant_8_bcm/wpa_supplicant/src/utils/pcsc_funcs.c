@@ -20,10 +20,6 @@
 #ifndef ANDROID
 #include <winscard.h>
 #endif
-#ifdef ANDROID
-#include <cutils/properties.h>
-#endif /* ANDROID */
-
 
 #include "common.h"
 #include "pcsc_funcs.h"
@@ -36,7 +32,7 @@
 #include <cutils/memory.h>
 #include "private/android_filesystem_config.h"
 #endif
-static int scard_Enabled = 0;
+
 /* See ETSI GSM 11.11 and ETSI TS 102 221 for details.
  * SIM commands:
  * Command APDU: CLA INS P1 P2 P3 Data
@@ -115,7 +111,6 @@ struct scard_data {
 	DWORD protocol;
 	sim_types sim_type;
 	int pin1_required;
-	int enabled;
 };
 
 #ifdef __MINGW32_VERSION
@@ -306,8 +301,6 @@ long SCardConnect(int dummy1, char *dummy2, int       dummy3,
 	if (socket_fd < 0) {
 		wpa_printf(MSG_ERROR, "APDU: could not connect to socket");
 		return SCARD_S_FAIL;
-	}else {
-	    scard_Enabled = 1;
 	}
 
 	return SCARD_S_SUCCESS;
@@ -316,7 +309,6 @@ long SCardConnect(int dummy1, char *dummy2, int       dummy3,
 long SCardDisconnect(int dummy1, int dummy2)
 {
 	close(socket_fd);
-	socket_fd = 0;
 	return SCARD_S_SUCCESS;
 }
 
@@ -376,8 +368,6 @@ long SCardTransmit(int dummy1, int dummy2,
 			buf_len -= ret;
 		}
 	} while (buf_len > 0);
-
-	wpa_printf(MSG_INFO, "APDU: Sended data");
 
 	/* receive answer */
 	buf_ptr = buf;
@@ -646,7 +636,6 @@ struct scard_data * scard_init(scard_sim_type sim_type, char *socket)
 	size_t blen;
 	int transaction = 0;
 	int pin_needed;
-	char operator_id[PROPERTY_VALUE_MAX] = {0};
 
 	wpa_printf(MSG_DEBUG, "SCARD: initializing smart card interface");
 	if (mingw_load_symbols())
@@ -657,17 +646,6 @@ struct scard_data * scard_init(scard_sim_type sim_type, char *socket)
 #ifdef PCSC_FUNCS_SEMC
 	apdu_socket = socket;
 #endif
-    wpa_printf(MSG_DEBUG, "SCARD: get gsm.sim.operator.numeric");
-    if(property_get("gsm.sim.operator.numeric",
-					 operator_id, NULL) != 0) {
-	   if(os_strlen(operator_id) < 5) {
-		   	wpa_printf(MSG_ERROR, "SCARD: SIM card is not ready");	   	
-		   	goto failed;
-	   }
-    }else {
-       wpa_printf(MSG_ERROR, "SCARD: SIM card is not ready");	   	
-		   	goto failed;
-    }
 
 	ret = SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL,
 				    &scard->ctx);
@@ -893,11 +871,6 @@ static long scard_transmit(struct scard_data *scard,
 {
 	long ret;
 	unsigned long rlen;
-
-	if(scard_Enabled == 0) {
-		wpa_printf(MSG_WARNING, "Apdu Socket re-build");
-		SCardConnect( 0, 0, 0, 0, 0, 0);
-	}
 
 	wpa_hexdump_key(MSG_DEBUG, "SCARD: scard_transmit: send",
 			_send, send_len);
@@ -1460,11 +1433,3 @@ int scard_umts_auth(struct scard_data *scard, const unsigned char *_rand,
 	wpa_printf(MSG_DEBUG, "SCARD: Unrecognized response");
 	return -1;
 }
-
-void disable_scard() {
-	scard_Enabled = 0;
-}
-void enable_scard() {
-	scard_Enabled = 1;
-}
-

@@ -3166,11 +3166,6 @@ static int wpa_supplicant_ctrl_iface_set_apdu_socket(
 	    wpa_printf(MSG_DEBUG, "apdu_socket == NULL");
     } else {
 	    wpa_printf(MSG_DEBUG, "apdu_socket == %s", apdu_socket);
-    	if(os_strncmp(apdu_socket, "Close", 5) == 0) {
-		     wpa_msg(wpa_s, MSG_INFO, "Apdu socket closed");
-		     disable_scard(wpa_s->scard);
-             return 0;
-	    }
     }
 
 	len = sizeof(wpa_s->apdu_socket);
