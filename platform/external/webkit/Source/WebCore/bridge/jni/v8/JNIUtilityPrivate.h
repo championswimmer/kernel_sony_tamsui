@@ -41,11 +41,7 @@ class JavaValue;
 JavaValue convertNPVariantToJavaValue(NPVariant, const String& javaClass);
 void convertJavaValueToNPVariant(JavaValue, NPVariant*);
 
-#if PLATFORM(ANDROID)
-JavaValue jvalueToJavaValue(const jvalue&, const JavaType&, bool requireAnnotation);
-#else
 JavaValue jvalueToJavaValue(const jvalue&, const JavaType&);
-#endif
 jvalue javaValueToJvalue(const JavaValue&);
 
 } // namespace Bindings

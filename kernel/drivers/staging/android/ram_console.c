@@ -27,6 +27,21 @@
 #include <linux/rslib.h>
 #endif
 
+
+/*Skies-2012/09/11, Preserve debug information++*/
+#include <mach/msm_smd.h>
+#define CRASH_STATUS_CMD_SIZE 2
+
+struct smem_debug_info {
+    uint32_t crash_status;
+    uint32_t ram_console_base;
+    uint32_t last_radio_log_base;
+};
+static unsigned char *debug_info_buf = NULL;
+struct smem_debug_info debug_info;
+/*Skies-2012/09/11, Preserve debug information--*/
+
+
 struct ram_console_buffer {
 	uint32_t    sig;
 	uint32_t    start;
@@ -315,6 +330,10 @@ static int __init ram_console_init(struct ram_console_buffer *buffer,
 		       "(sig = 0x%08x)\n", buffer->sig);
 	}
 
+/*Skies-2012/07/19, zero out ram console buffer before start ram_console*/
+        memset(buffer->data, 0, ram_console_buffer_size);
+/*Skies-2012/07/19, zero out ram console buffer before start ram_console*/
+
 	buffer->sig = RAM_CONSOLE_SIG;
 	buffer->start = 0;
 	buffer->size = 0;
@@ -399,6 +418,42 @@ static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 	return count;
 }
 
+/*Skies-2012/09/07, create proc file for crash status++*/
+static char crash_status[CRASH_STATUS_CMD_SIZE+1];
+static ssize_t crash_status_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
+{
+	loff_t pos = *offset;
+	ssize_t count;
+	size_t max = CRASH_STATUS_CMD_SIZE;
+    
+	if (pos >= CRASH_STATUS_CMD_SIZE)
+		return 0;
+        
+	count = min(len, max);
+	memset(crash_status, 0, sizeof(crash_status));
+	pr_emerg("%s: 0x%x\n", __func__, debug_info.crash_status);
+
+//	if ((debug_info.crash_status == 0x77665501)/*REBOOT_NORMAL*/ ||
+	if ((debug_info.crash_status == 0x776655aa)/*REBOOT_NORMAL2*/ ||
+		(debug_info.crash_status == 0xc0dedead)/*REBOOT_CRASHDUMP*/) {
+		snprintf(crash_status, sizeof(crash_status), "1\n");
+	} else {
+		snprintf(crash_status, sizeof(crash_status), "0\n");
+	}
+    
+	if (copy_to_user(buf, crash_status, count))
+		return -EFAULT;
+
+	*offset += count;
+	return count;
+}
+
+static const struct file_operations crash_status_file_ops = {
+	.owner = THIS_MODULE,
+	.read = crash_status_read,
+};
+/*Skies-2012/09/07, create proc file for crash status--*/
+
 static const struct file_operations ram_console_file_ops = {
 	.owner = THIS_MODULE,
 	.read = ram_console_read_old,
@@ -407,7 +462,28 @@ static const struct file_operations ram_console_file_ops = {
 static int __init ram_console_late_init(void)
 {
 	struct proc_dir_entry *entry;
+	/*Skies-2012/09/07, create proc file for crash status++*/
+	struct proc_dir_entry *entry_cs;
+        int size = 0;
+	/*Skies-2012/09/07, create proc file for crash status--*/
 
+	/*Skies-2012/09/07, create proc file for crash status++*/
+	entry_cs = create_proc_entry("crash_status", S_IFREG|S_IRUGO/*|S_IWUGO*/, NULL);
+	if (!entry_cs) {
+            pr_err("%s: failed to create proc entry\n", __func__);
+            return 0;
+	}
+	entry_cs->proc_fops = &crash_status_file_ops;
+	entry_cs->size = CRASH_STATUS_CMD_SIZE;
+
+	debug_info_buf = smem_get_entry(SMEM_ID_VENDOR0, &size);
+	if (debug_info_buf != NULL) {
+	    memcpy(&debug_info, debug_info_buf, sizeof(debug_info));
+	}else {
+	    return 0;
+	}
+	/*Skies-2012/09/07, create proc file for crash status--*/
+	
 	if (ram_console_old_log == NULL)
 		return 0;
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_EARLY_INIT

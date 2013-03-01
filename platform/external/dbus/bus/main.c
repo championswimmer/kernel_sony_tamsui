@@ -32,6 +32,9 @@
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
@@ -39,16 +42,23 @@
 
 static BusContext *context;
 
+#ifdef DBUS_UNIX
+
 static int reload_pipe[2];
 #define RELOAD_READ_END 0
 #define RELOAD_WRITE_END 1
 
 static void close_reload_pipe (void);
 
+typedef enum
+ {
+   ACTION_RELOAD = 'r',
+   ACTION_QUIT = 'q'
+ } SignalAction;
+
 static void
 signal_handler (int sig)
 {
-
   switch (sig)
     {
 #ifdef DBUS_BUS_ENABLE_DNOTIFY_ON_LINUX
@@ -59,18 +69,58 @@ signal_handler (int sig)
     case SIGHUP:
       {
         DBusString str;
-        _dbus_string_init_const (&str, "foo");
+        char action[2] = { ACTION_RELOAD, '\0' };
+
+        _dbus_string_init_const (&str, action);
         if ((reload_pipe[RELOAD_WRITE_END] > 0) &&
             !_dbus_write_socket (reload_pipe[RELOAD_WRITE_END], &str, 0, 1))
           {
-            _dbus_warn ("Unable to write to reload pipe.\n");
-            close_reload_pipe ();
+            /* If we receive SIGHUP often enough to fill the pipe buffer (4096
+             * times on old Linux, 65536 on modern Linux) before it can be
+             * drained, let's just warn and ignore. The configuration will be
+             * reloaded while draining the pipe buffer, which is what we
+             * wanted. It's harmless that it will be reloaded fewer times than
+             * we asked for, since the reload is delayed anyway, so new changes
+             * will be picked up.
+             *
+             * We use write() because _dbus_warn uses vfprintf, which isn't
+             * async-signal-safe.
+             *
+             * This is necessarily Unix-specific, but so are POSIX signals,
+             * so... */
+            static const char message[] =
+              "Unable to write to reload pipe - buffer full?\n";
+
+            write (STDERR_FILENO, message, strlen (message));
           }
       }
       break;
 #endif
+
+    case SIGTERM:
+      {
+        DBusString str;
+        char action[2] = { ACTION_QUIT, '\0' };
+        _dbus_string_init_const (&str, action);
+        if ((reload_pipe[RELOAD_WRITE_END] < 0) ||
+            !_dbus_write_socket (reload_pipe[RELOAD_WRITE_END], &str, 0, 1))
+          {
+            /* If we can't write to the socket, dying seems a more
+             * important response to SIGTERM than cleaning up sockets,
+             * so we exit. We'd use exit(), but that's not async-signal-safe,
+             * so we'll have to resort to _exit(). */
+            static const char message[] =
+              "Unable to write termination signal to pipe - buffer full?\n"
+              "Will exit instead.\n";
+
+            write (STDERR_FILENO, message, strlen (message));
+            _exit (1);
+          }
+      }
+      break;
     }
 }
+#endif /* DBUS_UNIX */
 
 static void
 usage (void)
@@ -163,6 +213,7 @@ check_two_pid_descriptors (const DBusString *pid_fd,
     }
 }
 
+#ifdef DBUS_UNIX
 static dbus_bool_t
 handle_reload_watch (DBusWatch    *watch,
 		     unsigned int  flags,
@@ -170,6 +221,8 @@ handle_reload_watch (DBusWatch    *watch,
 {
   DBusError error;
   DBusString str;
+  char *action_str;
+  char action = '\0';
 
   while (!_dbus_string_init (&str))
     _dbus_wait_for_memory ();
@@ -181,6 +234,12 @@ handle_reload_watch (DBusWatch    *watch,
       close_reload_pipe ();
       return TRUE;
     }
+
+  action_str = _dbus_string_get_data (&str);
+  if (action_str != NULL)
+    {
+      action = action_str[0];
+    }
   _dbus_string_free (&str);
 
   /* this can only fail if we don't understand the config file
@@ -188,15 +247,42 @@ handle_reload_watch (DBusWatch    *watch,
    * loaded config.
    */
   dbus_error_init (&error);
-  if (! bus_context_reload_config (context, &error))
+
+  switch (action)
     {
-      _DBUS_ASSERT_ERROR_IS_SET (&error);
-      _dbus_assert (dbus_error_has_name (&error, DBUS_ERROR_FAILED) ||
-		    dbus_error_has_name (&error, DBUS_ERROR_NO_MEMORY));
-      _dbus_warn ("Unable to reload configuration: %s\n",
-		  error.message);
-      dbus_error_free (&error);
+    case ACTION_RELOAD:
+      if (! bus_context_reload_config (context, &error))
+        {
+          _DBUS_ASSERT_ERROR_IS_SET (&error);
+          _dbus_assert (dbus_error_has_name (&error, DBUS_ERROR_FAILED) ||
+                        dbus_error_has_name (&error, DBUS_ERROR_NO_MEMORY));
+          _dbus_warn ("Unable to reload configuration: %s\n",
+                      error.message);
+          dbus_error_free (&error);
+        }
+      break;
+
+    case ACTION_QUIT:
+      {
+        DBusLoop *loop;
+        /*
+         * On OSs without abstract sockets, we want to quit
+         * gracefully rather than being killed by SIGTERM,
+         * so that DBusServer gets a chance to clean up the
+         * sockets from the filesystem. fd.o #38656
+         */
+        loop = bus_context_get_loop (context);
+        if (loop != NULL)
+          {
+            _dbus_loop_quit (loop);
+          }
+      }
+      break;
+
+    default:
+      break;
     }
+
   return TRUE;
 }
 
@@ -257,6 +343,7 @@ close_reload_pipe (void)
     _dbus_close_socket (reload_pipe[RELOAD_WRITE_END], NULL);
     reload_pipe[RELOAD_WRITE_END] = -1;
 }
+#endif /* DBUS_UNIX */
 
 int
 main (int argc, char **argv)
@@ -503,24 +590,25 @@ main (int argc, char **argv)
       exit (1);
     }
 
-  is_session_bus = bus_context_get_type(context) != NULL
-      && strcmp(bus_context_get_type(context),"session") == 0;
-
-  if (is_session_bus)
-    _dbus_daemon_publish_session_bus_address (bus_context_get_address (context));
-
   /* bus_context_new() closes the print_addr_pipe and
    * print_pid_pipe
    */
 
+#ifdef DBUS_UNIX
   setup_reload_pipe (bus_context_get_loop (context));
 
+  /* POSIX signals are Unix-specific, and _dbus_set_signal_handler is
+   * unimplemented (and probably unimplementable) on Windows, so there's
+   * no point in trying to make the handler portable to non-Unix. */
+
+  _dbus_set_signal_handler (SIGTERM, signal_handler);
 #ifdef SIGHUP
   _dbus_set_signal_handler (SIGHUP, signal_handler);
 #endif
 #ifdef DBUS_BUS_ENABLE_DNOTIFY_ON_LINUX
   _dbus_set_signal_handler (SIGIO, signal_handler);
 #endif /* DBUS_BUS_ENABLE_DNOTIFY_ON_LINUX */
+#endif /* DBUS_UNIX */
 
   _dbus_verbose ("We are on D-Bus...\n");
   _dbus_loop_run (bus_context_get_loop (context));
@@ -528,9 +616,6 @@ main (int argc, char **argv)
   bus_context_shutdown (context);
   bus_context_unref (context);
   bus_selinux_shutdown ();
-
-  if (is_session_bus)
-    _dbus_daemon_unpublish_session_bus_address ();
 
   return 0;
 }

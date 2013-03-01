@@ -5,7 +5,6 @@
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2010, Code Aurora Forum. All rights reserved.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -330,3 +329,6 @@ void avdtp_set_device_disconnect(struct avdtp *session, gboolean dev_dc);
 int avdtp_init(const bdaddr_t *src, GKeyFile *config, uint16_t *version);
 void avdtp_exit(const bdaddr_t *src);
 void copy_capabilities(gpointer data, gpointer user_data);
+gboolean avdtp_get_protection_req(struct avdtp *session);
+void avdtp_set_protection_req(struct avdtp *session, gboolean value);
+void avdtp_disconnect_session(struct avdtp *session);

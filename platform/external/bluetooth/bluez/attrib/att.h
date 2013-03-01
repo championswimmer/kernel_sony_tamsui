@@ -92,7 +92,8 @@
 #define ATT_ECODE_INSUFF_ENC			0x0F
 #define ATT_ECODE_UNSUPP_GRP_TYPE		0x10
 #define ATT_ECODE_INSUFF_RESOURCES		0x11
-/* Application error */
+/* Application errors */
+#define ATT_ECODE_INVALID_TRANSPORT		0xFE
 #define ATT_ECODE_IO				0xFF
 
 /* Characteristic Property bit field */

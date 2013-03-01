@@ -1,7 +1,6 @@
 /* include/linux/wakelock.h
  *
  * Copyright (C) 2007-2008 Google, Inc.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -27,28 +26,9 @@
  * interrupts will not entered from idle until the wake_locks are released.
  */
 
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+[*/
-#ifdef CONFIG_FIH_SUSPEND_HANG_TIMER
-
-#define POLLING_DUMP_SUSPEND_HANG_SECS  (5)
-#define DUMP_SUSPEND_HANG_LIMIT (10)
-
-enum {
-	SUSPEND_HANG = 0,
-	EARLY_SUSPEND_HANG,
-	LATE_RESUME_HANG,
-};
-
-#endif
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+]*/
 enum {
 	WAKE_LOCK_SUSPEND, /* Prevent suspend */
 	WAKE_LOCK_IDLE,    /* Prevent low power idle */
-	/* FIH-SW-KERNEL-HC-TCXO_SD_DURING_DISPLAY_ON-01+[ */
-	#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-	WAKE_LOCK_TCXO,
-	#endif
-	/* FIH-SW-KERNEL-HC-TCXO_SD_DURING_DISPLAY_ON-01+] */
 	WAKE_LOCK_TYPE_COUNT
 };
 
@@ -69,21 +49,6 @@ struct wake_lock {
 	} stat;
 #endif
 };
-
-//MTD-kernel-BH-PMSWakelockInfo-00+[
-#ifdef CONFIG_FIH_DUMP_WAKELOCK
-struct pms_wake_lock {
-	struct list_head	link;
-	char				*pid;
-	char				*tag;
-	char				*cmdline;
-	ktime_t				acquire_time;
-};
-
- void add_pms_wakelock_info(char *pid, char *cmdline, char * tag);
- void remove_pms_wakelock_info(char *pid, char * tag);
- #endif
-//MTD-kernel-BH-PMSWakelockInfo-00+]
 
 #ifdef CONFIG_HAS_WAKELOCK
 

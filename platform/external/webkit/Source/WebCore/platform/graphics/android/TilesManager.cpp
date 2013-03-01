@@ -112,7 +112,9 @@ TilesManager::TilesManager()
     m_availableTextures.reserveCapacity(MAX_TEXTURE_ALLOCATION);
     m_tilesTextures.reserveCapacity(MAX_TEXTURE_ALLOCATION);
     m_availableTilesTextures.reserveCapacity(MAX_TEXTURE_ALLOCATION);
+     //TPSW1_SoMC_2nd_Patches_Begin  
     m_pixmapsGenerationThread = new TexturesGenerator(this);
+     //TPSW1_SoMC_2nd_Patches_End  
     m_pixmapsGenerationThread->run("TexturesGenerator");
 }
 
@@ -411,6 +413,7 @@ void TilesManager::setMaxLayerTextureCount(int max)
     m_hasLayerTextures = true;
 }
 
+
 float TilesManager::tileWidth()
 {
     return TILE_WIDTH;
@@ -487,6 +490,8 @@ TilesManager* TilesManager::instance()
     if (!gInstance) {
         gInstance = new TilesManager();
         XLOG("instance(), new gInstance is %x", gInstance);
+         //TPSW1_SoMC_2nd_Patches_Begin  
+          //TPSW1_SoMC_2nd_Patches_End  
     }
     return gInstance;
 }

@@ -733,6 +733,10 @@
 #define ENABLE_LINK_PREFETCH 1
 #define ENABLE_WEB_TIMING 1
 
+// Arima Rockyang added 20120608 - WML support
+#define ENABLE_WML 1
+// Arima Rockyang added end
+
 // Android ENABLE guards not present upstream
 #define ENABLE_COMPOSITED_FIXED_ELEMENTS 1 // FIXME: Rename to ENABLE_ANDROID_COMPOSITED_FIXED_ELEMENTS
 #define ENABLE_APPLICATION_INSTALLED 1 // FIXME: Rename to ENABLE_ANDROID_APPLICATION_INSTALLED

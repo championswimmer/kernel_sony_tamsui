@@ -30,6 +30,9 @@ extern int console_printk[];
 #define default_message_loglevel (console_printk[1])
 #define minimum_console_loglevel (console_printk[2])
 #define default_console_loglevel (console_printk[3])
+//[Arima Edison] add for enable external added log ++
+#define set_external_log_level (console_printk[4])
+//[Arima Edison] add for enable external added log --
 
 static inline void console_silent(void)
 {

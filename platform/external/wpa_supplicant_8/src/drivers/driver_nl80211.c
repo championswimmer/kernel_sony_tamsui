@@ -25,7 +25,6 @@
 #include "scan.h"
 #endif
 #endif
-
 #ifdef CONFIG_LIBNL20
 /* libnl 2.0 compatibility code */
 #define nl_handle nl_sock
@@ -942,6 +941,7 @@ static void mlme_event_mgmt(struct wpa_driver_nl80211_data *drv,
 		wpa_supplicant_event(drv->ctx, EVENT_RX_MGMT, &event);
 	}
 }
+
 
 static void mlme_event_action_tx_status(struct wpa_driver_nl80211_data *drv,
 					struct nlattr *cookie, const u8 *frame,
@@ -7077,6 +7077,7 @@ static int nl80211_flush_pmkid(void *priv)
 	wpa_printf(MSG_DEBUG, "nl80211: Flush PMKIDs");
 	return nl80211_pmkid(bss, NL80211_CMD_FLUSH_PMKSA, NULL, NULL);
 }
+
 
 const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.name = "nl80211",

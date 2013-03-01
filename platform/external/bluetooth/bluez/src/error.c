@@ -33,84 +33,126 @@
 
 DBusMessage *btd_error_invalid_args(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".InvalidArguments",
 					"Invalid arguments in method call");
 }
 
 DBusMessage *btd_error_busy(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".InProgress",
 					"Operation already in progress");
 }
 
 DBusMessage *btd_error_already_exists(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".AlreadyExists",
 					"Already Exists");
 }
 
 DBusMessage *btd_error_not_supported(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".NotSupported",
 					"Operation is not supported");
 }
 
 DBusMessage *btd_error_not_connected(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".NotConnected",
 					"Not Connected");
 }
 
 DBusMessage *btd_error_already_connected(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".AlreadyConnected",
 					"Already Connected");
 }
 
 DBusMessage *btd_error_in_progress(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".InProgress",
 					"In Progress");
 }
 
 DBusMessage *btd_error_not_available(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".NotAvailable",
 					"Operation currently not available");
 }
 
 DBusMessage *btd_error_does_not_exist(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".DoesNotExist",
 					"Does Not Exist");
 }
 
 DBusMessage *btd_error_not_authorized(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".NotAuthorized",
 					"Operation Not Authorized");
 }
 
 DBusMessage *btd_error_no_such_adapter(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".NoSuchAdapter",
 					"No such adapter");
 }
 
 DBusMessage *btd_error_agent_not_available(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".AgentNotAvailable",
 					"Agent Not Available");
 }
 
 DBusMessage *btd_error_not_ready(DBusMessage *msg)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".NotReady",
 					"Resource Not Ready");
 }
 
 DBusMessage *btd_error_failed(DBusMessage *msg, const char *str)
 {
+	if (!msg)
+		return NULL;
+
 	return g_dbus_create_error(msg, ERROR_INTERFACE
 					".Failed", "%s", str);
 }

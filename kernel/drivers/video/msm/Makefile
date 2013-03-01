@@ -74,17 +74,10 @@ obj-$(CONFIG_FB_MSM_MIPI_DSI_NOVATEK) += mipi_novatek.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_RENESAS) += mipi_renesas.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY) += mipi_truly.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_SIMULATOR) += mipi_simulator.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_ILITEK) += mipi_ilitek.o
-
-# FIH-SW-MM-VH-DISPLAY-00+
-obj-$(CONFIG_FB_MSM_MIPI_DSI_RENESAS_HVGA) += mipi_renesas_hvga.o
-# FIH-SW-MM-VH-MES+
-obj-$(CONFIG_FB_MSM_MIPI_DSI_HIMAX) += mipi_himax.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_NOVATEK_FWVGA) += mipi_novatek_fwvga.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE) += mipi_orise.o
 
 # MIPI Bridge
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TC358764_DSI2LVDS) += mipi_tc358764_dsi2lvds.o
+obj-$(CONFIG_FB_MSM_MIPI_DSI_ILI9486) += mipi_ili9486.o
 
 # TVEnc
 obj-$(CONFIG_FB_MSM_TVOUT) += tvenc.o
@@ -132,22 +125,9 @@ obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_CMD_QHD_PT) += mipi_novatek_cmd_qhd_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_RENESAS_VIDEO_FWVGA_PT) += mipi_renesas_video_fwvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_RENESAS_CMD_FWVGA_PT) += mipi_renesas_cmd_fwvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TRULY_VIDEO_WVGA_PT) += mipi_truly_video_wvga_pt.o
+obj-$(CONFIG_FB_MSM_MIPI_ILI9486_CMD_WVGA_PT) += mipi_ili9486_cmd_wvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_SIMULATOR_VIDEO) += mipi_simulator_video.o
 obj-$(CONFIG_FB_MSM_MIPI_CHIMEI_WXGA) += mipi_chimei_wxga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_ILITEK_VIDEO_HVGA_PT) += mipi_ilitek_video_hvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_ILITEK_CMD_HVGA_PT) += mipi_ilitek_cmd_hvga_pt.o
-# FIH-SW-MM-VH-DISPLAY-00+[
-obj-$(CONFIG_FB_MSM_MIPI_RENESAS_VIDEO_HVGA_PT) += mipi_renesas_video_hvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_RENESAS_CMD_HVGA_PT) += mipi_renesas_cmd_hvga_pt.o
-# FIH-SW-MM-VH-DISPLAY-00+]
-# FIH-SW-MM-VH-MES+[
-obj-$(CONFIG_FB_MSM_MIPI_HIMAX_VIDEO_HVGA_PT) += mipi_himax_video_hvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_HIMAX_CMD_HVGA_PT) += mipi_himax_cmd_hvga_pt.o
-# FIH-SW-MM-VH-MES+]
-obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_VIDEO_FWVGA_PT) += mipi_novatek_video_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_CMD_FWVGA_PT) += mipi_novatek_cmd_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_ORISE_VIDEO_FWVGA_PT) += mipi_orise_video_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_ORISE_CMD_FWVGA_PT) += mipi_orise_cmd_fwvga_pt.o
 endif
 
 obj-$(CONFIG_FB_MSM_LCDC_PANEL) += lcdc_panel.o

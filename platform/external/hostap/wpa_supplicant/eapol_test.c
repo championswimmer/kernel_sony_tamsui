@@ -1,15 +1,9 @@
 /*
  * WPA Supplicant - test code
- * Copyright (c) 2003-2011, Jouni Malinen <j@w1.fi>
+ * Copyright (c) 2003-2012, Jouni Malinen <j@w1.fi>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  *
  * IEEE 802.1X Supplicant test code (to be used in place of wpa_supplicant.c.
  * Not used in production version.
@@ -862,7 +856,7 @@ static int scard_test(void)
 	unsigned char aka_ik[IK_LEN];
 	unsigned char aka_ck[CK_LEN];
 
-	scard = scard_init(SCARD_TRY_BOTH);
+	scard = scard_init(SCARD_TRY_BOTH, NULL);
 	if (scard == NULL)
 		return -1;
 	if (scard_set_pin(scard, "1234")) {
@@ -876,6 +870,9 @@ static int scard_test(void)
 		goto failed;
 	wpa_hexdump_ascii(MSG_DEBUG, "SCARD: IMSI", (u8 *) imsi, len);
 	/* NOTE: Permanent Username: 1 | IMSI */
+
+	wpa_printf(MSG_DEBUG, "SCARD: MNC length %d",
+		   scard_get_mnc_len(scard));
 
 	os_memset(_rand, 0, sizeof(_rand));
 	if (scard_gsm_auth(scard, _rand, sres, kc))
@@ -959,7 +956,7 @@ static int scard_get_triplets(int argc, char *argv[])
 		wpa_debug_level = 99;
 	}
 
-	scard = scard_init(SCARD_GSM_SIM_ONLY);
+	scard = scard_init(SCARD_GSM_SIM_ONLY, NULL);
 	if (scard == NULL) {
 		printf("Failed to open smartcard connection\n");
 		return -1;

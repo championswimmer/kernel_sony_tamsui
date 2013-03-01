@@ -1,5 +1,4 @@
 /*
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
  *
@@ -77,6 +76,8 @@ struct msm_nand_chip {
 	uint32_t ecc_bch_cfg;
 	uint32_t ecc_parity_bytes;
 	unsigned cw_size;
+	unsigned int uncorrectable_bit_mask;
+	unsigned int num_err_mask;
 };
 
 #define CFG1_WIDE_FLASH (1U << 1)
@@ -435,13 +436,6 @@ struct flash_identification {
 	uint32_t oobsize;
 	uint32_t ecc_correctability;
 } supported_flash;
-
-/* FIH-SW3-KERNEL-TH-write_panic_file-00+[ */
-uint32_t fih_get_flash_id(void)
-{
-	return supported_flash.flash_id;
-}
-/* FIH-SW3-KERNEL-TH-write_panic_file-00+] */
 
 uint16_t flash_onfi_crc_check(uint8_t *buffer, uint16_t count)
 {
@@ -1119,9 +1113,8 @@ static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
 		}
 		if (pageerr) {
 			for (n = start_sector; n < cwperpage; n++) {
-				if (enable_bch_ecc ?
-			(dma_buffer->data.result[n].buffer_status & 0x10) :
-			(dma_buffer->data.result[n].buffer_status & 0x8)) {
+				if (dma_buffer->data.result[n].buffer_status &
+					chip->uncorrectable_bit_mask) {
 					/* not thread safe */
 					mtd->ecc_stats.failed++;
 					pageerr = -EBADMSG;
@@ -1131,9 +1124,9 @@ static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
 		}
 		if (!rawerr) { /* check for corretable errors */
 			for (n = start_sector; n < cwperpage; n++) {
-				ecc_errors = enable_bch_ecc ?
-			(dma_buffer->data.result[n].buffer_status & 0xF) :
-			(dma_buffer->data.result[n].buffer_status & 0x7);
+				ecc_errors =
+				(dma_buffer->data.result[n].buffer_status
+				 & chip->num_err_mask);
 				if (ecc_errors) {
 					total_ecc_errors += ecc_errors;
 					/* not thread safe */
@@ -1901,7 +1894,7 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		if (pageerr) {
 			for (n = start_sector; n < cwperpage; n++) {
 				if (dma_buffer->data.result[n].buffer_status
-					& MSM_NAND_BUF_STAT_UNCRCTBL_ERR) {
+					& chip->uncorrectable_bit_mask) {
 					/* not thread safe */
 					mtd->ecc_stats.failed++;
 					pageerr = -EBADMSG;
@@ -1913,7 +1906,7 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 			for (n = start_sector; n < cwperpage; n++) {
 				ecc_errors = dma_buffer->data.
 					result[n].buffer_status
-					& MSM_NAND_BUF_STAT_NUM_ERR_MASK;
+					& chip->num_err_mask;
 				if (ecc_errors) {
 					total_ecc_errors += ecc_errors;
 					/* not thread safe */
@@ -7042,6 +7035,15 @@ no_dual_nand_ctlr_support:
 
 	pr_info("%s: allocated dma buffer at %p, dma_addr %x\n",
 		__func__, info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
+
+	/* Let default be VERSION_1 for backward compatibility */
+	info->msm_nand.uncorrectable_bit_mask = BIT(3);
+	info->msm_nand.num_err_mask = 0x7;
+
+	if (plat_data && (plat_data->version == VERSION_2)) {
+		info->msm_nand.uncorrectable_bit_mask = BIT(8);
+		info->msm_nand.num_err_mask = 0x1F;
+	}
 
 	info->mtd.name = dev_name(&pdev->dev);
 	info->mtd.priv = &info->msm_nand;

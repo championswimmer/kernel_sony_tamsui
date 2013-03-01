@@ -48,6 +48,10 @@ static bool bt_status;
 #define NUM_ADD	(MARIMBA_NUM_CHILD - 1)
 #endif
 
+//+ murphy 2011.11.07
+#define CONFIG_ARIMA_BT_DBG_INFO
+//- murphy 2011.11.07
+
 #if defined(CONFIG_DEBUG_FS)
 struct adie_dbg_device {
 	struct mutex		dbg_mutex;
@@ -169,6 +173,11 @@ int marimba_write_bit_mask(struct marimba *marimba, u8 reg, u8 *value,
 	u8 mask_value[num_bytes];
 
 	marimba = &marimba_modules[marimba->mod_id];
+	if (marimba == NULL) {
+		pr_err("%s: Unable to access Marimba core\n", __func__);
+		return -ENODEV;
+	}
+
 
 	mutex_lock(&marimba->xfer_lock);
 
@@ -177,6 +186,12 @@ int marimba_write_bit_mask(struct marimba *marimba, u8 reg, u8 *value,
 					& ~mask) | (value[i] & mask);
 
 	msg = &marimba->xfer_msg[0];
+	if (marimba->client == NULL) {
+		pr_err("%s: Unable to access the Marimba slave device.\n",
+								__func__);
+		return -ENODEV;
+	}
+
 	msg->addr = marimba->client->addr;
 	msg->flags = 0;
 	msg->len = num_bytes + 1;
@@ -756,6 +771,11 @@ static int marimba_probe(struct i2c_client *client,
 	struct marimba *marimba;
 	int i, status, rc, client_loop, adie_slave_idx_offset;
 	int rc_bahama = 0, rc_marimba = 0;
+  int l_retryCounter = 0; //murphy 2011.11.07
+
+#ifdef CONFIG_ARIMA_BT_DBG_INFO
+  printk(KERN_INFO "[BT_DBG] - marimba_probe()\n");
+#endif
 
 	if (!pdata) {
 		dev_dbg(&client->dev, "no platform data?\n");
@@ -795,6 +815,57 @@ static int marimba_probe(struct i2c_client *client,
 	marimba->client = client;
 
 	rc = get_adie_type();
+
+#ifdef CONFIG_ARIMA_BT_DBG_INFO
+  printk(KERN_INFO "[BT_DBG] - marimba_probe(), get_adie_type(), rc = %d \n", rc);
+#endif
+
+//+ murphy 2011.11.07
+#if 1
+  l_retryCounter = 0;
+  while (1)
+  {
+    if (rc < 0)
+    {
+      //retry counter
+      if (l_retryCounter++ > 5)
+      {
+        break;
+      }
+      //shutdown
+      if (pdata->bahama_shutdown != NULL)
+      {
+        pdata->bahama_shutdown(cur_adie_type);
+      }
+      if (pdata->marimba_shutdown != NULL)
+      {
+        pdata->marimba_shutdown();
+      }
+      //setup
+      if (pdata->marimba_setup != NULL)
+      {
+        pdata->marimba_setup();
+      }
+      if (pdata->bahama_setup != NULL)
+      {
+         pdata->bahama_setup();
+      }
+    }
+    else
+    {
+      break;
+    }
+    
+    rc = get_adie_type();
+    
+#ifdef CONFIG_ARIMA_BT_DBG_INFO
+    printk(KERN_INFO "[BT_DBG] - marimba_probe(), Init Retry # %0d \n", l_retryCounter);
+    printk(KERN_INFO "[BT_DBG] - marimba_probe(), get_adie_type(), rc = %d \n", rc);
+#endif
+
+  }
+#endif
+//- murphy 2011.11.07
 
 	if (rc < 0) {
 		if (pdata->bahama_setup != NULL)

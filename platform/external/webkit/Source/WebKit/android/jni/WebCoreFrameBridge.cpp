@@ -4,7 +4,6 @@
  * Portions created by Sony Ericsson are Copyright (C) 2011,
  * 2012 Sony Ericsson Mobile Communications AB.
  * All Rights Reserved.
- * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -125,12 +124,7 @@
 #include "JavaNPObjectV8.h"
 #include "JavaInstanceJobjectV8.h"
 #include "V8Counters.h"
-#include "JavaClassJobjectV8.h"
 #endif  // USE(JSC)
-
-#include <cutils/properties.h>
-
-extern "C" void SetCloseUnUsedSocketsFlag();
 
 #ifdef ANDROID_INSTRUMENT
 #include "TimeCounter.h"
@@ -151,8 +145,6 @@ static String* gUploadFileLabel;
 static String* gResetLabel;
 static String* gSubmitLabel;
 static String* gNoFileChosenLabel;
-
-static int gPageLoadCounter = 0;
 
 String* WebCore::PlatformBridge::globalLocalizedName(
         WebCore::PlatformBridge::rawResId resId)
@@ -358,17 +350,13 @@ WebFrame::WebFrame(JNIEnv* env, jobject obj, jobject historyList, WebCore::Page*
     mUserInitiatedAction = false;
     mBlockNetworkLoads = false;
     m_renderSkins = 0;
+
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
     mUserAgentProfile = WTF::String();
 #endif
+// BU1SW1_SoMC_SS_Patches ....... end
 
-    mPageLoadStarted = false;
-    mCloseUnusedSocketsEnabled = false;
-    char netCloseUnusedSocketsSystemProperty[PROPERTY_VALUE_MAX];
-    if(property_get("net.close.unused.sockets",
-            netCloseUnusedSocketsSystemProperty, "1")) {
-        mCloseUnusedSocketsEnabled = (bool)atoi(netCloseUnusedSocketsSystemProperty);
-    }
 }
 
 WebFrame::~WebFrame()
@@ -628,12 +616,6 @@ WebFrame::loadStarted(WebCore::Frame* frame)
 #if USE(CHROME_NETWORK_STACK)
     if (isMainFrame) {
         StatHubCmd(INPUT_CMD_WK_START_PAGE_LOAD, (void*)url.string().utf8().data(), strlen( url.string().utf8().data())+1, (void*)frame, 0);
-        if (true == mCloseUnusedSocketsEnabled) {
-            if (false == mPageLoadStarted) {
-                gPageLoadCounter++;
-                mPageLoadStarted = true;
-            }
-        }
     }
 #endif //  USE(CHROME_NETWORK_STACK)
 
@@ -723,15 +705,6 @@ WebFrame::didFinishLoad(WebCore::Frame* frame)
 #if USE(CHROME_NETWORK_STACK)
     if (isMainFrame) {
         StatHubCmd(INPUT_CMD_WK_FINISH_PAGE_LOAD, (void*)url.string().utf8().data(), strlen( url.string().utf8().data())+1, (void*)frame, 0);
-        if (true == mCloseUnusedSocketsEnabled) {
-            if ((gPageLoadCounter > 0) && (true == mPageLoadStarted)) {
-                mPageLoadStarted = false;
-                gPageLoadCounter--;
-                if(0 == gPageLoadCounter) {
-                    SetCloseUnUsedSocketsFlag();
-                }
-            }
-        }
     }
 #endif //  USE(CHROME_NETWORK_STACK)
 }
@@ -1020,12 +993,13 @@ WebFrame::density() const
 }
 
 #if USE(CHROME_NETWORK_STACK)
+// BU1SW1_SoMC_SS_Patches ....... begin
 const WTF::String
 WebFrame::userAgentProfile()
 {
     return mUserAgentProfile;
 }
-
+// BU1SW1_SoMC_SS_Patches ....... end
 void
 WebFrame::didReceiveAuthenticationChallenge(WebUrlLoaderClient* client, const std::string& host, const std::string& realm, bool useCachedCredentials, bool suppressDialog)
 {
@@ -1819,9 +1793,9 @@ public:
         return adoptRef(new WeakJavaInstance(obj, root));
     }
 #elif USE(V8)
-    static PassRefPtr<WeakJavaInstance> create(jobject obj, bool requireAnnotation)
+    static PassRefPtr<WeakJavaInstance> create(jobject obj)
     {
-        return adoptRef(new WeakJavaInstance(obj, requireAnnotation));
+        return adoptRef(new WeakJavaInstance(obj));
     }
 #endif
 
@@ -1830,8 +1804,8 @@ private:
     WeakJavaInstance(jobject instance, PassRefPtr<RootObject> rootObject)
         : JavaInstance(instance, rootObject)
 #elif USE(V8)
-    WeakJavaInstance(jobject instance, bool requireAnnotation)
-        : JavaInstanceJobject(instance, requireAnnotation)
+    WeakJavaInstance(jobject instance)
+        : JavaInstanceJobject(instance)
 #endif
         , m_beginEndDepth(0)
     {
@@ -1893,7 +1867,7 @@ private:
 };
 
 static void AddJavascriptInterface(JNIEnv *env, jobject obj, jint nativeFramePointer,
-        jobject javascriptObj, jstring interfaceName, jboolean requireAnnotation)
+        jobject javascriptObj, jstring interfaceName)
 {
 #ifdef ANDROID_INSTRUMENT
     TimeCounterAuto counter(TimeCounter::NativeCallbackTimeCounter);
@@ -1932,8 +1906,7 @@ static void AddJavascriptInterface(JNIEnv *env, jobject obj, jint nativeFramePoi
     }
 #elif USE(V8)
     if (pFrame) {
-        RefPtr<JavaInstance> addedObject = WeakJavaInstance::create(javascriptObj,
-                requireAnnotation);
+        RefPtr<JavaInstance> addedObject = WeakJavaInstance::create(javascriptObj);
         const char* name = getCharactersFromJStringInEnv(env, interfaceName);
         // Pass ownership of the added object to bindToWindowObject.
         NPObject* npObject = JavaInstanceToNPObject(addedObject.get());
@@ -2368,7 +2341,7 @@ static JNINativeMethod gBrowserFrameNativeMethods[] = {
         (void*) Reload },
     { "nativeGoBackOrForward", "(I)V",
         (void*) GoBackOrForward },
-    { "nativeAddJavascriptInterface", "(ILjava/lang/Object;Ljava/lang/String;Z)V",
+    { "nativeAddJavascriptInterface", "(ILjava/lang/Object;Ljava/lang/String;)V",
         (void*) AddJavascriptInterface },
     { "stringByEvaluatingJavaScriptFromString",
             "(Ljava/lang/String;)Ljava/lang/String;",
@@ -2405,10 +2378,6 @@ static JNINativeMethod gBrowserFrameNativeMethods[] = {
 
 int registerWebFrame(JNIEnv* env)
 {
-#if USE(V8)	
-    JavaClassJobject::RegisterJavaClassJobject(env);
-#endif
-
     jclass clazz = env->FindClass("android/webkit/BrowserFrame");
     LOG_ASSERT(clazz, "Cannot find BrowserFrame");
     gFrameField = env->GetFieldID(clazz, "mNativeFrame", "I");

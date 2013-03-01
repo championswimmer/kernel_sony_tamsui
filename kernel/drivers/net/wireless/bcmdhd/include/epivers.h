@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -34,17 +33,17 @@
 
 #define	EPI_RC_NUMBER		125
 
-#define	EPI_INCREMENTAL_NUMBER	120
+#define	EPI_INCREMENTAL_NUMBER	94
 
-#define EPI_BUILD_NUMBER	1
+#define	EPI_BUILD_NUMBER	0
 
-#define	EPI_VERSION		5, 90, 125, 120
+#define	EPI_VERSION		5, 90, 125, 94
 
-#define	EPI_VERSION_NUM		0x055a7d78
+#define	EPI_VERSION_NUM		0x055a7d5e
 
 #define EPI_VERSION_DEV		5.90.125
 
 
-#define	EPI_VERSION_STR		"5.90.125.120.2"
+#define	EPI_VERSION_STR		"5.90.125.94"
 
 #endif 

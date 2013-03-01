@@ -136,6 +136,7 @@ void ZoomManager::processNewScale(double currentTime, float scale)
     m_prepareNextTiledPage = false;
     m_zooming = false;
     const SkIRect& viewportTileBounds = m_glWebViewState->viewportTileBounds();
+    bool didScheduleUpdate = false;
 
     if (scale == m_currentScale
         || m_glWebViewState->preZoomBounds().isEmpty())
@@ -151,6 +152,7 @@ void ZoomManager::processNewScale(double currentTime, float scale)
 
         // schedule the new Zoom request
         scheduleUpdate(currentTime, viewportTileBounds, scale);
+        didScheduleUpdate = true;
 
         // If it's a new request, we will have to prepare the page.
         if (m_scaleRequestState == ZoomManager::kRequestNewScale)
@@ -170,6 +172,9 @@ void ZoomManager::processNewScale(double currentTime, float scale)
         m_zooming = true;
     }
 
+    if ((!didScheduleUpdate) && (m_scaleRequestState != ZoomManager::kRequestNewScale) && (scale != m_futureScale) && (m_currentScale != m_futureScale) ) {
+        scheduleUpdate(currentTime, viewportTileBounds, scale);
+    }
     // Get the current scale; if we are zooming, we don't change the scale
     // factor immediately (see BaseLayerAndroid::drawBasePictureInGL()), but
     // we change the scaleRequestState. When the state is kReceivedNewScale

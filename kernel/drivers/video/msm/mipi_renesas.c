@@ -14,7 +14,10 @@
 #include "mipi_dsi.h"
 #include "mipi_renesas.h"
 #include <mach/socinfo.h>
+#include <mach/gpio.h>//Flea
 
+
+static u16 fan_current_backlight_step = FAN_LIGHT_MAX_LEVEL;
 #define RENESAS_CMD_DELAY 0 /* 50 */
 #define RENESAS_SLEEP_OFF_DELAY 50
 static struct msm_panel_common_pdata *mipi_renesas_pdata;
@@ -23,6 +26,7 @@ static struct dsi_buf renesas_tx_buf;
 static struct dsi_buf renesas_rx_buf;
 
 static int mipi_renesas_lcd_init(void);
+
 
 static char config_sleep_out[2] = {0x11, 0x00};
 static char config_CMD_MODE[2] = {0x40, 0x01};
@@ -255,6 +259,7 @@ static struct dsi_cmd_desc renesas_display_off_cmds[] = {
 	{DTYPE_DCS_LWRITE, 1, 0, 0, RENESAS_CMD_DELAY,
 		sizeof(config_TEOFF), config_TEOFF},
 };
+
 
 static struct dsi_cmd_desc renesas_display_on_cmds[] = {
 	/* Choosing Command Mode */
@@ -1138,7 +1143,7 @@ static int mipi_renesas_lcd_on(struct platform_device *pdev)
 	mipi_dsi_cmds_tx(mfd, &renesas_tx_buf, renesas_display_on_cmds,
 			ARRAY_SIZE(renesas_display_on_cmds));
 
-	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa()) {
+	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa() || cpu_is_msm7x25ab()) {
 		mipi_dsi_cmds_tx(mfd, &renesas_tx_buf, renesas_hvga_on_cmds,
 			ARRAY_SIZE(renesas_hvga_on_cmds));
 	}
@@ -1150,6 +1155,21 @@ static int mipi_renesas_lcd_on(struct platform_device *pdev)
 		mipi_dsi_cmds_tx(mfd, &renesas_tx_buf, renesas_cmd_on_cmds,
 			ARRAY_SIZE(renesas_cmd_on_cmds));
 	mipi_set_tx_power_mode(0);
+
+
+	{
+        pr_emerg("Flea-mipi_renesas_lcd_on-not initial\n");	
+
+	}
+      pr_emerg("Flea-mipi_renesas_lcd_on-Start \n");
+       //gpio_set_value(113, 0);
+      //mipi_set_tx_power_mode(1);
+       mipi_dsi_cmds_tx(mfd, &renesas_tx_buf, renesas_display_ili9486_on_cmds,
+			ARRAY_SIZE(renesas_display_ili9486_on_cmds));
+      //mipi_set_tx_power_mode(0);	   
+	//gpio_set_value(113, 1);
+      pr_emerg("Flea-mipi_renesas_lcd_on-end \n");
+
 
 	return 0;
 }
@@ -1183,8 +1203,62 @@ static int __devinit mipi_renesas_lcd_probe(struct platform_device *pdev)
 	return 0;
 }
 
+//static int previous_level = 0;
 static void mipi_renesas_set_backlight(struct msm_fb_data_type *mfd)
 {
+//<<SkiesLee, Implement LCM backlight function
+/* reset everytime */
+	int bl_level;
+	int i;
+	int clock_level;
+	int new_light_level;
+	static int restart = 0;
+
+	bl_level = mfd->bl_level;
+	if ((bl_level-previous_level > 0) && (bl_level-previous_level <= 3))
+	{
+        return;
+	}
+	previous_level = bl_level;
+	pr_emerg("[BKL] %s : (%d)\n", __func__, bl_level);
+	if (bl_level == 0)
+	{
+        fan_current_backlight_step = 0;
+		restart = 1;
+		gpio_set_value(8, 0);
+	}
+	else
+	{
+		new_light_level = bl_level * FAN_LIGHT_MAX_LEVEL * FAN_LIGHT_CURRENT_OUTPUT_LIMIT / FAN_LIGHT_CURRENT_OUTPUT_MAX / DRIVER_MAX_BACKLIGHT_LEVEL;
+		if (new_light_level > 0)
+			new_light_level--;
+		new_light_level = FAN_LIGHT_MAX_LEVEL - new_light_level;
+		
+		if (fan_current_backlight_step < 0)
+		{
+			clock_level = 1;
+		}
+		else
+		{
+			if (fan_current_backlight_step != FAN_LIGHT_MAX_LEVEL)
+				fan_current_backlight_step = fan_current_backlight_step % FAN_LIGHT_MAX_LEVEL;
+			if (new_light_level < fan_current_backlight_step)
+				clock_level = (new_light_level + FAN_LIGHT_MAX_LEVEL) - fan_current_backlight_step;
+			else
+				clock_level = new_light_level - fan_current_backlight_step;	
+		}
+
+		for (i=clock_level; i>0; i--)
+		{
+			gpio_set_value(8, 0);
+			udelay(2);
+			gpio_set_value(8, 1);
+			udelay(14);
+			fan_current_backlight_step++;
+		}
+                mdelay(10);
+	}
+
 	int ret = -EPERM;
 	int bl_level;
 
@@ -1194,6 +1268,9 @@ static void mipi_renesas_set_backlight(struct msm_fb_data_type *mfd)
 		ret = mipi_renesas_pdata->pmic_backlight(bl_level);
 	else
 		pr_err("%s(): Backlight level set failed", __func__);
+
+//>>SkiesLee, Implement LCM backlight function
+
 }
 
 static struct platform_driver this_driver = {
@@ -1211,11 +1288,14 @@ static struct msm_fb_panel_data renesas_panel_data = {
 
 static int ch_used[3];
 
+
 int mipi_renesas_device_register(struct msm_panel_info *pinfo,
 					u32 channel, u32 panel)
 {
+
 	struct platform_device *pdev = NULL;
 	int ret;
+ pr_emerg("Flea-mipi_renesas_device_register\n");	
 	if ((channel >= 3) || ch_used[channel])
 		return -ENODEV;
 
@@ -1251,12 +1331,17 @@ int mipi_renesas_device_register(struct msm_panel_info *pinfo,
 err_device_put:
 	platform_device_put(pdev);
 	return ret;
+  #endif//Flea_test
 }
 
 static int mipi_renesas_lcd_init(void)
 {
+       pr_emerg("Flea-mipi_renesas_lcd_init \n");
 	mipi_dsi_buf_alloc(&renesas_tx_buf, DSI_BUF_SIZE);
 	mipi_dsi_buf_alloc(&renesas_rx_buf, DSI_BUF_SIZE);
 
+
+	gpio_set_value(113, 0);
+	
 	return platform_driver_register(&this_driver);
 }

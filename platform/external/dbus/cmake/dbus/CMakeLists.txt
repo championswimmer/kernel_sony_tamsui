@@ -2,7 +2,7 @@ project(dbus-lib)
 
 SET(DBUS_DIR ${CMAKE_SOURCE_DIR}/../dbus)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/dbus-arch-deps.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/dbus-arch-deps.h )
+configure_file(${DBUS_DIR}/dbus-arch-deps.h.in ${CMAKE_CURRENT_BINARY_DIR}/dbus-arch-deps.h )
 
 add_definitions(-DDBUS_COMPILATION)
 
@@ -57,10 +57,6 @@ set (DBUS_LIB_SOURCES
 	${DBUS_DIR}/dbus-transport.c
 	${DBUS_DIR}/dbus-transport-socket.c
 	${DBUS_DIR}/dbus-watch.c
-#dbus-md5.c
-#
-#  find a clean Windows implementation
-#  and move code to a *-win.c file
 )
 
 
@@ -103,7 +99,6 @@ set (DBUS_LIB_HEADERS
 	${DBUS_DIR}/dbus-transport-protected.h
 	${DBUS_DIR}/dbus-watch.h
 	${CMAKE_BINARY_DIR}/config.h
-##dbus-md5.h
 )
 if(UNIX)
 	set (DBUS_LIB_HEADERS ${DBUS_LIB_HEADERS} 
@@ -213,12 +208,14 @@ else (WIN32)
 		${DBUS_DIR}/dbus-sysdeps-unix.c
 		${DBUS_DIR}/dbus-sysdeps-pthread.c
 		${DBUS_DIR}/dbus-userdb.c
+        ${DBUS_DIR}/sd-daemon.c
 	)
 	set (DBUS_SHARED_HEADERS ${DBUS_SHARED_HEADERS} 
 		${DBUS_DIR}/dbus-server-unix.h
 		${DBUS_DIR}/dbus-transport-unix.h
 		${DBUS_DIR}/dbus-sysdeps-unix.h
 		${DBUS_DIR}/dbus-userdb.h
+        ${DBUS_DIR}/sd-daemon.h
 	)
 	set (DBUS_UTIL_SOURCES ${DBUS_UTIL_SOURCES}
 		${DBUS_DIR}/dbus-spawn.c
@@ -259,10 +256,9 @@ endif(MSVC_IDE)
 ### Client library
 
 add_library(dbus-1 SHARED
-			${DBUS_LIB_SOURCES}
-			${DBUS_SHARED_SOURCES}
-			${DBUS_LIB_HEADERS}
-			${DBUS_SHARED_HEADERS})
+			${libdbus_SOURCES}
+			${libdbus_HEADERS}
+)
 if(WIN32)
     if(WINCE)
         target_link_libraries(dbus-1 ws2)

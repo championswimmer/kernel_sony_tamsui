@@ -4,7 +4,6 @@
  * Copyright (C) 2003 Al Borchers (alborchers@steinerpoint.com)
  * Copyright (C) 2008 David Brownell
  * Copyright (C) 2008 by Nokia Corporation
- * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This code also borrows from usbserial.c, which is
  * Copyright (C) 1999 - 2002 Greg Kroah-Hartman (greg@kroah.com)
@@ -1314,7 +1313,7 @@ static void usb_debugfs_init(struct gs_port *ui_dev, int port_num)
 		return;
 
 	debugfs_create_file("readstatus", 0444, dent, ui_dev, &debug_adb_ops);
-	debugfs_create_file("reset", 0220, dent, ui_dev, &debug_rst_ops);/*MTD-CONN-EH-FS_PERMISSION-00**/
+	debugfs_create_file("reset", 0222, dent, ui_dev, &debug_rst_ops);
 }
 #else
 static void usb_debugfs_init(struct gs_port *ui_dev) {}

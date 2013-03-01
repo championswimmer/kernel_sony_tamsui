@@ -539,6 +539,51 @@ config INPUT_PMIC8058_VIBRA_MEMLESS
 	  To compile this driver as module, choose M here: the
 	  module will be called pmic8058-vib-memless.
 
+# /*++ Huize - 20120329 Proximity sensor ++*/
+config INPUT_ISL29021
+       tristate "ISL3DF SENSOR"
+       default n
+       help
+         This option enables device driver support for the proximity sensor
+         on Intersil Americas Inc ISL29021 chip.
+
+config INPUT_EPL6803
+       tristate "EPL6803 SENSOR"
+       default n
+       help
+         This option enables device driver support for the proximity sensor
+         Elan Microelectronics Corp. EPL6803 chip.
+# /*-- Huize - 20120329 Proximity sensor --*/
+
+# /*++ Huize - 20120329 Accelerometer sensor ++*/
+config INPUT_LIS3DF
+       tristate "LIS3DF SENSOR"
+       default n
+       help
+         This option enables device driver support for the acclerometer sensor
+         on ST Microelectionics LIS3DF chip.
+
+config INPUT_KXTJ9
+       tristate "KXTJ9 SENSOR"
+       default n
+       help
+         This option enables device driver support for the acclerometer sensor
+         on Kionix KXTJ9 chip.
+
+config INPUT_BMA250
+       tristate "BMA250 SENSOR"
+       default n
+       help
+         This option enables device driver support for the acclerometer sensor
+
+config INPUT_BMA250E
+       tristate "BMA250E SENSOR"
+       default n
+       help
+         This option enables device driver support for the acclerometer sensor
+         on BOACH BMA250E chip.
+# /*-- Huize - 20120329 Accelerometer sensor --*/
+
 config BOSCH_BMA150
         tristate "SMB380/BMA150 acceleration sensor support"
         depends on I2C=y

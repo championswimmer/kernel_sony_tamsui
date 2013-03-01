@@ -3,7 +3,6 @@
  *
  *  Copyright (c) 2003-2005, Jouni Malinen <jkmaline@cc.hut.fi>
  *  Copyright (C) 2001-2008, Iwncomm Ltd.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #include "drivers/driver.h"

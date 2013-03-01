@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -201,8 +200,6 @@ PCOM_VREG_CONSUMERS(ncp)   = {
 };
 
 static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
-	/*MM-UW-support AF+++*/
-	/*FIH-SW3-KERNEL-HC-regulator-02+[ */
 	/* Standard regulators (SMPS and LDO)
 	 * R = rise time (us)
 	 * P = pulldown (1 = pull down, 0 = float, -1 = don't care)
@@ -212,15 +209,15 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	 * S = supply voltage (uV)
 	 * T = type of regulator (smps, pldo, nldo)
 	 *            name   id  supp  min uV    max uV  R   P  A  B  V  S  T*/
-	PCOM_VREG_SMP(smps1,  3, NULL, 1200000, 1200000, 0, -1, 0, 0, 0, 0, s),
+	PCOM_VREG_SMP(smps1,  3, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps2,  4, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps3,  2, NULL, 1800000, 1800000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps4, 24, NULL, 2100000, 2100000, 0, -1, 0, 0, 0, 0, s),
-	PCOM_VREG_LDO(ldo01, 12, NULL, 2800000, 2800000, 0, -1, 0, 0, 0, 0, p),
-	PCOM_VREG_LDO(ldo02, 13, NULL, 2050000, 2050000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo01, 12, NULL, 3000000, 3000000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo02, 13, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo03, 49, NULL, 1200000, 1200000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo04, 50, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, n),
-	PCOM_VREG_LDO(ldo05, 45, NULL, 1300000, 1300000, 0, -1, 0, 0, 0, 0, n),
+	PCOM_VREG_LDO(ldo05, 45, NULL, 1300000, 1350000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo06, 51, NULL, 1200000, 1200000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo07,  0, NULL, 2600000, 2600000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo08,  9, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
@@ -230,15 +227,13 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	PCOM_VREG_LDO(ldo12, 21, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo13, 18, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo14, 16, NULL, 3300000, 3300000, 0, -1, 0, 0, 0, 0, p),
-	PCOM_VREG_LDO(ldo15, 54, NULL, 3000000, 3000000, 0, -1, 0, 0, 0, 0, p),
-	PCOM_VREG_LDO(ldo16, 19, NULL, 3000000, 3000000, 0, -1, 0, 0, 0, 0, p),
-	PCOM_VREG_LDO(ldo17, 56, NULL, 1800000, 3300000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo15, 54, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo16, 19, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo17, 56, NULL, 2900000, 3300000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo18, 11, NULL, 2700000, 2700000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo19, 57, NULL, 1200000, 1800000, 0, -1, 0, 0, 0, 0, p),
 
 	PCOM_VREG_NCP(ncp,   31, NULL, -1800000, -1800000, 0,     0, 0, 0, 0),
-	/*FIH-SW3-KERNEL-HC-regulator-02+] */
-	/*MM-UW-support AF---*/
 };
 
 struct proccomm_regulator_platform_data msm7x27a_proccomm_regulator_data = {

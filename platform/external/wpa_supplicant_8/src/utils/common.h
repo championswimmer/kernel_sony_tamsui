@@ -336,6 +336,7 @@ static inline unsigned int wpa_swap_32(unsigned int v)
 #define ETH_P_RRB 0x890D
 #endif /* ETH_P_RRB */
 
+
 #ifdef __GNUC__
 #define PRINTF_FORMAT(a,b) __attribute__ ((format (printf, (a), (b))))
 #define STRUCT_PACKED __attribute__ ((packed))

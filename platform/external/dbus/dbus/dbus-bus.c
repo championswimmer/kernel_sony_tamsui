@@ -661,8 +661,6 @@ dbus_bus_register (DBusConnection *connection,
   _dbus_return_val_if_error_is_set (error, FALSE);
 
   retval = FALSE;
-  message = NULL;
-  reply = NULL;
 
   _DBUS_LOCK (bus_datas);
 
@@ -670,16 +668,18 @@ dbus_bus_register (DBusConnection *connection,
   if (bd == NULL)
     {
       _DBUS_SET_OOM (error);
-      goto out;
+      _DBUS_UNLOCK (bus_datas);
+      return FALSE;
     }
 
   if (bd->unique_name != NULL)
     {
       _dbus_verbose ("Ignoring attempt to register the same DBusConnection %s with the message bus a second time.\n",
                      bd->unique_name);
+      _DBUS_UNLOCK (bus_datas);
+
       /* Success! */
-      retval = TRUE;
-      goto out;
+      return TRUE;
     }
   
   message = dbus_message_new_method_call (DBUS_SERVICE_DBUS,
@@ -690,11 +690,15 @@ dbus_bus_register (DBusConnection *connection,
   if (!message)
     {
       _DBUS_SET_OOM (error);
-      goto out;
+
+      _DBUS_UNLOCK (bus_datas);
+      return FALSE;
     }
   
   reply = dbus_connection_send_with_reply_and_block (connection, message, -1, error);
 
+  dbus_message_unref (message);
+  
   if (reply == NULL)
     goto out;
   else if (dbus_set_error_from_message (error, reply))
@@ -714,17 +718,14 @@ dbus_bus_register (DBusConnection *connection,
   retval = TRUE;
   
  out:
-  _DBUS_UNLOCK (bus_datas);
-
-  if (message)
-    dbus_message_unref (message);
-
   if (reply)
     dbus_message_unref (reply);
 
   if (!retval)
     _DBUS_ASSERT_ERROR_IS_SET (error);
 
+  _DBUS_UNLOCK (bus_datas);
+  
   return retval;
 }
 
@@ -768,7 +769,7 @@ dbus_bus_set_unique_name (DBusConnection *connection,
                           const char     *unique_name)
 {
   BusData *bd;
-  dbus_bool_t success;
+  dbus_bool_t success = FALSE;
 
   _dbus_return_val_if_fail (connection != NULL, FALSE);
   _dbus_return_val_if_fail (unique_name != NULL, FALSE);
@@ -777,13 +778,14 @@ dbus_bus_set_unique_name (DBusConnection *connection,
   
   bd = ensure_bus_data (connection);
   if (bd == NULL)
-    return FALSE;
+    goto out;
 
   _dbus_assert (bd->unique_name == NULL);
   
   bd->unique_name = _dbus_strdup (unique_name);
   success = bd->unique_name != NULL;
-  
+
+out:
   _DBUS_UNLOCK (bus_datas);
   
   return success;
@@ -811,7 +813,7 @@ const char*
 dbus_bus_get_unique_name (DBusConnection *connection)
 {
   BusData *bd;
-  const char *unique_name;
+  const char *unique_name = NULL;
 
   _dbus_return_val_if_fail (connection != NULL, NULL);
 
@@ -819,12 +821,13 @@ dbus_bus_get_unique_name (DBusConnection *connection)
   
   bd = ensure_bus_data (connection);
   if (bd == NULL)
-    return NULL;
+    goto out;
 
   unique_name = bd->unique_name;
 
+out:
   _DBUS_UNLOCK (bus_datas);
-  
+
   return unique_name;
 }
 

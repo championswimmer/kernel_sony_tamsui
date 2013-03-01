@@ -12,7 +12,6 @@
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
  * Copyright (c) 1997-2007 Jean Tourrilhes, All Rights Reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #ifndef _LINUX_WIRELESS_H

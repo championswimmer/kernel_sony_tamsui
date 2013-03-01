@@ -1,5 +1,4 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +12,10 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/gpio_event.h>
+//Mel, 2012/4/18, Enable Key GPIO. ++
+#include <linux/gpio_keys.h>
+#include <linux/input.h>
+//Mel, 2012/4/18, Enable Key GPIO. --
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/board.h>
@@ -55,42 +58,83 @@
 #include <mach/socinfo.h>
 #include "pm-boot.h"
 #include "board-msm7627a.h"
+/*[Arima Edison] add for sony SNS++*/
+#include <linux/leds-lm3533.h>
+/*[Arima Edison] add for sony SNS--*/
+
+/*++ Mel - 20111124 Ecompass sensor ++*/
+#if (defined(CONFIG_SENSORS_AK8975) || defined(CONFIG_SENSORS_AK8975_MODULE))
+#include <linux/akm8975.h>
+#elif (defined(CONFIG_SENSORS_AK8963) || defined(CONFIG_SENSORS_AK8963_MODULE))
+#include <linux/akm8963.h>
+#endif
+/*-- Mel - 20111124 Ecompass sensor --*/
+
+//Arima Edison add for sending boot_reason 20111122 ++  
+#include "smd_private.h"
+//Arima Edison add for sending boot_reason 20111122 -- 
+
+//<<MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+#if defined(CONFIG_TOUCHSCREEN_ELAN_EKTF2040) || defined(CONFIG_TOUCHSCREEN_ILITEK_2103T) || defined(CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340)
+#ifdef CONFIG_TOUCHSCREEN_ELAN_EKTF2040
+#include <linux/ektf2k.h>
+int CTP_flag = 0;
+static int elan_ktf2k_ts_power(int on);  //murphy 2011.11.07  prototype declaration
+#endif
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340
+#include <linux/input/cy8c_ts.h>
+#endif
+#define CAP_TOUCH_INT 82
+#define CAP_TOUCH_RESET 7
+#define CAP_TOUCH_DETECT 6
+#endif
+//>>MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+
+#define ili9486 72250001
+#define LCDC_PANEL_TYPE ili9486
+
 
 #define PMEM_KERNEL_EBI1_SIZE	0x3A000
 #define MSM_PMEM_AUDIO_SIZE	0x5B000
 
-enum {
-	GPIO_EXPANDER_IRQ_BASE	= NR_MSM_IRQS + NR_GPIO_IRQS,
-	GPIO_EXPANDER_GPIO_BASE	= NR_MSM_GPIOS,
-	/* SURF expander */
-	GPIO_CORE_EXPANDER_BASE	= GPIO_EXPANDER_GPIO_BASE,
-	GPIO_BT_SYS_REST_EN	= GPIO_CORE_EXPANDER_BASE,
-	GPIO_WLAN_EXT_POR_N,
-	GPIO_DISPLAY_PWR_EN,
-	GPIO_BACKLIGHT_EN,
-	GPIO_PRESSURE_XCLR,
-	GPIO_VREG_S3_EXP,
-	GPIO_UBM2M_PWRDWN,
-	GPIO_ETM_MODE_CS_N,
-	GPIO_HOST_VBUS_EN,
-	GPIO_SPI_MOSI,
-	GPIO_SPI_MISO,
-	GPIO_SPI_CLK,
-	GPIO_SPI_CS0_N,
-	GPIO_CORE_EXPANDER_IO13,
-	GPIO_CORE_EXPANDER_IO14,
-	GPIO_CORE_EXPANDER_IO15,
-	/* Camera expander */
-	GPIO_CAM_EXPANDER_BASE	= GPIO_CORE_EXPANDER_BASE + 16,
-	GPIO_CAM_GP_STROBE_READY	= GPIO_CAM_EXPANDER_BASE,
-	GPIO_CAM_GP_AFBUSY,
-	GPIO_CAM_GP_CAM_PWDN,
-	GPIO_CAM_GP_CAM1MP_XCLR,
-	GPIO_CAM_GP_CAMIF_RESET_N,
-	GPIO_CAM_GP_STROBE_CE,
-	GPIO_CAM_GP_LED_EN1,
-	GPIO_CAM_GP_LED_EN2,
+
+#define GPIO_BACKLIGHT_EN 	8	//LCM_BL_EN
+#define GPIO_IN_97     		97	//LCM_TE
+#define GPIO_OUT_113     	113	//LCM_CSX
+#define GPIO_OUT_34   	34	//LCM_RESET
+
+#ifndef CONFIG_LEDS_CHIP_LM3533
+static int gpio_ili9486_array_num[] = {
+				GPIO_BACKLIGHT_EN, 
+				GPIO_IN_97, 
+				GPIO_OUT_113, 
+				GPIO_OUT_34, 
+								    };
+static uint32_t ili9486_gpio_table[] = {
+	GPIO_CFG(GPIO_BACKLIGHT_EN,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(GPIO_IN_97,0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(GPIO_OUT_113,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(GPIO_OUT_34,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
+#else
+static int gpio_ili9486_array_num[] = {		
+				GPIO_IN_97, 
+				GPIO_OUT_113,
+				/* << WilliamHU,20120422, Fix for build */
+				GPIO_OUT_34,
+				//GPIO_OUT_129, 
+				/* >> WilliamHU,20120422, Fix for build */
+								    };
+
+static uint32_t ili9486_gpio_table[] = {
+	GPIO_CFG(GPIO_IN_97,0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(GPIO_OUT_113,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+    /* << WilliamHU,20120422, Fix for build */
+	GPIO_CFG(GPIO_OUT_34,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	//GPIO_CFG(GPIO_OUT_129,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	/* >> WilliamHU,20120422, Fix for build */
+};
+#endif
 
 #if defined(CONFIG_GPIO_SX150X)
 enum {
@@ -136,6 +180,98 @@ static void __init register_i2c_devices(void)
 }
 #endif
 
+/*++ Mel - 20111124 Ecompass sensor ++*/
+#if (defined(CONFIG_SENSORS_AK8975) || defined(CONFIG_SENSORS_AK8975_MODULE))
+static struct akm8975_platform_data akm_platform_data_8975 = {
+	.gpio_DRDY = 18,
+	.layout = 6,
+};
+#elif (defined(CONFIG_SENSORS_AK8963) || defined(CONFIG_SENSORS_AK8963_MODULE))
+static struct akm8963_platform_data akm_platform_data_8963 = {
+	.gpio_DRDY = 18,
+	.gpio_RST = 111,
+	.layout = 4,
+	.outbit = 1,
+};
+#endif
+/*-- Mel - 20111124 Ecompass sensor --*/
+
+/*++ Huize - 20110914 Register sensor device ++*/
+static struct i2c_board_info Sensor_devices_info[] __initdata = {
+	/* Proximity sensor */
+	{
+		#ifdef CONFIG_INPUT_ISL29021
+		I2C_BOARD_INFO("isl29021", 0x44),
+		#endif
+		#ifdef CONFIG_INPUT_EPL6803
+		I2C_BOARD_INFO("epl6803", 0x49),
+		#endif
+	},
+	/* Accelerometer sensor */
+	{
+		#ifdef CONFIG_INPUT_LIS3DF
+		I2C_BOARD_INFO("lis3df", 0x18),
+		#endif
+		#ifdef CONFIG_INPUT_KXTJ9
+		I2C_BOARD_INFO("kxtj9", 0x0F),
+		#endif
+		#ifdef CONFIG_INPUT_BMA250
+		I2C_BOARD_INFO("bma250", 0x18),
+		#endif
+		#ifdef CONFIG_INPUT_BMA250E
+		I2C_BOARD_INFO("bma250e", 0x18),
+		#endif
+	},
+	/*++ Mel - 20111124 Ecompass sensor ++*/
+	#if (defined(CONFIG_SENSORS_AK8975) || defined(CONFIG_SENSORS_AK8975_MODULE))
+	{
+       I2C_BOARD_INFO("akm8975", 0x0D),
+       .flags = I2C_CLIENT_WAKE,
+       .platform_data = &akm_platform_data_8975,
+       .irq = MSM_GPIO_TO_INT(18),
+	},
+	#elif (defined(CONFIG_SENSORS_AK8963) || defined(CONFIG_SENSORS_AK8963_MODULE))
+	{
+       I2C_BOARD_INFO("akm8963", 0x0D),
+       .flags = I2C_CLIENT_WAKE,
+       .platform_data = &akm_platform_data_8963,
+       .irq = MSM_GPIO_TO_INT(18),
+	},
+	#endif
+	/*-- Mel - 20111124 Ecompass sensor --*/
+};
+/*-- Huize - 20110914 Register sensor device --*/
+
+/* ++ [Arima Edison] add for Sony SNS led device ++ */
+#ifdef CONFIG_LEDS_CHIP_LM3533
+
+static struct lm3533_platform_data lm3533_leds = {
+	.leds_size = LM3533_LEDS_MAX,
+	.leds = {
+		[0] = {
+			.name = "lm3533-light-sns",
+			.type = LM3533_LED_TYPE_LED			
+		},				
+		[1] = {
+			.name = "lm3533-light-button",
+			.type = LM3533_LED_TYPE_LED			
+		},
+		[2] = {
+			.name = "lm3533-light-backlight",
+			.type = LM3533_LED_TYPE_LED			
+		},		
+	}
+};
+
+static struct i2c_board_info i2c_led_devices_LM3533[] = {
+	{
+		I2C_BOARD_INFO("leds-lm3533", 0x36),
+		.platform_data = &lm3533_leds,	
+	}
+};
+#endif
+/* -- [Arima Edison] add for Sony SNS led device -- */
+
 static struct msm_gpio qup_i2c_gpios_io[] = {
 	{ GPIO_CFG(60, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 		"qup_scl" },
@@ -175,13 +311,15 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 }
 
 static struct msm_i2c_platform_data msm_gsbi0_qup_i2c_pdata = {
-	.clk_freq		= 100000,
+	.clk_freq		= 400000,
 	.msm_i2c_config_gpio	= gsbi_qup_i2c_gpio_config,
 };
 
 static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
-	.clk_freq		= 100000,
+	/*++ Huize - 20120224 Improve I2C transmit speed ++*/
+	.clk_freq		= 400000,
 	.msm_i2c_config_gpio	= gsbi_qup_i2c_gpio_config,
+	/*-- Huize - 20120224 Improve I2C transmit speed --*/
 };
 
 #ifdef CONFIG_ARCH_MSM7X27A
@@ -554,6 +692,16 @@ static void config_lcdc_gpio_table(uint32_t *table, int len, unsigned enable)
 	}
 }
 
+static void lcdc_sili9486_config_gpios(int enable)
+{
+	//skeis+
+	return;
+	//skeis-
+
+	config_lcdc_gpio_table(ili9486_gpio_table,
+		ARRAY_SIZE(ili9486_gpio_table), enable);
+}
+
 static void lcdc_toshiba_config_gpios(int enable)
 {
 	config_lcdc_gpio_table(lcdc_gpio_table,
@@ -565,11 +713,12 @@ static int msm_fb_lcdc_power_save(int on)
 	int rc = 0;
 	/* Doing the init of the LCDC GPIOs very late as they are from
 		an I2C-controlled IO Expander */
+	
 	lcdc_toshiba_gpio_init();
 
 	if (lcdc_gpio_initialized) {
 		gpio_set_value_cansleep(GPIO_DISPLAY_PWR_EN, on);
-		gpio_set_value_cansleep(GPIO_BACKLIGHT_EN, on);
+		//gpio_set_value_cansleep(GPIO_BACKLIGHT_EN, on);
 
 		rc = on ? regulator_bulk_enable(
 				ARRAY_SIZE(regs_lcdc), regs_lcdc) :
@@ -577,13 +726,15 @@ static int msm_fb_lcdc_power_save(int on)
 				ARRAY_SIZE(regs_lcdc), regs_lcdc);
 
 		if (rc)
+		{
 			pr_err("%s: could not %sable regulators: %d\n",
 					__func__, on ? "en" : "dis", rc);
+			// Arima modification , updated by Jordan-20111230	
+		}
 	}
 
 	return rc;
 }
-
 
 static int lcdc_toshiba_set_bl(int level)
 {
@@ -674,6 +825,37 @@ static struct platform_device msm_fb_device = {
 };
 
 #ifdef CONFIG_FB_MSM_MIPI_DSI
+/*Flea-- */
+
+static int ili9486_set_bl(int level)
+{
+	int ret;
+
+	ret = pmapp_disp_backlight_set_brightness(level);
+
+	if (ret)
+		pr_err("%s: can't set lcd backlight!\n", __func__);
+
+	return ret;
+}
+
+static struct msm_panel_common_pdata mipi_ili9486_panel_data = {
+	.panel_config_gpio =lcdc_sili9486_config_gpios,
+	.gpio_num          = gpio_ili9486_array_num,
+	.pmic_backlight =ili9486_set_bl,
+};
+
+static struct platform_device mipi_dsi_ili9486_panel_device = {
+	.name = "mipi_ili9486",
+	.id = 0,
+	.dev    = {
+		.platform_data = &mipi_ili9486_panel_data,
+	}
+};
+
+
+#else
+
 static int mipi_renesas_set_bl(int level)
 {
 	int ret;
@@ -698,6 +880,7 @@ static struct platform_device mipi_dsi_renesas_panel_device = {
 		.platform_data = &mipi_renesas_pdata,
 	}
 };
+
 #endif
 
 #define SND(desc, num) { .name = #desc, .id = num }
@@ -719,6 +902,12 @@ static struct snd_endpoint snd_endpoints_list[] = {
 	SND(CURRENT, 0x7FFFFFFE),
 	SND(FM_ANALOG_STEREO_HEADSET, 35),
 	SND(FM_ANALOG_STEREO_HEADSET_CODEC, 36),
+	/*++ Kevin Shiu - 20120320 To fix audio path can't change when plug in headphone during a call ++*/
+	SND(NO_MIC_HEADSET, 3),		/* Headphone's adie config is different form headset */
+	/*-- Kevin Shiu - 20120320 To fix audio path can't change when plug in headphone during a call --*/
+	/*++ Kevin Shiu - 20120710 implement HAC feature ++*/
+	SND(HANDSET_HAC, 37),
+	/*-- Kevin Shiu - 20120710 implement HAC feature --*/
 };
 #undef SND
 
@@ -869,8 +1058,9 @@ static struct platform_device android_pmem_device = {
 static u32 msm_calculate_batt_capacity(u32 current_voltage);
 
 static struct msm_psy_batt_pdata msm_psy_batt_data = {
-	.voltage_min_design     = 2800,
-	.voltage_max_design     = 4300,
+	.voltage_min_design     = 3200,
+	.voltage_max_design     = 4200,
+	.voltage_fail_safe      = 3340,
 	.avail_chg_sources      = AC_CHG | USB_CHG ,
 	.batt_technology        = POWER_SUPPLY_TECHNOLOGY_LION,
 	.calculate_capacity     = &msm_calculate_batt_capacity,
@@ -881,7 +1071,12 @@ static u32 msm_calculate_batt_capacity(u32 current_voltage)
 	u32 low_voltage	 = msm_psy_batt_data.voltage_min_design;
 	u32 high_voltage = msm_psy_batt_data.voltage_max_design;
 
-	return (current_voltage - low_voltage) * 100
+	if (current_voltage <= low_voltage)
+		return 0;
+	else if (current_voltage >= high_voltage)
+		return 100;
+	else
+		return (current_voltage - low_voltage) * 100
 			/ (high_voltage - low_voltage);
 }
 
@@ -951,6 +1146,25 @@ static void msm7x27a_cfg_smsc911x(void)
 	gpio_set_value(ETH_FIFO_SEL_GPIO, 0);
 }
 
+/*<<Skies-2012/06/01, RAM console driver*/
+#if 1
+static struct resource ram_console_resource[] = {
+	{
+		.start  = 0x2D760000,
+		.end    = 0x2D77FFFF,
+		.flags  = IORESOURCE_MEM,
+	}
+};
+                                
+static struct platform_device ram_console_device = {
+	.name = "ram_console",
+	.id = -1,
+	.num_resources  = ARRAY_SIZE(ram_console_resource),
+	.resource       = ram_console_resource,
+};
+#endif
+/*>>Skies-2012/06/01, RAM console driver*/
+
 #if defined(CONFIG_SERIAL_MSM_HSL_CONSOLE) \
 		&& defined(CONFIG_MSM_SHARED_GPIO_FOR_UART2DM)
 static struct msm_gpio uart2dm_gpios[] = {
@@ -1009,7 +1223,9 @@ static struct platform_device *surf_ffa_devices[] __initdata = {
 	&msm_batt_device,
 	&smsc911x_device,
 #ifdef CONFIG_FB_MSM_MIPI_DSI
-	&mipi_dsi_renesas_panel_device,
+	&mipi_dsi_ili9486_panel_device,	    
+	#else
+	&mipi_dsi_renesas_panel_device, //orignal-source
 #endif
 	&msm_kgsl_3d0,
 #ifdef CONFIG_BT
@@ -1018,6 +1234,15 @@ static struct platform_device *surf_ffa_devices[] __initdata = {
 	&asoc_msm_pcm,
 	&asoc_msm_dai0,
 	&asoc_msm_dai1,
+/*Skies-2011/10/19, button-backlight*/
+	//&button_led_pdev,
+/*Skies-2012/06/01, RAM console driver*/
+	&ram_console_device,
+	//Edison add for RGB LED test ++
+	&red_led_pdev,
+	&green_led_pdev,
+	&blue_led_pdev,	
+	//Edison add for RGB LED test --
 };
 
 static unsigned pmem_kernel_ebi1_size = PMEM_KERNEL_EBI1_SIZE;
@@ -1135,7 +1360,7 @@ static struct msm_panel_common_pdata mdp_pdata = {
 
 #ifdef CONFIG_FB_MSM
 #define GPIO_LCDC_BRDG_PD	128
-#define GPIO_LCDC_BRDG_RESET_N	129
+#define GPIO_LCDC_BRDG_RESET_N	34
 
 #define LCDC_RESET_PHYS		0x90008014
 
@@ -1226,10 +1451,46 @@ static struct regulator_bulk_data regs_dsi[] = {
 	{ .supply = "msme1", .min_uV = 1800000, .max_uV = 1800000 },
 };
 
-static int dsi_gpio_initialized;
+static int dsi_gpio_initialized=0;//Arima modification
 
 static int mipi_dsi_panel_power(int on)
 {
+#if 1//Flea_test
+	int rc = 0;
+	if (unlikely(!dsi_gpio_initialized)) {
+		pr_emerg("%s\n", __func__);
+		#ifndef CONFIG_LEDS_CHIP_LM3533
+		rc = gpio_request(GPIO_BACKLIGHT_EN, "gpio_bl_en");
+		if (rc < 0) {
+			pr_err("failed to request gpio_bl_en\n");
+			return rc;
+		}
+		rc = gpio_tlmm_config(
+			GPIO_CFG(GPIO_BACKLIGHT_EN,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+			GPIO_CFG_ENABLE);
+		#endif	
+		if (rc) {
+			pr_err("Failed to enable gpio_bl_en\n");
+			goto fail_gpio1;
+		}
+		rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs_dsi), regs_dsi);
+		if (rc) {
+			pr_err("%s: could not get regulators: %d\n",
+					__func__, rc);
+			goto fail_gpio2;
+		}
+
+		rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs_dsi), regs_dsi);
+		if (rc) {
+			pr_err("%s: could not set voltages: %d\n",
+					__func__, rc);
+			goto fail_vreg;
+		}
+
+		dsi_gpio_initialized = 1;
+	}
+
+#else //Flea
 	int rc = 0;
 	uint32_t lcdc_reset_cfg;
 
@@ -1324,6 +1585,7 @@ static int mipi_dsi_panel_power(int on)
 	} else {
 		gpio_set_value_cansleep(GPIO_LCDC_BRDG_PD, 1);
 	}
+#endif //Flea--
 
 	rc = on ? regulator_bulk_enable(ARRAY_SIZE(regs_dsi), regs_dsi) :
 		  regulator_bulk_disable(ARRAY_SIZE(regs_dsi), regs_dsi);
@@ -1339,7 +1601,8 @@ fail_vreg:
 fail_gpio2:
 	gpio_free(GPIO_BACKLIGHT_EN);
 fail_gpio1:
-	gpio_free(GPIO_DISPLAY_PWR_EN);
+//Jordan-20111230 , remove 	
+//	gpio_free(GPIO_DISPLAY_PWR_EN);
 	dsi_gpio_initialized = 0;
 	return rc;
 }
@@ -1399,10 +1662,11 @@ static void __init msm7x27a_init_ebi2(void)
 	iounmap(ebi2_cfg_ptr);
 }
 
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MAXTOUCH
 #define ATMEL_TS_I2C_NAME "maXTouch"
 
 static struct regulator_bulk_data regs_atmel[] = {
-	{ .supply = "ldo2",  .min_uV = 2850000, .max_uV = 2850000 },
+	{ .supply = "ldo12",  .min_uV = 2700000, .max_uV = 3300000 },
 	{ .supply = "smps3", .min_uV = 1800000, .max_uV = 1800000 },
 };
 
@@ -1525,13 +1789,295 @@ static struct i2c_board_info atmel_ts_i2c_info[] __initdata = {
 	},
 };
 
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340
+static struct regulator *vreg_tma340;
+static int tma340_power(int vreg_on)
+{
+	int rc = -EINVAL;
+
+	if (!vreg_tma340) {
+		pr_err("%s: regulator rfrx1 not found (%d)\n",
+			__func__, rc);
+		return rc;
+	}
+
+	rc = vreg_on ? regulator_enable(vreg_tma340) :
+			regulator_disable(vreg_tma340);
+	if (rc < 0)
+		pr_err("%s: vreg rfrx1 %s failed (%d)\n",
+				__func__, vreg_on ? "enable" : "disable", rc);
+
+	/* wait for vregs to stabilize */
+	msleep(100);
+
+	return rc;
+}
+
+static int tma340_dev_setup(bool enable)
+{
+	int rc;
+
+	if (enable) {
+		vreg_tma340 = regulator_get(NULL, "gp2");
+		if (IS_ERR(vreg_tma340)) {
+			pr_err("%s: regulator get of rfrx1 failed (%ld)\n",
+				__func__, PTR_ERR(vreg_tma340));
+			rc = PTR_ERR(vreg_tma340);
+			return rc;
+		}
+
+		rc = regulator_set_voltage(vreg_tma340, 2850000, 2850000);
+		if (rc) {
+			pr_err("%s: regulator_set_voltage() = %d\n",
+				__func__, rc);
+			goto reg_put;
+		}
+
+	} else {
+		/* put voltage sources */
+		regulator_put(vreg_tma340);
+	}
+	
+       rc = gpio_request(CAP_TOUCH_RESET,"cy8c_resout_gpio");
+	if (rc) {
+		pr_err("%s: unable to request gpio %d\n",
+			__func__, CAP_TOUCH_RESET);
+	}
+	
+       rc = gpio_direction_output(CAP_TOUCH_RESET, 1);
+	if (rc) {
+		pr_err("%s: unable to set direction for gpio %d\n",
+			__func__, CAP_TOUCH_RESET);
+	}
+		
+	return 0;
+reg_put:
+	regulator_put(vreg_tma340);
+	return rc;
+}
+
+
+static struct cy8c_ts_platform_data cy8ctma340_pdata = {
+	.ts_name = "cy8ctma340_touch",
+	.dis_min_x = 0,
+	.dis_max_x = 1024,
+	.dis_min_y = 0,
+	.dis_max_y = 1038, // y resolution is 1180, 1038 = 1180 - function key area.
+	.min_tid = 0,
+	.max_tid = 255,
+	.min_touch = 0,
+	.max_touch = 255,
+	.min_width = 0,
+	.max_width = 255,
+	.power_on = tma340_power,
+	.dev_setup = tma340_dev_setup,
+	.nfingers = 2,
+	.irq_gpio = CAP_TOUCH_INT,
+	.resout_gpio = CAP_TOUCH_RESET,
+};
+static struct i2c_board_info i2c_touch_devices_cypress_tma340[] = {
+        {
+                I2C_BOARD_INFO("cy8ctma340_touch", 0x24),
+		  .irq = MSM_GPIO_TO_INT(CAP_TOUCH_INT),
+                .platform_data = &cy8ctma340_pdata,
+        }
+};
+#endif
+
+//<<MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+#ifdef CONFIG_TOUCHSCREEN_ELAN_EKTF2040
+static int elan_ktf2k_ts_power(int on)
+{
+#ifdef CONFIG_MSMHW_PDP_BOARD
+        struct vreg *vreg_l1;
+        //pr_info("%s: power %d\n", __func__, on);
+        vreg_l1= vreg_get(NULL, "rfrx1");
+
+        if (on) {
+                     pr_info("-- Elan_KTF2040_power_on\n");
+                     vreg_set_level(vreg_l1,3000);
+                     vreg_enable(vreg_l1);
+        } else {
+                     pr_info("-- Elan_KTF2040_power_off\n");
+                     vreg_disable(vreg_l1);
+        }
+#else
+        struct vreg *vreg_l1;
+        //pr_info("%s: power %d\n", __func__, on);
+        vreg_l1= vreg_get(NULL, "gp2");
+
+        if (on) {
+                     pr_info("-- Elan_KTF2040_power_on\n");
+                     vreg_set_level(vreg_l1,2850);
+                     vreg_enable(vreg_l1);
+        } else {
+                     pr_info("-- Elan_KTF2040_power_off\n");
+                     vreg_disable(vreg_l1);
+        }
+#endif
+        return 0;
+}
+
+struct elan_ktf2k_i2c_platform_data ts_elan_ktf2k_data[] = {
+        {
+                .version = 0x0001,
+                .abs_x_min = 0,
+                .abs_x_max = ELAN_X_MAX,   
+                .abs_y_min = 0,
+                .abs_y_max = ELAN_Y_MAX,
+                .intr_gpio = CAP_TOUCH_INT,
+                .reset_gpio = CAP_TOUCH_RESET,
+                .power = elan_ktf2k_ts_power,
+        },
+};
+
+static struct i2c_board_info i2c_touch_devices_harry_elan[] = {
+        {
+                I2C_BOARD_INFO("elan-ktf2k", 0x15),
+		  .irq = MSM_GPIO_TO_INT(82),
+                .platform_data = &ts_elan_ktf2k_data,
+        }
+};
+#endif
+
+#ifdef CONFIG_LEDS_CHIP_LM3533
+static void led_lm3533_hw_init(void)
+{
+
+	int rc;
+
+	rc = gpio_request(GPIO_BACKLIGHT_EN, "gpio_bl_en");
+	if (rc < 0){
+		pr_err("%s : failed to request gpio_homekey_bl_en(%d)\n", __func__, rc);			
+	}
+	rc = gpio_tlmm_config(GPIO_CFG(GPIO_BACKLIGHT_EN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
+				GPIO_CFG_ENABLE);
+	if (rc){
+		pr_err("%s: gpio_tlmm_config for %d failed\n", __func__, GPIO_BACKLIGHT_EN);		
+	}
+
+	printk(KERN_EMERG "%s enable pin = %d",__func__,gpio_get_value(GPIO_BACKLIGHT_EN));	
+
+	gpio_set_value(GPIO_BACKLIGHT_EN, 1);
+
+}
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_2103T
+static void tp_ilitek_2103t_hw_init(void)
+{
+	struct vreg *vreg_l1;
+    	vreg_l1= vreg_get(NULL, "rfrx1");
+    	vreg_set_level(vreg_l1, 3000);
+    	vreg_enable(vreg_l1);
+
+	if (!gpio_request(CAP_TOUCH_RESET, "ili2103t_RESET")) {
+		if (gpio_tlmm_config(GPIO_CFG(CAP_TOUCH_RESET, 0, GPIO_CFG_OUTPUT,
+								   GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE))
+				  pr_err("Failed to configure GPIO %d\n",
+								   CAP_TOUCH_RESET);
+	    } else{
+			pr_err("Failed to request GPIO%d\n", CAP_TOUCH_RESET);
+	   }
+	
+	gpio_set_value(CAP_TOUCH_RESET,  0);
+	mdelay(100);
+	gpio_set_value(CAP_TOUCH_RESET,  1);
+	mdelay(100);
+
+	gpio_request(CAP_TOUCH_INT, "gpio_ili2103t0_input");
+
+	gpio_direction_input(CAP_TOUCH_INT);
+	gpio_tlmm_config(GPIO_CFG(CAP_TOUCH_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
+}
+
+static struct i2c_board_info i2c_touch_devices_harry_ilitek[] = {
+       {
+		//I2C_BOARD_INFO("ili2103t", 0x41),
+		I2C_BOARD_INFO("ilitek_i2c", 0x41),
+		.irq = MSM_GPIO_TO_INT(82),
+	}
+
+};
+
+#endif
+//>>MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+
+//Mel, 2012/4/18, Enable Key GPIO. ++
+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+static struct gpio_keys_button NanHu_buttons[] = {
+	{
+		.gpio			= 37,
+		.type			= EV_KEY,
+		.code			= KEY_VOLUMEUP,
+		.desc			= "Volume Up",
+		.active_low		= 1,
+		.wakeup			= 1,
+		/*[Arima Edison]add key debounce time++*/
+		.debounce_interval = 30,  
+		/*[Arima Edison]add key debounce time--*/
+	},
+	{
+		.gpio			= 38,
+		.type			= EV_KEY,
+		.code			= KEY_VOLUMEDOWN,
+		.desc			= "Volume Down",
+		.active_low		= 1,
+		.wakeup			= 1,
+		/*[Arima Edison]add key debounce time++*/
+		.debounce_interval = 30,
+		/*[Arima Edison]add key debounce time--*/
+	},
+	{
+		.gpio			= 117,
+		.type			= EV_KEY,
+		.code			= KEY_CAMERA,
+		.desc			= "Camera key",
+		.active_low		= 1,
+		.wakeup			= 1,
+		/*[Arima Edison]add key debounce time++*/
+		.debounce_interval = 30,
+		/*[Arima Edison]add key debounce time--*/
+	}
+};
+
+static struct gpio_keys_platform_data NanHu_button_data = {
+	.buttons	= NanHu_buttons,
+	.nbuttons	= ARRAY_SIZE(NanHu_buttons),
+};
+
+static struct platform_device NanHu_button_device = {
+	.name		= "gpio-keys",
+	.id		= -1,
+	.num_resources	= 0,
+	.dev		= {
+		.platform_data	= &NanHu_button_data,
+	}
+};
+#endif 
+//Mel, 2012/4/18, Enable Key GPIO. --
+//Mel, 2012/4/18, Disable key-matrix. ++
+#if 0
 #define KP_INDEX(row, col) ((row)*ARRAY_SIZE(kp_col_gpios) + (col))
 
+//<<SKIES 2011/10/26, keypad matrix
+#if 1
+static unsigned int kp_row_gpios[] = {31};
+static unsigned int kp_col_gpios[] = {37, 38};
+#else
 static unsigned int kp_row_gpios[] = {31, 32, 33, 34, 35};
 static unsigned int kp_col_gpios[] = {36, 37, 38, 39, 40};
+#endif
 
 static const unsigned short keymap[ARRAY_SIZE(kp_col_gpios) *
 					  ARRAY_SIZE(kp_row_gpios)] = {
+#if 1 //Arima modification
+	[KP_INDEX(0, 0)] = KEY_VOLUMEDOWN,
+	[KP_INDEX(0, 1)] = KEY_VOLUMEUP,
+#else
 	[KP_INDEX(0, 0)] = KEY_7,
 	[KP_INDEX(0, 1)] = KEY_DOWN,
 	[KP_INDEX(0, 2)] = KEY_UP,
@@ -1561,6 +2107,8 @@ static const unsigned short keymap[ARRAY_SIZE(kp_col_gpios) *
 	[KP_INDEX(4, 2)] = KEY_MENU,
 	[KP_INDEX(4, 3)] = KEY_VOLUMEUP,
 	[KP_INDEX(4, 4)] = KEY_VOLUMEDOWN,
+#endif
+//>>SKIES 2011/10/26
 };
 
 /* SURF keypad platform device information */
@@ -1594,10 +2142,12 @@ static struct platform_device kp_pdev = {
 		.platform_data	= &kp_pdata,
 	},
 };
+#endif
+//Mel, 2012/4/18, Disable key-matrix. --
 
 static struct msm_handset_platform_data hs_platform_data = {
 	.hs_name = "7k_handset",
-	.pwr_key_delay_ms = 500, /* 0 will disable end key */
+	.pwr_key_delay_ms = 0/*500*/, /* 0 will disable end key */   //Mel. Set delay to 0.
 };
 
 static struct platform_device hs_pdev = {
@@ -1629,6 +2179,7 @@ static void __init msm7627a_rumi3_init(void)
 #if defined(CONFIG_BT) && defined(CONFIG_MARIMBA_CORE)
 static int __init msm7x27a_init_ar6000pm(void)
 {
+    msm_wlan_ar6000_pm_device.dev.platform_data = &ar600x_wlan_power;
 	return platform_device_register(&msm_wlan_ar6000_pm_device);
 }
 #else
@@ -1643,8 +2194,36 @@ static void __init msm7x27a_init_regulators(void)
 				__func__, rc);
 }
 
+// << FerryWu, 2012/07/12, SoMC S1 boot integration
+#if defined(CONFIG_SEMC_S1)
+static int __init s1_boot_reason(char *str)
+{
+	get_option(&str, &boot_reason);
+	return 0;
+}
+early_param("startup", s1_boot_reason);
+#endif /* CONFIG_SEMC_S1 */
+// >> FerryWu, 2012/07/12, SoMC S1 boot integration
+
 static void __init msm7x2x_init(void)
 {
+	//Arima Edison add for sending boot_reason 20111122 ++ 
+	unsigned int smem_size;
+	//Arima Edison add for sending boot_reason 20111122 -- 
+	// << FerryWu, 2012/07/12, SoMC S1 boot integration
+	#if defined(CONFIG_SEMC_S1)
+	unsigned int *smem_boot_reason;
+	#endif /* CONFIG_SEMC_S1 */
+	// >> FerryWu, 2012/07/12, SoMC S1 boot integration
+
+	// << FerryWu, 2012/06/13, SoMC S1 boot integration
+	#if defined(CONFIG_SEMC_S1)
+	do {
+		udelay(2000);
+	} while (smem_get_entry(SMEM_SMSM_SHARED_STATE, &smem_size) == NULL);
+	#endif /* CONFIG_SEMC_S1 */
+	// >> FerryWu, 2012/06/13, SoMC S1 boot integration
+
 	msm7x2x_misc_init();
 
 	/* Initialize regulators first so that other devices can use them */
@@ -1692,6 +2271,7 @@ static void __init msm7x2x_init(void)
 #if defined(CONFIG_BT) && defined(CONFIG_MARIMBA_CORE)
 	msm7627a_bt_power_init();
 #endif
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MAXTOUCH
 	if (machine_is_msm7625a_surf() || machine_is_msm7625a_ffa()) {
 		atmel_ts_pdata.min_x = 0;
 		atmel_ts_pdata.max_x = 480;
@@ -1702,11 +2282,71 @@ static void __init msm7x2x_init(void)
 	i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
 		atmel_ts_i2c_info,
 		ARRAY_SIZE(atmel_ts_i2c_info));
+#endif		
+//>>MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC and Cypress TMA340
+#if defined(CONFIG_TOUCHSCREEN_ELAN_EKTF2040) || defined(CONFIG_TOUCHSCREEN_ILITEK_2103T) || defined(CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340)
+	gpio_tlmm_config(GPIO_CFG(CAP_TOUCH_DETECT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
+	mdelay(10);
+			
+	if(gpio_get_value(CAP_TOUCH_DETECT))
+	{
+#if defined(CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340)
+		pr_info("-- CAP_TOUCH_DETECT is Cypress IC + Jtouch Panel  --\n");
+		i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID, 
+              i2c_touch_devices_cypress_tma340, 
+              ARRAY_SIZE(i2c_touch_devices_cypress_tma340));
+#else
+		pr_info("-- CAP_TOUCH_DETECT High - Fail --\n");
+#endif
+	}
+	else
+	{
+#if defined(CONFIG_TOUCHSCREEN_ELAN_EKTF2040)
+		pr_info("-- CAP_TOUCH_DETECT is ELAN IC  --\n");
+		elan_ktf2k_ts_power(1);
+		i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID, i2c_touch_devices_harry_elan, ARRAY_SIZE(i2c_touch_devices_harry_elan));
+#elif defined(CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340)
+		pr_info("-- CAP_TOUCH_DETECT is Cypress IC + Second Source Panel  --\n");
+		i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID, 
+              i2c_touch_devices_cypress_tma340, 
+              ARRAY_SIZE(i2c_touch_devices_cypress_tma340));
+#else
+		pr_info("-- CAP_TOUCH_DETECT Low - Fail --\n");
+#endif
+	}
+#endif
+//>>MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+
+	/*++ Huize - 20110914 Register sensor device ++*/
+	i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
+							Sensor_devices_info,
+							ARRAY_SIZE(Sensor_devices_info));	
+	/*-- Huize - 20110914 Register sensor device --*/
+
+	/* ++ Edison add led device ++ */
+	#ifdef CONFIG_LEDS_CHIP_LM3533	
+	printk(KERN_NOTICE "i2c_led_devices_LM3533");
+	 led_lm3533_hw_init();
+	i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
+							i2c_led_devices_LM3533,
+							ARRAY_SIZE(i2c_led_devices_LM3533));		
+	#endif
+	/* -- Edison add led device -- */
 
 #if defined(CONFIG_MSM_CAMERA)
 	msm7627a_camera_init();
 #endif
-	platform_device_register(&kp_pdev);
+//Mel, 2012/4/18, Enable Key GPIO. ++
+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+	platform_device_register(&NanHu_button_device);
+#endif	
+//Mel, 2012/4/18, Enable Key GPIO. --
+//Mel, 2012/4/18, Disable Key Matrix. ++
+#if 0 
+  platform_device_register(&kp_pdev);
+#endif	
+//Mel, 2012/4/18, Disable Key Matrix. --
 	platform_device_register(&hs_pdev);
 
 	/* configure it as a pdm function*/
@@ -1719,11 +2359,32 @@ static void __init msm7x2x_init(void)
 		platform_device_register(&led_pdev);
 
 #ifdef CONFIG_MSM_RPC_VIBRATOR
-	if (machine_is_msm7x27a_ffa() || machine_is_msm7625a_ffa())
+//<<Skies, 2011/10/12 enable vibrator function
+//	if (machine_is_msm7x27a_ffa() || machine_is_msm7625a_ffa())
+//>>Skies, 2011/10/12
 		msm_init_pmic_vibrator();
-#endif		
+#endif
 	/*7x25a kgsl initializations*/
 	msm7x25a_kgsl_3d0_init();
+
+	// << FerryWu, 2012/07/12, SoMC S1 boot integration
+	#if defined(CONFIG_SEMC_S1)
+	printk(KERN_NOTICE "Boot Reason = 0x%02x\n", boot_reason);
+	smem_size = sizeof(unsigned int);
+	smem_boot_reason = (unsigned int *)
+		(smem_alloc(SMEM_POWER_ON_STATUS_INFO, smem_size));
+	if (smem_boot_reason) {
+		*smem_boot_reason = boot_reason;
+	}
+	#else /* CONFIG_SEMC_S1 */
+	//Arima Edison add for sending boot_reason 20111122 ++ 
+	boot_reason = *(unsigned int *)
+		(smem_get_entry(SMEM_POWER_ON_STATUS_INFO, &smem_size));
+	printk(KERN_NOTICE "Boot Reason = 0x%02x\n", boot_reason);
+	//Arima Edison add for sending boot_reason 20111122 -- 
+	#endif /* CONFIG_SEMC_S1 */
+	// >> FerryWu, 2012/07/12, SoMC S1 boot integration
+
 }
 
 static void __init msm7x2x_init_early(void)

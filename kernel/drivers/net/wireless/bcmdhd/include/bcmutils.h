@@ -2,7 +2,6 @@
  * Misc useful os-independent macros and functions.
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -330,9 +329,6 @@ extern char *bcm_ip_ntoa(struct ipv4_addr *ia, char *buf);
 
 
 extern void bcm_mdelay(uint ms);
-
-#define NVRAM_RECLAIM_CHECK(name)
-
 
 extern char *getvar(char *vars, const char *name);
 extern int getintvar(char *vars, const char *name);

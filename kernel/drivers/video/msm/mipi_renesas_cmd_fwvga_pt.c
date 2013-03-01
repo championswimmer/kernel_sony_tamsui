@@ -13,7 +13,7 @@
 #include "msm_fb.h"
 #include "mipi_dsi.h"
 #include "mipi_renesas.h"
-
+#include <mach/gpio.h>//Flea
 static struct msm_panel_info pinfo;
 
 static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = {
@@ -30,7 +30,7 @@ static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = {
 	{0xbb, 0x02, 0x06, 0x00},
 	/* pll control */
 	{0x01, 0xec, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62,
-	0x01, 0x0f, 0x07,
+	0x01, 0x0f, 0x0f,//Arima modification
 	0x05, 0x14, 0x03, 0x0, 0x0, 0x0, 0x20, 0x0, 0x02, 0x0},
 #else
 	/* DSI_BIT_CLK at 400MHz, 1 lane, RGB888 */
@@ -57,11 +57,13 @@ static int __init mipi_cmd_renesas_fwvga_pt_init(void)
 {
 	int ret;
 
+	pr_emerg("Flea-mipi_cmd_renesas_fwvga_pt_init \n");
+
 	if (msm_fb_detect_client("mipi_cmd_renesas_fwvga"))
 		return 0;
 
-	pinfo.xres = 480;
-	pinfo.yres = 864;
+	pinfo.xres =320;
+	pinfo.yres =480;
 	pinfo.type = MIPI_CMD_PANEL;
 	pinfo.pdest = DISPLAY_1;
 	pinfo.wait_cycle = 0;
@@ -93,7 +95,7 @@ static int __init mipi_cmd_renesas_fwvga_pt_init(void)
 	pinfo.lcdc.border_clr = 0;	/* blk */
 	pinfo.lcdc.underflow_clr = 0xff;	/* blue */
 	pinfo.lcdc.hsync_skew = 0;
-	pinfo.bl_max = 100;
+	pinfo.bl_max = DRIVER_MAX_BACKLIGHT_LEVEL;
 	pinfo.bl_min = 1;
 	pinfo.fb_num = 2;
 
@@ -145,9 +147,10 @@ static int __init mipi_cmd_renesas_fwvga_pt_init(void)
 	pinfo.mipi.wr_mem_start = 0x2c;
 	pinfo.mipi.dsi_phy_db = &dsi_cmd_mode_phy_db;
 #endif /* CONFIG_FB_MSM_MDP303 */
-
+// gpio_set_value(8, 1);
+       pr_emerg("Flea-mipi_cmd_renesas_fwvga_pt_init_set_bl \n");
 	ret = mipi_renesas_device_register(&pinfo, MIPI_DSI_PRIM,
-						MIPI_DSI_PANEL_FWVGA_PT);
+						MIPI_DSI_PANEL_WVGA);
 	if (ret)
 		pr_err("%s: failed to register device!\n", __func__);
 

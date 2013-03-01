@@ -30,6 +30,7 @@
 #include "dbus-auth.h"
 #include "dbus-address.h"
 #include "dbus-credentials.h"
+#include "dbus-mainloop.h"
 #include "dbus-message-private.h"
 #include "dbus-marshal-header.h"
 #ifdef DBUS_BUILD_TESTS
@@ -71,16 +72,12 @@ live_messages_notify (DBusCounter *counter,
   _dbus_verbose ("Unix FD counter value is now %d\n",
                  (int) _dbus_counter_get_unix_fd_value (counter));
 #endif
-
+  
   /* disable or re-enable the read watch for the transport if
    * required.
    */
   if (transport->vtable->live_messages_changed)
-    {
-      _dbus_connection_lock (transport->connection);
-      (* transport->vtable->live_messages_changed) (transport);
-      _dbus_connection_unlock (transport->connection);
-    }
+    (* transport->vtable->live_messages_changed) (transport);
 
   _dbus_transport_unref (transport);
 }
@@ -277,7 +274,7 @@ check_address (const char *address, DBusError *error)
  * @returns a new transport, or #NULL on failure.
  */
 static DBusTransport*
-_dbus_transport_new_for_autolaunch (DBusError      *error)
+_dbus_transport_new_for_autolaunch (const char *scope, DBusError *error)
 {
   DBusString address;
   DBusTransport *result = NULL;
@@ -290,7 +287,7 @@ _dbus_transport_new_for_autolaunch (DBusError      *error)
       return NULL;
     }
 
-  if (!_dbus_get_autolaunch_address (&address, error))
+  if (!_dbus_get_autolaunch_address (scope, &address, error))
     {
       _DBUS_ASSERT_ERROR_IS_SET (error);
       goto out;
@@ -319,7 +316,9 @@ _dbus_transport_open_autolaunch (DBusAddressEntry  *entry,
 
   if (strcmp (method, "autolaunch") == 0)
     {
-      *transport_p = _dbus_transport_new_for_autolaunch (error);
+      const char *scope = dbus_address_entry_get_value (entry, "scope");
+
+      *transport_p = _dbus_transport_new_for_autolaunch (scope, error);
 
       if (*transport_p == NULL)
         {
@@ -743,17 +742,6 @@ _dbus_transport_get_is_authenticated (DBusTransport *transport)
               _dbus_connection_unref_unlocked (transport->connection);
               return FALSE;
             }
-
-          if (transport->expected_guid == NULL)
-            {
-              transport->expected_guid = _dbus_strdup (server_guid);
-
-              if (transport->expected_guid == NULL)
-                {
-                  _dbus_verbose ("No memory to complete auth\n");
-                  return FALSE;
-                }
-            }
         }
 
       /* If we're the server, see if we want to allow this identity to proceed.
@@ -855,6 +843,8 @@ _dbus_transport_get_server_id (DBusTransport *transport)
 {
   if (transport->is_server)
     return NULL;
+  else if (transport->authenticated)
+    return _dbus_auth_get_guid_from_server (transport->auth);
   else
     return transport->expected_guid;
 }
@@ -1154,13 +1144,6 @@ _dbus_transport_queue_messages (DBusTransport *transport)
         }
       else
         {
-          /* We didn't call the notify function when we added the counter, so
-           * catch up now. Since we have the connection's lock, it's desirable
-           * that we bypass the notify function and call this virtual method
-           * directly. */
-          if (transport->vtable->live_messages_changed)
-            (* transport->vtable->live_messages_changed) (transport);
-
           /* pass ownership of link and message ref to connection */
           _dbus_connection_queue_received_message_link (transport->connection,
                                                         link);

@@ -1,5 +1,4 @@
 /* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,7 +37,6 @@ enum {
 	MEMTYPE_SMI,
 	MEMTYPE_EBI0,
 	MEMTYPE_EBI1,
-	MEMTYPE_EBI1_FIH, //MTD-SW3-KERNEL-MP-Fix_ioremap-00+
 	MEMTYPE_MAX,
 };
 
@@ -68,5 +66,5 @@ struct reserve_info {
 
 extern struct reserve_info *reserve_info;
 
-unsigned long __init reserve_memory_for_fmem(unsigned long);
+unsigned long __init reserve_memory_for_fmem(unsigned long, unsigned long);
 #endif

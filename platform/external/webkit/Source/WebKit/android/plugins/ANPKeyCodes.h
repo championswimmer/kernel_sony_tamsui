@@ -221,8 +221,9 @@ enum ANPKeyCodes {
     kProgYellow_ANPKeyCode = 185,
     kProgBlue_ANPKeyCode = 186,
     kAppSwitch_ANPKeyCode = 187,
+     //TPSW1_SoMC_2nd_Patches_Begin  
     kButtonSDSD_ANPKeyCode = 1025,
-
+    //TPSW1_SoMC_2nd_Patches_End  
     // NOTE: If you add a new keycode here you must also add it to several other files.
     //       Refer to frameworks/base/core/java/android/view/KeyEvent.java for the full list.
 };

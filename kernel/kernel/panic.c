@@ -1,7 +1,6 @@
 /*
  *  linux/kernel/panic.c
  *
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
@@ -24,18 +23,10 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 #include <linux/dmi.h>
+#include <mach/gpio.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
-
-/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-00+[ */
-#include <linux/rtc.h>
-#include <linux/ktime.h>
-/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-00-[ */
-
-/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01+[ */
-void * get_timestamp_buffer_virt_addr(void);
-/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01-[ */
 
 /* Machine specific panic information string */
 char *mach_panic_string;
@@ -56,10 +47,28 @@ ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
 EXPORT_SYMBOL(panic_notifier_list);
 
+
+/*<<Skies-2012/04/11, panic indication by LCM backlight blink*/
+void panic_timeout_set(int timeout)
+{
+	panic_timeout = timeout;
+}
+EXPORT_SYMBOL(panic_timeout_set);
+
+#if 0
+#define GPIO_BKL_EN 8
+static long lcm_backlight_blink(int state)
+{
+	gpio_set_value(GPIO_BKL_EN, state);
+	return 0;
+}
+#else
 static long no_blink(int state)
 {
 	return 0;
 }
+#endif
+/*>>Skies-2012/04/11, panic indication by LCM backlight blink*/
 
 /* Returns how long it waited in ms */
 long (*panic_blink)(int state);
@@ -79,12 +88,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 	va_list args;
 	long i, i_next = 0;
 	int state = 0;
-	/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01+[ */
-	struct timespec tmp_time;
-	struct rtc_time rtc_new_rtc_time;
-	char Timebuf[15];
-	void *crash_timestamp_buffer_virt_addr = 0;
-	/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01-[ */
 
 	/*
 	 * It's possible to come here directly from a panic-assertion and
@@ -124,7 +127,10 @@ NORET_TYPE void panic(const char * fmt, ...)
 	bust_spinlocks(0);
 
 	if (!panic_blink)
+/*<<Skies-2012/04/11, panic indication by LCM backlight blink*/
 		panic_blink = no_blink;
+//		panic_blink = lcm_backlight_blink;
+/*>>Skies-2012/04/11, panic indication by LCM backlight blink*/
 
 	if (panic_timeout > 0) {
 		/*
@@ -141,32 +147,12 @@ NORET_TYPE void panic(const char * fmt, ...)
 			}
 			mdelay(PANIC_TIMER_STEP);
 		}
-		
-		/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01+[ */
-		getnstimeofday(&tmp_time);
-		rtc_time_to_tm(tmp_time.tv_sec, &rtc_new_rtc_time);
-		snprintf(Timebuf, sizeof(Timebuf), "%04d%02d%02d%02d%02d%02d",
-						rtc_new_rtc_time.tm_year + 1900,
-						rtc_new_rtc_time.tm_mon + 1,
-						rtc_new_rtc_time.tm_mday,				
-						rtc_new_rtc_time.tm_hour, 
-						rtc_new_rtc_time.tm_min,
-						rtc_new_rtc_time.tm_sec);
-		printk(KERN_EMERG "Crash time on panic(mon/day/year hour:min:sec): %s\n", Timebuf);
-		crash_timestamp_buffer_virt_addr = get_timestamp_buffer_virt_addr();
-		memcpy(crash_timestamp_buffer_virt_addr, Timebuf, sizeof(Timebuf));
-		/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01-[ */
-		
 		/*
 		 * This will not be a clean reboot, with everything
 		 * shutting down.  But if there is a chance of
 		 * rebooting the system it will be rebooted.
 		 */
-		/* FIH-SW3-KERNEL-TH-porting_dbgcfgtool-00*[ */
-		//emergency_restart();
-		kernel_restart("panic");
-		/* FIH-SW3-KERNEL-TH-porting_dbgcfgtool-00*] */
-		
+		emergency_restart();
 	}
 #ifdef __sparc__
 	{

@@ -135,7 +135,10 @@ using namespace SVGNames;
 #if ENABLE(XHTMLMP)
 static const char defaultAcceptHeader[] = "application/vnd.wap.xhtml+xml,application/xhtml+xml;profile='http://www.wapforum.org/xhtml',text/html,application/xml;q=0.9,*/*;q=0.8";
 #else
-static const char defaultAcceptHeader[] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+// Arima Rockyang modified 20120626
+//static const char defaultAcceptHeader[] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+static const char defaultAcceptHeader[] = "application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
+// Arima Rockyang modified end
 #endif
 
 static double storedTimeOfLastCompletedLoad;

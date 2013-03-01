@@ -489,6 +489,7 @@ static int l2cap_connect(struct gatt_service *gatt, GError **gerr,
 				struct primary *prim,  gboolean listen)
 {
 	GIOChannel *io;
+	struct bt_le_params *params = NULL;
 
 	if (gatt->attrib != NULL) {
 		gatt->attrib = g_attrib_ref(gatt->attrib);
@@ -502,20 +503,35 @@ static int l2cap_connect(struct gatt_service *gatt, GError **gerr,
 	 * Configuration it is necessary to poll the server from time
 	 * to time checking for modifications.
 	 */
-	if (gatt->psm < 0)
-		io = bt_io_connect(BT_IO_L2CAP, connect_cb, gatt, NULL, gerr,
-			BT_IO_OPT_SOURCE_BDADDR, &gatt->sba,
-			BT_IO_OPT_DEST_BDADDR, &gatt->dba,
-			BT_IO_OPT_CID, ATT_CID,
-			BT_IO_OPT_SEC_LEVEL, BT_IO_SEC_MEDIUM,
-			BT_IO_OPT_INVALID);
-	else
+	params = read_le_params(&gatt->sba, &gatt->dba);
+
+	if (gatt->psm < 0) {
+		if(!params)
+			io = bt_io_connect(BT_IO_L2CAP, connect_cb, gatt, NULL, gerr,
+				BT_IO_OPT_SOURCE_BDADDR, &gatt->sba,
+				BT_IO_OPT_DEST_BDADDR, &gatt->dba,
+				BT_IO_OPT_CID, ATT_CID,
+				BT_IO_OPT_SEC_LEVEL, BT_IO_SEC_MEDIUM,
+				BT_IO_OPT_INVALID);
+		else
+			io = bt_io_connect(BT_IO_L2CAP, connect_cb, gatt, NULL, gerr,
+				BT_IO_OPT_SOURCE_BDADDR, &gatt->sba,
+				BT_IO_OPT_DEST_BDADDR, &gatt->dba,
+				BT_IO_OPT_CID, ATT_CID,
+				BT_IO_OPT_SEC_LEVEL, BT_IO_SEC_MEDIUM,
+				BT_IO_OPT_LE_PARAMS, *params,
+				BT_IO_OPT_INVALID);
+	} else {
 		io = bt_io_connect(BT_IO_L2CAP, connect_cb, gatt, NULL, gerr,
 			BT_IO_OPT_SOURCE_BDADDR, &gatt->sba,
 			BT_IO_OPT_DEST_BDADDR, &gatt->dba,
 			BT_IO_OPT_PSM, gatt->psm,
 			BT_IO_OPT_SEC_LEVEL, BT_IO_SEC_MEDIUM,
 			BT_IO_OPT_INVALID);
+	}
+
+	g_free(params);
+
 	if (!io)
 		return -1;
 
@@ -1471,6 +1487,86 @@ static DBusMessage *prim_get_properties(DBusConnection *conn, DBusMessage *msg,
 	return reply;
 }
 
+static DBusMessage *connect_request_cancel(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct primary *prim = data;
+	struct gatt_service *gatt = prim->gatt;
+	struct btd_device *device = gatt->dev;
+
+	if (device_get_type(device) != DEVICE_TYPE_LE)
+		return btd_error_not_supported(msg);
+
+	if (device_is_connected(device))
+		return btd_error_already_connected(msg);
+
+	if (!gatt->attrib)
+		return btd_error_not_connected(msg);
+
+	/* This closes connection if connect request was only reference */
+	g_attrib_ref(gatt->attrib);
+	g_attrib_unref(gatt->attrib);
+
+	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *connect_request(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct primary *prim = data;
+	struct gatt_service *gatt = prim->gatt;
+	struct btd_device *device = gatt->dev;
+	struct bt_le_params params;
+	GIOChannel *io;
+	bdaddr_t src;
+
+	if (dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_BYTE, &params.prohibit_remote_chg,
+			DBUS_TYPE_BYTE, &params.filter_policy,
+			DBUS_TYPE_UINT16, &params.scan_interval,
+			DBUS_TYPE_UINT16, &params.scan_window,
+			DBUS_TYPE_UINT16, &params.interval_min,
+			DBUS_TYPE_UINT16, &params.interval_max,
+			DBUS_TYPE_UINT16, &params.latency,
+			DBUS_TYPE_UINT16, &params.supervision_timeout,
+			DBUS_TYPE_UINT16, &params.min_ce_len,
+			DBUS_TYPE_UINT16, &params.max_ce_len,
+			DBUS_TYPE_UINT16, &params.conn_timeout,
+			DBUS_TYPE_INVALID) == FALSE)
+		return btd_error_invalid_args(msg);
+
+	if (device_get_type(device) != DEVICE_TYPE_LE)
+		return btd_error_not_supported(msg);
+
+	if (gatt->attrib || device_is_connected(device))
+		return btd_error_already_connected(msg);
+
+	adapter_get_address(device_get_adapter(device), &src);
+
+	io = bt_io_connect(BT_IO_L2CAP, connect_cb,
+				gatt, NULL, NULL,
+				BT_IO_OPT_SOURCE_BDADDR, &src,
+				BT_IO_OPT_DEST_BDADDR, &gatt->dba,
+				BT_IO_OPT_CID, ATT_CID,
+				BT_IO_OPT_SEC_LEVEL, BT_IO_SEC_LOW,
+				BT_IO_OPT_LE_PARAMS, params,
+				BT_IO_OPT_INVALID);
+
+	if (!io)
+		goto fail;
+
+	gatt->attrib = g_attrib_new(io);
+	g_io_channel_unref(io);
+	g_attrib_set_destroy_function(gatt->attrib, attrib_destroy, gatt);
+	g_attrib_set_disconnect_function(gatt->attrib, attrib_disconnect,
+									gatt);
+
+	return dbus_message_new_method_return(msg);
+
+fail:
+	return btd_error_failed(msg, "Connect Request Failed");
+}
+
 static DBusMessage *disconnect_service(DBusConnection *conn, DBusMessage *msg,
 								void *data)
 {
@@ -1518,6 +1614,8 @@ static GDBusMethodTable prim_methods[] = {
 						unregister_watcher	},
 	{ "GetProperties",	"",	"a{sv}",prim_get_properties	},
 	{ "Disconnect",	"",	"", disconnect_service	},
+	{ "ConnectReq",	"yyqqqqqqqqq", "", connect_request },
+	{ "ConnectCancel", "", "", connect_request_cancel },
 	{ }
 };
 
@@ -1641,4 +1739,52 @@ GAttrib *attrib_client_find (struct btd_device *device) {
 	gatt = l->data;
 
 	return gatt->attrib;
+}
+
+int attrib_client_update (struct btd_device *device,
+			uint8_t prohibit_remote_chg,
+			uint16_t interval_min, uint16_t interval_max,
+			uint16_t latency, uint16_t supervision_timeout)
+{
+	GSList *l;
+	GIOChannel *io;
+	GError *gerr = NULL;
+	struct gatt_service *gatt;
+	struct bt_le_params params;
+	int sock;
+
+	if (gatt_services == NULL)
+		return -1;
+
+	DBG("");
+
+	l = g_slist_find_custom(gatt_services, device, gatt_dev_cmp);
+	if (!l)
+		return -1;
+
+	gatt = l->data;
+
+	if (!gatt || !gatt->attrib)
+		return -1;
+
+	io = g_attrib_get_channel(gatt->attrib);
+
+	if (!io)
+		return -1;
+
+	sock = g_io_channel_unix_get_fd(io);
+
+	if (!get_le_params(sock, &params, &gerr))
+		return -1;
+
+	params.prohibit_remote_chg = prohibit_remote_chg;
+	params.interval_min = interval_min;
+	params.interval_max = interval_max;
+	params.latency = latency;
+	params.supervision_timeout = supervision_timeout;
+
+	if (!set_le_params(sock, &params, &gerr))
+		return -1;
+
+	return 0;
 }

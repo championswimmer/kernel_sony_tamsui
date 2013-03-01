@@ -34,6 +34,28 @@
 
 static const char adb_shortname[] = "android_adb";
 
+// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+/* string descriptors: */
+
+#define ADB_INTERFACE_IDX	0
+
+/* static strings, in UTF-8 */
+static struct usb_string adb_string_defs[] = {
+	[ADB_INTERFACE_IDX].s = "Android ADB Interface",
+	{  /* ZEROES END LIST */ },
+};
+
+static struct usb_gadget_strings adb_string_table = {
+	.language =		0x0409,	/* en-us */
+	.strings =		adb_string_defs,
+};
+
+static struct usb_gadget_strings *adb_strings[] = {
+	&adb_string_table,
+	NULL,
+};
+// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
+
 struct adb_dev {
 	struct usb_function function;
 	struct usb_composite_dev *cdev;
@@ -500,6 +522,10 @@ adb_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	adb_request_free(dev->rx_req, dev->ep_out);
 	while ((req = adb_req_get(dev, &dev->tx_idle)))
 		adb_request_free(req, dev->ep_in);
+
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	adb_string_defs[ADB_INTERFACE_IDX].id = 0;
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 }
 
 static int adb_function_set_alt(struct usb_function *f,
@@ -554,6 +580,16 @@ static int adb_bind_config(struct usb_configuration *c)
 
 	printk(KERN_INFO "adb_bind_config\n");
 
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	if (adb_string_defs[ADB_INTERFACE_IDX].id == 0) {
+		int id = usb_string_id(c->cdev);
+		if (id < 0)
+			return id;
+		adb_string_defs[ADB_INTERFACE_IDX].id = id;
+		adb_interface_desc.iInterface = id;
+	}
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
+
 	dev->cdev = c->cdev;
 	dev->function.name = "adb";
 	dev->function.descriptors = fs_adb_descs;
@@ -562,6 +598,9 @@ static int adb_bind_config(struct usb_configuration *c)
 	dev->function.unbind = adb_function_unbind;
 	dev->function.set_alt = adb_function_set_alt;
 	dev->function.disable = adb_function_disable;
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	dev->function.strings = adb_strings;
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 
 	return usb_add_function(c, &dev->function);
 }

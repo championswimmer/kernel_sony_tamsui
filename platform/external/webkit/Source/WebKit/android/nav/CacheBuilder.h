@@ -34,7 +34,10 @@
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
 
-#define NAVIGATION_MAX_PHONE_LENGTH 14
+// Ariam Rockyang modified 20120712 - for phone pattern changed
+//#define NAVIGATION_MAX_PHONE_LENGTH 14
+#define NAVIGATION_MAX_PHONE_LENGTH 29
+// Arima Rockyang modified end
 
 using namespace WebCore;
 

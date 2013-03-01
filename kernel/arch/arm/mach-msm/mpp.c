@@ -44,6 +44,19 @@ int mpp_config_digital_in(unsigned mpp, unsigned config)
 }
 EXPORT_SYMBOL(mpp_config_digital_in);
 
+/*++ Huize - 20120329 Add for button backlight is controlled by mpp ++*/
+int mpp_config_i_sink(unsigned mpp, unsigned config)
+{
+	int err;
+	err = msm_proc_comm(PCOM_PM_MPP_CONFIG_I_SINK, &mpp, &config);
+	if (err)
+		pr_err("%s: msm_proc_comm(PCOM_PM_MPP_CONFIG) failed\n",
+		       __func__);
+	return err;
+}
+EXPORT_SYMBOL(mpp_config_i_sink);
+/*-- Huize - 20120329 Add for button backlight is controlled by mpp --*/
+
 #if defined(CONFIG_DEBUG_FS)
 static int test_result;
 

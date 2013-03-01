@@ -851,11 +851,11 @@ uint16_t enc_notify(uint16_t handle, const uint8_t *value, int vlen,
 {
 	const uint16_t min_len = sizeof(pdu[0]) + sizeof(uint16_t);
 
-	if (pdu == NULL)
+	if (pdu == NULL || len < min_len)
 		return 0;
 
 	if (vlen + min_len > len)
-		return 0;
+		vlen = len - min_len;
 
 	pdu[0] = ATT_OP_HANDLE_NOTIFY;
 	att_put_u16(handle, &pdu[1]);
@@ -869,11 +869,11 @@ uint16_t enc_indicate(uint16_t handle, const uint8_t *value, int vlen,
 {
 	const uint16_t min_len = sizeof(pdu[0]) + sizeof(uint16_t);
 
-	if (pdu == NULL)
+	if (pdu == NULL || len < min_len)
 		return 0;
 
 	if (vlen + min_len > len)
-		return 0;
+		vlen = len - min_len;
 
 	pdu[0] = ATT_OP_HANDLE_IND;
 	att_put_u16(handle, &pdu[1]);

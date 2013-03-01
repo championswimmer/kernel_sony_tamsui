@@ -44,6 +44,7 @@
 #define ADM0_PBUS_CLK_CTL_REG			REG(0x2208)
 #define CE1_HCLK_CTL_REG			REG(0x2720)
 #define CE1_CORE_CLK_CTL_REG			REG(0x2724)
+#define PRNG_CLK_NS_REG				REG(0x2E80)
 #define CE3_HCLK_CTL_REG			REG(0x36C4)
 #define CE3_CORE_CLK_CTL_REG			REG(0x36CC)
 #define CE3_CLK_SRC_NS_REG			REG(0x36C0)
@@ -470,7 +471,7 @@ static int set_vdd_l23(struct clk_vdd_class *vdd_class, int level)
 				RPM_VREG_VOTER3, 1800000, 1800000, 1);
 	} else {
 		rc = rpm_vreg_set_voltage(RPM_VREG_ID_PM8921_S8,
-				RPM_VREG_VOTER3, 2200000, 2200000, 1);
+				RPM_VREG_VOTER3, 2050000, 2200000, 1);
 		if (rc)
 			return rc;
 		rc = rpm_vreg_set_voltage(RPM_VREG_ID_PM8921_L23,
@@ -1496,7 +1497,12 @@ static struct branch_clk pmem_clk = {
 		.freq_hz = f, \
 		.src_clk = &s##_clk.c, \
 	}
-static struct clk_freq_tbl clk_tbl_prng[] = {
+static struct clk_freq_tbl clk_tbl_prng_32[] = {
+	F_PRNG(32000000, pll8),
+	F_END
+};
+
+static struct clk_freq_tbl clk_tbl_prng_64[] = {
 	F_PRNG(64000000, pll8),
 	F_END
 };
@@ -1510,12 +1516,12 @@ static struct rcg_clk prng_clk = {
 		.halt_bit = 10,
 	},
 	.set_rate = set_rate_nop,
-	.freq_tbl = clk_tbl_prng,
+	.freq_tbl = clk_tbl_prng_32,
 	.current_freq = &rcg_dummy_freq,
 	.c = {
 		.dbg_name = "prng_clk",
 		.ops = &clk_ops_rcg_8960,
-		VDD_DIG_FMAX_MAP2(LOW, 32000000, NOMINAL, 65000000),
+		VDD_DIG_FMAX_MAP2(LOW, 32000000, NOMINAL, 64000000),
 		CLK_INIT(prng_clk.c),
 	},
 };
@@ -4382,7 +4388,7 @@ static CLK_AIF_BIT_DIV(spare_i2s_spkr_bit, LCC_SPARE_I2S_SPKR_NS_REG,
 		.mnd_en_mask = BIT(8) * !!(n), \
 	}
 static struct clk_freq_tbl clk_tbl_pcm[] = {
-	F_PCM(       0, gnd,  1, 0,   0),
+	{ .ns_val = BIT(10) /* external input */ },
 	F_PCM(  512000, pll4, 4, 1, 192),
 	F_PCM(  768000, pll4, 4, 1, 128),
 	F_PCM( 1024000, pll4, 4, 1,  96),
@@ -4410,7 +4416,7 @@ static struct rcg_clk pcm_clk = {
 	.ns_reg = LCC_PCM_NS_REG,
 	.md_reg = LCC_PCM_MD_REG,
 	.root_en_mask = BIT(9),
-	.ns_mask = (BM(31, 16) | BM(6, 0)),
+	.ns_mask = BM(31, 16) | BIT(10) | BM(6, 0),
 	.set_rate = set_rate_mnd,
 	.freq_tbl = clk_tbl_pcm,
 	.current_freq = &rcg_dummy_freq,
@@ -5264,18 +5270,24 @@ static struct clk_lookup msm_clocks_8960_v1[] __initdata = {
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-0020"),
 	CLK_LOOKUP("csi_src_clk",	csi0_src_clk.c,		"msm_csid.0"),
 	CLK_LOOKUP("csi_src_clk",	csi1_src_clk.c,		"msm_csid.1"),
+	CLK_LOOKUP("csi_src_clk",	csi2_src_clk.c,		"msm_csid.2"),
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,		"msm_csid.0"),
 	CLK_LOOKUP("csi_clk",		csi1_clk.c,		"msm_csid.1"),
+	CLK_LOOKUP("csi_clk",		csi2_clk.c,		"msm_csid.2"),
 	CLK_LOOKUP("csi_phy_clk",	csi0_phy_clk.c,		"msm_csid.0"),
 	CLK_LOOKUP("csi_phy_clk",	csi1_phy_clk.c,		"msm_csid.1"),
+	CLK_LOOKUP("csi_phy_clk",	csi2_phy_clk.c,		"msm_csid.2"),
 	CLK_LOOKUP("csi_pix_clk",	csi_pix_clk.c,		"msm_ispif.0"),
 	CLK_LOOKUP("csi_rdi_clk",	csi_rdi_clk.c,		"msm_ispif.0"),
 	CLK_LOOKUP("csiphy_timer_src_clk",
 			   csiphy_timer_src_clk.c, "msm_csiphy.0"),
 	CLK_LOOKUP("csiphy_timer_src_clk",
 			   csiphy_timer_src_clk.c, "msm_csiphy.1"),
+	CLK_LOOKUP("csiphy_timer_src_clk",
+			   csiphy_timer_src_clk.c, "msm_csiphy.2"),
 	CLK_LOOKUP("csiphy_timer_clk",	csi0phy_timer_clk.c,	"msm_csiphy.0"),
 	CLK_LOOKUP("csiphy_timer_clk",	csi1phy_timer_clk.c,	"msm_csiphy.1"),
+	CLK_LOOKUP("csiphy_timer_clk",	csi2phy_timer_clk.c,	"msm_csiphy.2"),
 	CLK_LOOKUP("dsi_byte_div_clk",	dsi1_byte_clk.c,	NULL),
 	CLK_LOOKUP("dsi_byte_div_clk",	dsi2_byte_clk.c,	NULL),
 	CLK_LOOKUP("dsi_esc_clk",	dsi1_esc_clk.c,		NULL),
@@ -5324,6 +5336,7 @@ static struct clk_lookup msm_clocks_8960_v1[] __initdata = {
 	CLK_LOOKUP("amp_pclk",		amp_p_clk.c,		NULL),
 	CLK_LOOKUP("csi_pclk",		csi_p_clk.c,		"msm_csid.0"),
 	CLK_LOOKUP("csi_pclk",		csi_p_clk.c,		"msm_csid.1"),
+	CLK_LOOKUP("csi_pclk",		csi_p_clk.c,		"msm_csid.2"),
 	CLK_LOOKUP("dsi_m_pclk",	dsi1_m_p_clk.c,		NULL),
 	CLK_LOOKUP("dsi_s_pclk",	dsi1_s_p_clk.c,		NULL),
 	CLK_LOOKUP("dsi_m_pclk",	dsi2_m_p_clk.c,		NULL),
@@ -5816,6 +5829,8 @@ static void __init msm8960_clock_init(void)
 
 		gmem_axi_clk.c.depends = &gfx3d_axi_clk.c;
 	}
+	if ((readl_relaxed(PRNG_CLK_NS_REG) & 0x7F) == 0x2B)
+		prng_clk.freq_tbl = clk_tbl_prng_64;
 
 	vote_vdd_level(&vdd_dig, VDD_DIG_HIGH);
 
@@ -5826,7 +5841,7 @@ static void __init msm8960_clock_init(void)
 
 	/* Initialize rates for clocks that only support one. */
 	clk_set_rate(&pdm_clk.c, 27000000);
-	clk_set_rate(&prng_clk.c, 64000000);
+	clk_set_rate(&prng_clk.c, prng_clk.freq_tbl->freq_hz);
 	clk_set_rate(&mdp_vsync_clk.c, 27000000);
 	clk_set_rate(&tsif_ref_clk.c, 105000);
 	clk_set_rate(&tssc_clk.c, 27000000);

@@ -1,6 +1,5 @@
 /*
  * Copyright 2008, The Android Open Source Project
- * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,11 +21,7 @@
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * NOTE: This file has been modified by Sony Mobile Communications AB.
- * Modifications are licensed under the License.
  */
-
 
 #define LOG_TAG "webviewglue"
 
@@ -48,9 +43,6 @@
 #include "SkRegion.h"
 #include "SkUtils.h"
 #include "TextRun.h"
-extern "C" {
-#include "harfbuzz-unicode.h"
-}
 
 #ifdef DEBUG_NAV_UI
 #include <wtf/text/CString.h>
@@ -106,8 +98,7 @@ private:
     int m_offset;
 };
 
-// RTL characters are drawn in reverse order from their logic order, we need to revert back to
-// their logic order
+// ReverseBidi is a trimmed-down version of GraphicsContext::drawBidiText()
 void ReverseBidi(UChar* chars, int len) {
     using namespace WTF::Unicode;
     WTF::Vector<UChar> result;
@@ -121,35 +112,33 @@ void ReverseBidi(UChar* chars, int len) {
     bidiResolver.createBidiRunsForLine(TextRunIterator(&run, len));
     if (!bidiRuns.runCount())
         return;
-
-    /*
-     * TODO GraphicsContext::drawBidiText draws runs from left to right. If we are in a RTL context
-     * we should reverse the order of runs. To determine if we are in an RTL context we should look
-     * at the direction style of the elements with the current text , but with the current design
-     * of text selection that information is not readily available.
-     */
-
-    // Font::drawComplexText draws words within RTL run from left to right, so we need to reverse
-    // the order of words. Note that the characters are drawn from right to left and does not need
-    //reversing.
     BidiCharacterRun* bidiRun = bidiRuns.firstRun();
     while (bidiRun) {
         int bidiStart = bidiRun->start();
         int bidiStop = bidiRun->stop();
+        int size = result.size();
         int bidiCount = bidiStop - bidiStart;
-
+        result.append(chars + bidiStart, bidiCount);
         if (bidiRun->level() % 2) {
-            HB_ScriptItem output;
-            ssize_t iter = bidiCount - 1;
-            const uint16_t* start = chars + bidiStart;
-            size_t len = bidiCount;
-            while (hb_utf16_script_run_prev(0, &output, start, len, &iter)) {
-                result.append(chars + bidiStart + output.pos, output.length);
+            UChar* start = &result[size];
+            UChar* end = start + bidiCount;
+            // reverse the order of any RTL substrings
+            while (start < end) {
+                UChar temp = *start;
+                *start++ = *--end;
+                *end = temp;
             }
-        } else {
-            result.append(chars + bidiStart, bidiCount);
+            start = &result[size];
+            end = start + bidiCount - 1;
+            // if the RTL substring had a surrogate pair, restore its order
+            while (start < end) {
+                UChar trail = *start++;
+                if (!U16_IS_SURROGATE(trail))
+                    continue;
+                start[-1] = *start; // lead
+                *start++ = trail;
+            }
         }
-        
         bidiRun = bidiRun->next();
     }
     bidiRuns.deleteRuns();

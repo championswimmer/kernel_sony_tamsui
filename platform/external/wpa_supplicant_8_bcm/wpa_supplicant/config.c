@@ -1,7 +1,6 @@
 /*
  * WPA Supplicant / Configuration parser and common functions
  * Copyright (c) 2003-2008, Jouni Malinen <j@w1.fi>
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -725,26 +724,8 @@ static char * wpa_config_write_key_mgmt(const struct parse_data *data,
 	return buf;
 }
 #endif /* NO_CONFIG_WRITE */
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-static int wpa_config_parse_identify_format(const struct parse_data *data,
-				     struct wpa_ssid *ssid, int line,
-				     const char *value) 
-{
-    wpa_printf(MSG_INFO,
-			   "Line %d: Skip check identify_format.", line);
-	return 0;
 
-}
-static char * wpa_config_write_identify_format(const struct parse_data *data,
-					struct wpa_ssid *ssid)
 
-{
-    wpa_printf(MSG_INFO,
-			   "Skip write identify_format.");
-	return NULL;
-
-}
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
 static int wpa_config_parse_cipher(int line, const char *value)
 {
 	int val = 0, last;
@@ -1585,7 +1566,6 @@ static const struct parse_data ssid_fields[] = {
 	{ FUNC(auth_alg) },
 	{ FUNC(scan_freq) },
 	{ FUNC(freq_list) },
-	{ FUNC(identify_format) },  /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
 #ifdef WAPI
 	{ INT(wapi) },
 	{ INT(psk_key_type) },

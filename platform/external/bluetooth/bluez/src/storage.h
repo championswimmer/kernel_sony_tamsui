@@ -100,6 +100,8 @@ int write_device_type(const bdaddr_t *sba, const bdaddr_t *dba,
 device_type_t read_device_type(const bdaddr_t *sba, const bdaddr_t *dba);
 int read_special_map_devaddr(char *category, bdaddr_t *peer, uint8_t *match);
 int read_special_map_devname(char *category, char *name, uint8_t *match);
+int write_le_params(bdaddr_t *src, bdaddr_t *dst, struct bt_le_params *params);
+struct bt_le_params *read_le_params(bdaddr_t *src, bdaddr_t *dst);
 
 #define PNP_UUID		"00001200-0000-1000-8000-00805f9b34fb"
 

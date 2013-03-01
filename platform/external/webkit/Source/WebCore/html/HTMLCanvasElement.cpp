@@ -77,6 +77,7 @@ static const int DefaultHeight = 150;
 #if PLATFORM(ANDROID)
 //TODO::VA::Make this robust later (prototyping)... needs to be protected by ifdefs for android
 int HTMLCanvasElement::s_canvas_id = 0;
+bool HTMLCanvasElement::s_glEnabled = true;
 #endif
 
 // Firefox limits width/height to 32767 pixels, but slows down dramatically before it
@@ -114,6 +115,7 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     , m_gpuRendering(false)
     , m_supportedCompositing(true)
     , m_canUseGpuRendering(false)
+    , m_gpuAccelerationStatus(false)
 #endif
 {
     ASSERT(hasTagName(canvasTag));
@@ -344,12 +346,18 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const IntRect& r)
         int id = m_canvasLayer->getCanvasID();
         bool oom_status = CanvasLayerAndroid::isCanvasOOM(id);
 
-        if(m_canUseGpuRendering && m_gpuRendering && m_gpuCanvasEnabled && !oom_status)
+        if(m_canUseGpuRendering && m_gpuRendering && m_gpuCanvasEnabled && !oom_status && s_glEnabled)
         {
             imageBuffer->copyRecordingToLayer(context, r, m_canvasLayer);
+            m_gpuAccelerationStatus = true;
         }
         else
         {
+            if(s_glEnabled && m_gpuAccelerationStatus)
+            {
+                imageBuffer->resetRecordingToLayer(context, r, m_canvasLayer);
+                m_gpuAccelerationStatus = false;
+            }
             imageBuffer->copyRecordingToCanvas(context, r);
         }
 
@@ -357,6 +365,11 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const IntRect& r)
     }
     else
     {
+        if(m_gpuAccelerationStatus)
+        {
+            imageBuffer->resetRecordingToLayer(context, r, m_canvasLayer);
+            m_gpuAccelerationStatus = false;
+        }
         m_canUseGpuRendering = false;
     }
 #endif
@@ -369,7 +382,7 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const IntRect& r)
                 context->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, r);
 
 #if PLATFORM(ANDROID)
-            // Allow one frame to be painted, then switch to a recording canvas.
+    // Allow one frame to be painted, then switch to a recording canvas.
             if (imageBuffer->isAnimating() && m_recordingCanvasEnabled) {
                 SLOGD("[%s] Animation detected. Converting the HTML5 canvas buffer to a SkPicture.", __FUNCTION__);
                 imageBuffer->convertToRecording();

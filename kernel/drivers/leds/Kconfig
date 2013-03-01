@@ -194,6 +194,81 @@ config LEDS_MSM_PDM
 	  To compile this driver as a module, choose M here: the
 	  module will be called leds-msm-pdm.
 
+comment "<<SKIES 2011/10/19 button-backlight"
+config LEDS_ARIMA_GPIO
+	tristate "LED Support through GPIO"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the button LEDs operated through GPIO.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-arima-gpio.
+comment ">>SKIES 2011/10/19"
+
+# /*++ Huize - 20120329 Add for button backlight is controlled by mpp ++*/
+config LEDS_ACM_BUTTON_BACKLIGHT
+	tristate "LED Support through MPP"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the button LEDs operated through MPP.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-acm-button_backlight.o.
+# /*-- Huize - 20120329 Add for button backlight is controlled by mpp --*/
+
+
+#/*++ Edison add LED CONTROL CHIP LM3533 ++ */
+config LEDS_CHIP_LM3533
+	tristate "LED Support through chip LM3533"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the button LEDs operated through LM3533.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-lm3533.
+#/*-- Edison add LED CONTROL CHIP LM3533 -- */
+
+comment "<<Edison  2012/03/01 RGB leds"
+config LEDS_ACM_RED
+	tristate "RED LED Support through PM MPP"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the RED LED operated through PM MPP8.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-acm-red.
+comment ">>Edison 2012/03/01"
+config LEDS_ACM_GREEN
+	tristate "GREEN LED Support through GPIO"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the GREEN LED operated through  GPIO129.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-acm-blue.
+comment ">>Edison 2012/03/01"
+config LEDS_ACM_BLUE
+	tristate "BLUE LED Support through PM GPIO"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the GREEN LED operated through PM GPIO1.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-acm-green.
+comment ">>Edison 2012/03/01"
+
 config LEDS_GPIO_PLATFORM
 	bool "Platform device bindings for GPIO LEDs"
 	depends on LEDS_GPIO
@@ -356,16 +431,6 @@ config LEDS_MSM_PMIC
         tristate "LED Support for Qualcomm PMIC connected LEDs"
         default n
         depends on ARCH_MSM
-        help
-          This option enables support for LEDs connected over PMIC
-          (Power Management IC) chip on Qualcomm reference boards,
-          for example SURF and FFAs.
-
-config FIH_LEDS_MSM_PMIC
-        tristate "FIH LED"
-        default y
-        depends on ARCH_MSM
-        select FIH_DEVELOPMENT_TOOL
         help
           This option enables support for LEDs connected over PMIC
           (Power Management IC) chip on Qualcomm reference boards,

@@ -22,7 +22,6 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/of.h>
-#include <linux/spinlock.h>
 #ifdef CONFIG_DIAG_OVER_USB
 #include <mach/usbdiag.h>
 #endif
@@ -43,10 +42,6 @@
 #define ALL_SSID		-1
 #define MAX_SSID_PER_RANGE	100
 
-//+{WP5-HH-ON_DEVICE_QXDM-01
-#include <mach/dbgcfgtool.h>
-//WP5-HH-ON_DEVICE_QXDM-01}+
-
 int diag_debug_buf_idx;
 unsigned char diag_debug_buf[1024];
 static unsigned int buf_tbl_size = 8; /*Number of entries in table of buffers */
@@ -61,7 +56,6 @@ struct mask_info {
 	int num_items;
 	int index;
 };
-spinlock_t diag_cntl_lock;
 
 #define CREATE_MSG_MASK_TBL_ROW(XX)					\
 do {									\
@@ -709,9 +703,9 @@ void diag_send_log_mask_update(smd_channel_t *ch, int equip_id)
 	void *buf = driver->buf_log_mask_update;
 	int header_size = sizeof(struct diag_ctrl_log_mask);
 	struct mask_info *ptr = (struct mask_info *)driver->log_masks;
-	int i, size, wr_size = -ENOMEM, retry_count = 0;
-	unsigned long flags = 0;
+	int i, size, wr_size = -ENOMEM, retry_count = 0, timer;
 
+	mutex_lock(&driver->diag_cntl_mutex);
 	for (i = 0; i < MAX_EQUIP_ID; i++) {
 		size = (ptr->num_items+7)/8;
 		/* reached null entry */
@@ -732,15 +726,13 @@ void diag_send_log_mask_update(smd_channel_t *ch, int equip_id)
 									 size);
 			if (ch) {
 				while (retry_count < 3) {
-					spin_lock_irqsave(&diag_cntl_lock,
-									 flags);
 					wr_size = smd_write(ch, buf,
 							 header_size + size);
-					spin_unlock_irqrestore(&diag_cntl_lock,
-									 flags);
 					if (wr_size == -ENOMEM) {
 						retry_count++;
-						usleep(20000);
+						for (timer = 0; timer < 5;
+								 timer++)
+							udelay(2000);
 					} else
 						break;
 				}
@@ -756,17 +748,19 @@ void diag_send_log_mask_update(smd_channel_t *ch, int equip_id)
 		}
 		ptr++;
 	}
+	mutex_unlock(&driver->diag_cntl_mutex);
 }
 
 void diag_send_event_mask_update(smd_channel_t *ch, int num_bytes)
 {
 	void *buf = driver->buf_event_mask_update;
 	int header_size = sizeof(struct diag_ctrl_event_mask);
-	int wr_size = -ENOMEM, retry_count = 0;
-	unsigned long flags = 0;
+	int wr_size = -ENOMEM, retry_count = 0, timer;
 
+	mutex_lock(&driver->diag_cntl_mutex);
 	if (num_bytes == 0) {
 		pr_debug("diag: event mask not set yet, so no update\n");
+		mutex_unlock(&driver->diag_cntl_mutex);
 		return;
 	}
 	/* send event mask update */
@@ -780,12 +774,11 @@ void diag_send_event_mask_update(smd_channel_t *ch, int num_bytes)
 	memcpy(buf+header_size, driver->event_masks, num_bytes);
 	if (ch) {
 		while (retry_count < 3) {
-			spin_lock_irqsave(&diag_cntl_lock, flags);
 			wr_size = smd_write(ch, buf, header_size + num_bytes);
-			spin_unlock_irqrestore(&diag_cntl_lock, flags);
 			if (wr_size == -ENOMEM) {
 				retry_count++;
-				usleep(20000);
+				for (timer = 0; timer < 5; timer++)
+					udelay(2000);
 			} else
 				break;
 		}
@@ -794,17 +787,18 @@ void diag_send_event_mask_update(smd_channel_t *ch, int num_bytes)
 					 wr_size, header_size + num_bytes);
 	} else
 		pr_err("diag: ch not valid for event update\n");
+	mutex_unlock(&driver->diag_cntl_mutex);
 }
 
 void diag_send_msg_mask_update(smd_channel_t *ch, int updated_ssid_first,
 						int updated_ssid_last, int proc)
 {
 	void *buf = driver->buf_msg_mask_update;
-	int first, last, size = -ENOMEM, retry_count = 0;
+	int first, last, size = -ENOMEM, retry_count = 0, timer;
 	int header_size = sizeof(struct diag_ctrl_msg_mask);
 	uint8_t *ptr = driver->msg_masks;
-	unsigned long flags = 0;
 
+	mutex_lock(&driver->diag_cntl_mutex);
 	while (*(uint32_t *)(ptr + 4)) {
 		first = *(uint32_t *)ptr;
 		ptr += 4;
@@ -827,31 +821,31 @@ void diag_send_msg_mask_update(smd_channel_t *ch, int updated_ssid_first,
 				 4 * (driver->msg_mask->msg_mask_size));
 			if (ch) {
 				while (retry_count < 3) {
-					spin_lock_irqsave(&diag_cntl_lock,
-									 flags);
 					size = smd_write(ch, buf, header_size +
 					 4*(driver->msg_mask->msg_mask_size));
-					spin_unlock_irqrestore(&diag_cntl_lock,
-									 flags);
 					if (size == -ENOMEM) {
 						retry_count++;
-						usleep(20000);
+						for (timer = 0; timer < 5;
+								 timer++)
+							udelay(2000);
 					} else
 						break;
 				}
 				if (size != header_size +
 					 4*(driver->msg_mask->msg_mask_size))
-					pr_err("diag:  msg mask update fail %d,"
-							" tried %d\n", size,
-			 header_size + 4*(driver->msg_mask->msg_mask_size));
+					pr_err("diag: proc %d, msg mask update "
+	 "fail %d, tried %d\n", proc, size,
+	 header_size + 4*(driver->msg_mask->msg_mask_size));
 				else
 					pr_debug("diag: sending mask update for"
-		" ssid first %d, last %d on PROC %d\n", first, last, proc);
+		"ssid first %d, last %d on PROC %d\n", first, last, proc);
 			} else
-				pr_err("diag: ch invalid msg mask update\n");
+				pr_err("diag: proc %d, ch invalid msg mask"
+						 "update\n", proc);
 		}
 		ptr += MAX_SSID_PER_RANGE*4;
 	}
+	mutex_unlock(&driver->diag_cntl_mutex);
 }
 
 static int diag_process_apps_pkt(unsigned char *buf, int len)
@@ -909,13 +903,13 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 			*(int *)(driver->apps_rsp_buf + 4) = 0x0;
 			if (driver->ch_cntl)
 				diag_send_log_mask_update(driver->ch_cntl,
-								 *(int *)buf);
+								ALL_EQUIP_ID);
 			if (driver->chqdsp_cntl)
 				diag_send_log_mask_update(driver->chqdsp_cntl,
-								 *(int *)buf);
+								ALL_EQUIP_ID);
 			if (driver->ch_wcnss_cntl)
 				diag_send_log_mask_update(driver->ch_wcnss_cntl,
-								 *(int *)buf);
+								ALL_EQUIP_ID);
 			ENCODE_RSP_AND_SEND(7);
 			return 0;
 		} else
@@ -1650,43 +1644,10 @@ static int diag_smd_probe(struct platform_device *pdev)
 {
 	int r = 0;
 
-//+{WP5-HH-ON_DEVICE_QXDM-01
-#ifndef CONFIG_FIH_FTM
-    int cfg_val;
-//  unsigned int keyinfo = (*((unsigned int *)(MSM_SHARED_RAM_BASE + 0x220C)));
-    r = DbgCfgGetByBit(DEBUG_MODEM_LOGGER_CFG, (int*)&cfg_val);
-    if ((r == 0) && (cfg_val == 1) /*&& (keyinfo&KEY_MASK) != RECOVERY_KEY*/) {
-        printk(KERN_INFO "FIH:Embedded QXDM Enabled. %s", __FUNCTION__);
-    } else {
-        printk(KERN_ERR "FIH:Fail to call DbgCfgGetByBit(), ret=%d or Embedded QxDM disabled, cfg_val=%d.", r, cfg_val);
-        printk(KERN_ERR "FIH:Default: Embedded QXDM Disabled.\n");
-        if (pdev->id == 0) {
-            if (driver->buf_in_1 == NULL || driver->buf_in_2 == NULL) {
-                if (driver->buf_in_1 == NULL)
-                    driver->buf_in_1 = kzalloc(IN_BUF_SIZE, GFP_KERNEL);
-                if (driver->buf_in_2 == NULL)
-                    driver->buf_in_2 = kzalloc(IN_BUF_SIZE, GFP_KERNEL);
-                if (driver->buf_in_1 == NULL || driver->buf_in_2 == NULL)
-                    return 0;
-                else {
-                    r = smd_open("DIAG", &driver->ch, driver, diag_smd_notify);
-                    ch_temp = driver->ch;
-                }
-            }
-            else {
-                r = smd_open("DIAG", &driver->ch, driver, diag_smd_notify);
-                ch_temp = driver->ch;
-            }
-        }
-    }
-#else
-//WP5-HH-ON_DEVICE_QXDM-01}+
 	if (pdev->id == SMD_APPS_MODEM) {
 		r = smd_open("DIAG", &driver->ch, driver, diag_smd_notify);
 		ch_temp = driver->ch;
 	}
-#endif //+WP5-HH-ON_DEVICE_QXDM-01	
-		
 #if defined(CONFIG_MSM_N_WAY_SMD)
 	if (pdev->id == SMD_APPS_QDSP) {
 		r = smd_named_open_on_edge("DIAG", SMD_APPS_QDSP
@@ -1747,7 +1708,7 @@ void diagfwd_init(void)
 {
 	diag_debug_buf_idx = 0;
 	driver->read_len_legacy = 0;
-	spin_lock_init(&diag_cntl_lock);
+	mutex_init(&driver->diag_cntl_mutex);
 
 	if (driver->event_mask == NULL) {
 		driver->event_mask = kzalloc(sizeof(

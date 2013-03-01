@@ -54,6 +54,16 @@ static struct snd_ctxt the_snd;
 
 #define SND_SET_DEVICE_PROC 2
 #define SND_SET_VOLUME_PROC 3
+/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+#define SND_SET_INFO_PROC 42
+/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
+/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+#define SND_SET_VOIP_PROC 43
+/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+#define SND_SET_TTY_PROC 44
+/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/
+
 #define SND_AVC_CTL_PROC 29
 #define SND_AGC_CTL_PROC 30
 
@@ -74,7 +84,31 @@ struct rpc_snd_set_volume_args {
 	uint32_t cb_func;
 	uint32_t client_data;
 };
-
+/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+struct rpc_snd_set_info_args {
+	uint32_t secondary_mic;
+	uint32_t reserved_1;
+	uint32_t reserved_2;
+	uint32_t cb_func;
+	uint32_t client_data;
+};
+/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
+/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+struct rpc_snd_set_voip_args {
+	uint32_t audiopath;
+	uint32_t voip_mute;
+	uint32_t reserved_2;
+	uint32_t cb_func;
+	uint32_t client_data;
+};
+/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+struct rpc_snd_set_tty_args {
+	uint32_t tty_mode;
+	uint32_t cb_func;
+	uint32_t client_data;
+};
+/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/
 struct rpc_snd_avc_ctl_args {
 	uint32_t avc_ctl;
 	uint32_t cb_func;
@@ -91,7 +125,24 @@ struct snd_set_device_msg {
 	struct rpc_request_hdr hdr;
 	struct rpc_snd_set_device_args args;
 };
-
+/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+struct snd_set_info_msg {
+	struct rpc_request_hdr hdr;
+	struct rpc_snd_set_info_args args;
+};
+/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
+/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+struct snd_set_voip_msg {
+	struct rpc_request_hdr hdr;
+	struct rpc_snd_set_voip_args args;
+};
+/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+struct snd_set_tty_msg {
+	struct rpc_request_hdr hdr;
+	struct rpc_snd_set_tty_args args;
+};
+/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/
 struct snd_set_volume_msg {
 	struct rpc_request_hdr hdr;
 	struct rpc_snd_set_volume_args args;
@@ -153,6 +204,19 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	struct msm_snd_device_config dev;
 	struct msm_snd_volume_config vol;
+	/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+	struct msm_snd_info_config info;
+	struct snd_set_info_msg imsg;
+	/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
+	/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+	struct msm_snd_voip_config voip;
+	struct snd_set_voip_msg voipmsg;
+	/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+	/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+	struct msm_snd_tty_config tty;
+	struct snd_set_tty_msg ttymsg;
+	/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/
+	
 	struct snd_ctxt *snd = file->private_data;
 	int rc = 0;
 
@@ -264,7 +328,69 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case SND_GET_ENDPOINT:
 		rc = get_endpoint(snd, arg);
 		break;
+/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+	case SND_SET_INFO:
+		if (copy_from_user(&info, (void __user *) arg, sizeof(info))) {
+			MM_ERR("set device: invalid pointer\n");
+			rc = -EFAULT;
+			break;
+		}
+		
+		imsg.args.secondary_mic = cpu_to_be32(info.secondary_mic);
+		imsg.args.reserved_1 = cpu_to_be32(info.reserved_1);
+		imsg.args.reserved_2 = cpu_to_be32(info.reserved_2);
+		imsg.args.cb_func = -1;
+		imsg.args.client_data = 0;
+		
+		MM_INFO("snd_set_info %d %d %d\n",imsg.args.secondary_mic, imsg.args.reserved_1, imsg.args.reserved_2);
+		
+		rc = msm_rpc_call(snd->ept,
+			SND_SET_INFO_PROC,&imsg, 
+			sizeof(imsg), 5 * HZ);
+		break;
+/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
 
+/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+	case SND_SET_VOIP:
+		if (copy_from_user(&voip, (void __user *) arg, sizeof(voip))) {
+			MM_ERR("set device: invalid pointer\n");
+			rc = -EFAULT;
+			break;
+		}
+		
+		voipmsg.args.audiopath = cpu_to_be32(voip.audiopath);
+		voipmsg.args.voip_mute = cpu_to_be32(voip.voip_mute);
+		voipmsg.args.reserved_2 = cpu_to_be32(voip.reserved_2);
+		voipmsg.args.cb_func = -1;
+		voipmsg.args.client_data = 0;
+		
+		MM_INFO("snd_set_voip %d %d %d\n",voipmsg.args.audiopath, voipmsg.args.voip_mute, voipmsg.args.reserved_2);
+		
+		rc = msm_rpc_call(snd->ept,
+			SND_SET_VOIP_PROC,&voipmsg, 
+			sizeof(voipmsg), 5 * HZ);
+		break;
+/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+
+/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+	case SND_SET_TTY:
+		if (copy_from_user(&tty, (void __user *) arg, sizeof(tty))) {
+			MM_ERR("set device: invalid pointer\n");
+			rc = -EFAULT;
+			break;
+		}
+
+		ttymsg.args.tty_mode = cpu_to_be32(tty.tty_mode);
+		ttymsg.args.cb_func = -1;
+		ttymsg.args.client_data = 0x0;
+
+		MM_INFO("snd_set_tty %d\n",ttymsg.args.tty_mode);
+		
+		rc = msm_rpc_call(snd->ept,
+			SND_SET_TTY_PROC,&ttymsg, 
+			sizeof(ttymsg), 5 * HZ);
+		break;
+/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/	
 	default:
 		MM_ERR("unknown command\n");
 		rc = -EINVAL;

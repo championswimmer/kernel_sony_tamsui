@@ -1304,7 +1304,7 @@ static int rmt_storage_get_ramfs(struct rmt_storage_srv *srv)
 	}
 	return 0;
 }
-/*MTD-BSP-AC-NVSYNC-01*[*/
+
 static ssize_t
 show_force_sync(struct device *dev, struct device_attribute *attr,
 		char *buf)
@@ -1324,7 +1324,7 @@ show_force_sync(struct device *dev, struct device_attribute *attr,
 
 	return rmt_storage_force_sync(srv->rpc_client);
 }
-/*MTD-BSP-AC-NVSYNC-01*]*/
+
 /* Returns -EINVAL for invalid sync token and an error value for any failure
  * in RPC call. Upon success, it returns a sync status of 1 (sync done)
  * or 0 (sync still pending).
@@ -1399,7 +1399,7 @@ static void rmt_storage_set_client_status(struct rmt_storage_srv *srv,
 	spin_unlock(&rmc->lock);
 }
 
-static DEVICE_ATTR(force_sync, S_IRUGO | S_IWUSR, show_force_sync, NULL);/*MTD-BSP-AC-NVSYNC-01**/
+static DEVICE_ATTR(force_sync, S_IRUGO | S_IWUSR, show_force_sync, NULL);
 static DEVICE_ATTR(sync_sts, S_IRUGO | S_IWUSR, show_sync_sts, NULL);
 static struct attribute *dev_attrs[] = {
 	&dev_attr_force_sync.attr,

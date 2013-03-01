@@ -2,7 +2,6 @@
  * Linux cfg80211 driver - Android related functions
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -131,7 +130,7 @@ extern int dhd_os_check_if_up(void *dhdp);
 extern void *bcmsdh_get_drvdata(void);
 
 extern bool ap_fw_loaded;
-#if defined(CUSTOMER_HW2) || defined(FIH_HW)
+#ifdef CUSTOMER_HW2
 extern char iface_name[IFNAMSIZ];
 #endif
 
@@ -380,23 +379,19 @@ int wl_android_wifi_off(struct net_device *dev)
 
 	printk("%s in\n", __FUNCTION__);
 	if (!dev) {
-		DHD_ERROR(("%s: dev is null\n", __FUNCTION__));
-		//return -EINVAL;
-                if (g_wifi_on) {
-                        sdioh_stop(NULL);
-                        dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
-                        g_wifi_on = 0;
-                }
-	} else {
-		dhd_net_if_lock(dev);
-		if (g_wifi_on) {
-			ret = dhd_dev_reset(dev, TRUE);
-			sdioh_stop(NULL);
-			dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
-			g_wifi_on = 0;
-		}
-		dhd_net_if_unlock(dev);
+		DHD_TRACE(("%s: dev is null\n", __FUNCTION__));
+		return -EINVAL;
 	}
+
+	dhd_net_if_lock(dev);
+	if (g_wifi_on) {
+		ret = dhd_dev_reset(dev, TRUE);
+		sdioh_stop(NULL);
+		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
+		g_wifi_on = 0;
+	}
+	dhd_net_if_unlock(dev);
+
 	return ret;
 }
 
@@ -563,9 +558,8 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		snprintf(command, 3, "OK");
 		bytes_written = strlen("OK");
 	}
-	if (bytes_written >= 0) {
-		if (bytes_written == 0)
-			command[0] = '\0';
+
+	if (bytes_written > 0) {
 		if (bytes_written > priv_cmd.total_len) {
 			DHD_ERROR(("%s: bytes_written = %d\n", __FUNCTION__, bytes_written));
 			bytes_written = priv_cmd.total_len;
@@ -598,7 +592,7 @@ int wl_android_init(void)
 #ifdef ENABLE_INSMOD_NO_FW_LOAD
 	dhd_download_fw_on_driverload = FALSE;
 #endif /* ENABLE_INSMOD_NO_FW_LOAD */
-#if defined(CUSTOMER_HW2) || defined(FIH_HW)
+#ifdef CUSTOMER_HW2
 	if (!iface_name[0]) {
 		memset(iface_name, 0, IFNAMSIZ);
 		bcm_strncpy_s(iface_name, IFNAMSIZ, "wlan", IFNAMSIZ);
@@ -625,7 +619,7 @@ int wl_android_post_init(void)
 		g_wifi_on = 0;
 	} else {
 		memset(buf, 0, IFNAMSIZ);
-#if defined(CUSTOMER_HW2) || defined(FIH_HW)
+#ifdef CUSTOMER_HW2
 		snprintf(buf, IFNAMSIZ, "%s%d", iface_name, 0);
 #else
 		snprintf(buf, IFNAMSIZ, "%s%d", "eth", 0);
@@ -637,22 +631,6 @@ int wl_android_post_init(void)
 	}
 	return ret;
 }
-//FIH-ADD+[
-extern void *sisi_wifi_mem_prealloc(int section, unsigned long size);
-void* wl_android_prealloc(int section, unsigned long size)
-{
-    void *alloc_ptr = NULL;
-    alloc_ptr = sisi_wifi_mem_prealloc(section, size);
-	if (alloc_ptr) {
-		DHD_ERROR(("success alloc section %d\n", section));
-		bzero(alloc_ptr, size);
-		return alloc_ptr;
-	}
-
-	DHD_ERROR(("can't alloc section %d\n", section));
-	return 0;
-}
-//FIH-ADD+]
 
 /**
  * Functions for Android WiFi card detection

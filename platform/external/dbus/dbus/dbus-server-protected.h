@@ -50,6 +50,7 @@ struct DBusServerVTable
 };
 
 /**
+ * @ingroup DBusServerInternals
  * Internals of DBusServer object
  */
 struct DBusServer
@@ -66,7 +67,8 @@ struct DBusServer
   DBusTimeoutList *timeouts;                  /**< Our timeouts */  
 
   char *address;                              /**< Address this server is listening on. */
-  
+  dbus_bool_t published_address;              /**< flag which indicates that server has published its bus address. */
+
   int max_connections;                        /**< Max number of connections allowed at once. */
 
   DBusDataSlotList slot_list;   /**< Data stored by allocated integer ID */
@@ -116,7 +118,8 @@ typedef enum
   DBUS_SERVER_LISTEN_NOT_HANDLED, /**< we aren't in charge of this address type */
   DBUS_SERVER_LISTEN_OK,          /**< we set up the listen */
   DBUS_SERVER_LISTEN_BAD_ADDRESS, /**< malformed address */
-  DBUS_SERVER_LISTEN_DID_NOT_CONNECT /**< well-formed address but failed to set it up */
+  DBUS_SERVER_LISTEN_DID_NOT_CONNECT, /**< well-formed address but failed to set it up */
+  DBUS_SERVER_LISTEN_ADDRESS_ALREADY_USED /**< address is already used */
 } DBusServerListenResult;
 
 DBusServerListenResult _dbus_server_listen_platform_specific (DBusAddressEntry  *entry,

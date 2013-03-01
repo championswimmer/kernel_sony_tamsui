@@ -2,7 +2,6 @@
  * DHD Bus Module for SDIO
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -383,7 +382,7 @@ static bool dhd_readahead;
 
 /* To check if there's window offered */
 #define DATAOK(bus) \
-	(((uint8)(bus->tx_max - bus->tx_seq) > 1) && \
+	(((uint8)(bus->tx_max - bus->tx_seq) > 2) && \
 	(((uint8)(bus->tx_max - bus->tx_seq) & 0x80) == 0))
 
 /* To check if there's window offered for ctrl frame */
@@ -5361,10 +5360,6 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 	ret = dhd_custom_get_mac_address(ea_addr.octet);
 	if (!ret) {
 		memcpy(bus->dhd->mac.octet, (void *)&ea_addr, ETHER_ADDR_LEN);
-	}
-	else {
-		DHD_ERROR(("%s: Invalid MAC address  \n", __FUNCTION__));
-		goto fail;
 	}
 #endif /* GET_CUSTOM_MAC_ENABLE */
 

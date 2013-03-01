@@ -244,7 +244,9 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 
 	print_modules();
 	__show_regs(regs);
-	printk(KERN_EMERG "Process %.*s (pid: %d, stack limit = 0x%p)\n",
+	
+	/*Skies-2012/07/17, add magic characters for MTBF parsing*/
+	printk(KERN_EMERG "@#$ Process %.*s (pid: %d, stack limit = 0x%p)\n",
 		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {

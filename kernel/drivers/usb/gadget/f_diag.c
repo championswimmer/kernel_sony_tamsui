@@ -27,6 +27,28 @@
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 
+// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+/* string descriptors: */
+
+#define DIAG_INTERFACE_IDX	0
+
+/* static strings, in UTF-8 */
+static struct usb_string diag_string_defs[] = {
+	[DIAG_INTERFACE_IDX].s = "Diagnostics",
+	{  /* ZEROES END LIST */ },
+};
+
+static struct usb_gadget_strings diag_string_table = {
+	.language =		0x0409,	/* en-us */
+	.strings =		diag_string_defs,
+};
+
+static struct usb_gadget_strings *diag_strings[] = {
+	&diag_string_table,
+	NULL,
+};
+// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
+
 static DEFINE_SPINLOCK(ch_lock);
 static LIST_HEAD(usb_diag_ch_list);
 
@@ -558,6 +580,10 @@ static void diag_function_unbind(struct usb_configuration *c,
 
 	usb_free_descriptors(f->descriptors);
 	ctxt->ch.priv_usb = NULL;
+
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	diag_string_defs[DIAG_INTERFACE_IDX].id = 0;
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 }
 
 static int diag_function_bind(struct usb_configuration *c,
@@ -626,6 +652,16 @@ int diag_function_add(struct usb_configuration *c, const char *name,
 		return -ENODEV;
 	}
 
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	if (diag_string_defs[DIAG_INTERFACE_IDX].id == 0) {
+		int id = usb_string_id(c->cdev);
+		if (id < 0)
+			return id;
+		diag_string_defs[DIAG_INTERFACE_IDX].id = id;
+		intf_desc.iInterface = id;
+	}
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
+
 	dev = container_of(_ch, struct diag_context, ch);
 	/* claim the channel for this USB interface */
 	_ch->priv_usb = dev;
@@ -639,6 +675,9 @@ int diag_function_add(struct usb_configuration *c, const char *name,
 	dev->function.unbind = diag_function_unbind;
 	dev->function.set_alt = diag_function_set_alt;
 	dev->function.disable = diag_function_disable;
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	dev->function.strings = diag_strings;
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 	spin_lock_init(&dev->lock);
 	INIT_LIST_HEAD(&dev->read_pool);
 	INIT_LIST_HEAD(&dev->write_pool);

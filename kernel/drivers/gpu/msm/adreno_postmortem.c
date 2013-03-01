@@ -53,7 +53,7 @@ static const struct pm_id_name pm3_types[] = {
 	{CP_IM_LOAD,			"IN__LOAD"},
 	{CP_IM_LOAD_IMMEDIATE,		"IM_LOADI"},
 	{CP_IM_STORE,			"IM_STORE"},
-	{CP_INDIRECT_BUFFER,		"IND_BUF_"},
+	{CP_INDIRECT_BUFFER_PFE,	"IND_BUF_"},
 	{CP_INDIRECT_BUFFER_PFD,	"IND_BUFP"},
 	{CP_INTERRUPT,			"PM4_INTR"},
 	{CP_INVALIDATE_STATE,		"INV_STAT"},
@@ -681,19 +681,14 @@ static int adreno_dump(struct kgsl_device *device)
 	}
 
 	/* Dump the registers if the user asked for it */
-	/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-	#if 0
+
 	if (adreno_is_a20x(adreno_dev))
 		adreno_dump_regs(device, a200_registers,
 			a200_registers_count);
 	else if (adreno_is_a22x(adreno_dev))
 		adreno_dump_regs(device, a220_registers,
 			a220_registers_count);
-	#else
-		adreno_dump_regs(device, a200_registers,
-			a200_registers_count);
-	#endif
-	/* FIH-SW2-MM-KW-Useless_codes-00-} */
+
 error_vfree:
 	vfree(rb_copy);
 end:

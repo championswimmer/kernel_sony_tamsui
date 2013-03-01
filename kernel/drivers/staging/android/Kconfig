@@ -16,9 +16,10 @@ config ANDROID_LOGGER
 	tristate "Android log driver"
 	default n
 
+# Skies-2012/06/01, Enable RAM console driver
 config ANDROID_RAM_CONSOLE
 	bool "Android RAM buffer console"
-	default n
+	default y
 
 config ANDROID_RAM_CONSOLE_ENABLE_VERBOSE
 	bool "Enable verbose console messages on Android RAM console"

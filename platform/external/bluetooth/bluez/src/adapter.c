@@ -5,7 +5,6 @@
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2010-2012 Code Aurora Forum. All rights reserved
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -163,8 +162,6 @@ struct btd_adapter {
 
 static void adapter_set_pairable_timeout(struct btd_adapter *adapter,
 					guint interval);
-static DBusMessage *set_discoverable(DBusConnection *conn, DBusMessage *msg,
-				gboolean discoverable, void *data);
 
 void update_streaming_device(struct btd_device *dev, gboolean streaming)
 {
@@ -199,14 +196,6 @@ void force_master_role(struct btd_adapter *adapter)
 
 	dev = adapter->streaming_device;
 	remote_bdaddr = get_bdaddr(dev);
-
-	/*Check whether this is needed for the remote device
-	  by comparing against the known IOP devices
-	*/
-	match = 0;
-	ret = read_special_map_devaddr("force_master", remote_bdaddr, &match);
-	if (ret < 0 || !match)
-		return;
 
 	dev_id = adapter_get_dev_id(adapter);
 	dd = hci_open_dev(dev_id);
@@ -283,7 +272,9 @@ static char *expand_name(char *dst, int size, char *str, int dev_id)
 
 #ifdef ANDROID_EXPAND_NAME
 	char value[PROPERTY_VALUE_MAX];
-	char customer_value[PROPERTY_VALUE_MAX];
+       //TPSW1_SoMC_SS_4th_Patches_Begin
+ 	char customer_value[PROPERTY_VALUE_MAX];
+        //TPSW1_SoMC_SS_4th_Patches_End
 #endif
 
 	if (!str || !dst)
@@ -313,8 +304,10 @@ static char *expand_name(char *dst, int size, char *str, int dev_id)
 
 			case 'm':
 				property_get("ro.product.model", value, "");
-				property_get("ro.semc.product.name", customer_value, value);
+			      //TPSW1_SoMC_SS_4th_Patches_Begin
+                        	property_get("ro.semc.product.name", customer_value, value);
 				opt = customer_value;
+			       //TPSW1_SoMC_SS_4th_Patches_End
 			break;
 
 			case 'n':
@@ -490,7 +483,7 @@ static gboolean discov_timeout_handler(gpointer user_data)
 
 	adapter->discov_timeout_id = 0;
 
-	set_discoverable(NULL, NULL, FALSE, user_data);
+	adapter_ops->set_discoverable(adapter->dev_id, FALSE);
 
 	modestr = mode2str(MODE_CONNECTABLE);
 	write_device_mode(&adapter->bdaddr, modestr);
@@ -666,7 +659,7 @@ static DBusMessage *set_discoverable(DBusConnection *conn, DBusMessage *msg,
 	}
 
 	err = set_mode(adapter, mode, msg);
-	if (err < 0)
+	if (err < 0 && msg)
 		return btd_error_failed(msg, strerror(-err));
 
 	return NULL;
@@ -2529,8 +2522,8 @@ static int add_handsfree_ag_record(struct btd_adapter* adapter) {
 
 	sdp_uuid16_create(&profile.uuid, HANDSFREE_PROFILE_ID);
 #ifdef ANDROID_EXPAND_NAME
-	property_get("ro.qualcomm.bluetooth.hfp.wbs", value, "");
-	if (!strcmp("true", value))
+	property_get("ro.bluetooth.hfp.ver", value, "1.5");
+	if (!strcmp("1.6", value))
 		profile.version = 0x0106;
 	else
 		profile.version = 0x0105;
@@ -2551,7 +2544,7 @@ static int add_handsfree_ag_record(struct btd_adapter* adapter) {
 	apseq = sdp_list_append(apseq, proto[1]);
 
 #ifdef ANDROID_EXPAND_NAME
-	if (!strcmp("true", value))
+	if (!strcmp("1.6", value))
 		u16 |= 0x20;
 #endif
 	features = sdp_data_alloc(SDP_UINT16, &u16);
@@ -2988,6 +2981,418 @@ fail:
 	return btd_error_failed(msg, strerror(-err));
 }
 
+//+ murphy 2012.02.17
+//reference to \comp_5901_linux\system\bluetooth\bluedroid\bluetooth.c
+
+#if 0
+#undef NDEBUG
+
+#define LOG_NIDEBUG 0
+#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
+#endif
+
+#include <cutils/log.h>
+
+#define LOG_TAG "bluez - adapter.c"
+
+#define BTA_HCI_ENABLE_DEVICE_UNDER_TEST_MODE_OGF 0x06
+#define BTA_HCI_ENABLE_DEVICE_UNDER_TEST_MODE_OCF 0x03
+#define BTA_HCI_SET_EVENT_FILTER_OGF              0x03
+#define BTA_HCI_SET_EVENT_FILTER_OCF              0x05
+#define BTA_HCI_WRITE_SCAN_ENABLE_OGF             0x03
+#define BTA_HCI_WRITE_SCAN_ENABLE_OCF             0x1A
+#define BTA_HCI_WRITE_AUTHENTICATION_ENABLE_OGF   0x03
+#define BTA_HCI_WRITE_AUTHENTICATION_ENABLE_OCF   0x20
+#define BTA_HCI_WRITE_ENCRYPTION_MODE_OGF         0x03
+#define BTA_HCI_WRITE_ENCRYPTION_MODE_OCF         0x22
+
+#define BTA_HCI_RESET_OGF                         0x03
+#define BTA_HCI_RESET_OCF                         0x03
+#define BTA_HCI_PROD_TEST_TX_CONTINUOUS_OGF       0x3F
+#define BTA_HCI_PROD_TEST_TX_CONTINUOUS_OCF       0x04
+#define BTA_HCI_NVM_ACCESS_SET_OGF                0x3F
+#define BTA_HCI_NVM_ACCESS_SET_OCF                0x0B
+
+
+//reference hci_cmd(...)
+int bta_hci_cmd(uint8_t ogf,
+               uint16_t ocf,
+               uint16_t params_len,
+               uint8_t *params)
+{
+
+    int dd, ret, dev_id = -1;
+
+    LOGI("Getting Device ID");
+    dev_id = hci_get_route(NULL);
+    if(dev_id < 0) {
+        LOGE("No Device found");
+        return dev_id;
+    }
+
+    dd = hci_open_dev(dev_id);
+    if(dd < 0) {
+        LOGE("Device open failed");
+        return dd;
+    }
+
+    LOGV("HCI Command: ogf 0x%02x, ocf 0x%04x, plen %d\n",
+          ogf, ocf, params_len);
+
+    if((ret = hci_send_cmd(dd, ogf, ocf, params_len, params)) < 0) {
+        LOGE("HCI command send failed");
+    } else {
+        LOGV("HCI command send success");
+        ret = 1;
+    }
+
+    hci_close_dev(dd);
+    return ret;
+}
+
+int bta_hci_dut_mode()
+{
+  int l_retVal = -1;
+  uint8_t cmd_set_event_filter_params[] =
+  {
+      /* FILTER_TYPE: 02 - Connection Setup */
+      /* FILTER_CONDITION_TYPE: 00 - Allow All Connections */
+      /* AUTO ACCEPT FLAG: 02 - Auto accept: Role switch disabled */
+      0x02, 0x00, 0x02
+  };
+  uint8_t cmd_write_scan_enable_params[] =
+  {
+      /* SCAN_ENABLE: 3 - PageScan & InquiryScan Enabled */
+      0x03
+  };
+  uint8_t cmd_write_auth_enable_params[] =
+  {
+      /* AUTHENTICATION: 0 - Disabled */
+      0x00
+  };
+  uint8_t cmd_write_encrpt_enable_params[] =
+  {
+      /* ENCRYPTION MODE: 0 - Disabled */
+      0x00
+  };
+  
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_RESET_OGF,
+                         BTA_HCI_RESET_OCF,
+                         0,  // No params
+                         NULL);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_RESET failed");
+    return l_retVal;
+  }
+  
+  usleep(300000);  //300 ms delay
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_ENABLE_DEVICE_UNDER_TEST_MODE_OGF,
+                         BTA_HCI_ENABLE_DEVICE_UNDER_TEST_MODE_OCF,
+                         0,
+                         NULL);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_ENABLE_DEVICE_UNDER_TEST_MODE failed");
+    return l_retVal;
+  }
+  
+  usleep(50000);  //50 ms delay
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_SET_EVENT_FILTER_OGF,
+                         BTA_HCI_SET_EVENT_FILTER_OCF,
+                         sizeof(cmd_set_event_filter_params),
+                         cmd_set_event_filter_params);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_SET_EVENT_FILTER failed");
+    return l_retVal;
+  }
+  
+  usleep(50000);  //50 ms delay
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_WRITE_SCAN_ENABLE_OGF,
+                         BTA_HCI_WRITE_SCAN_ENABLE_OCF,
+                         sizeof(cmd_write_scan_enable_params),
+                         cmd_write_scan_enable_params);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_WRITE_SCAN_ENABLE failed");
+    return l_retVal;
+  }
+  
+  usleep(50000);  //50 ms delay
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_WRITE_AUTHENTICATION_ENABLE_OGF,
+                         BTA_HCI_WRITE_AUTHENTICATION_ENABLE_OCF,
+                         sizeof(cmd_write_auth_enable_params),
+                         cmd_write_auth_enable_params);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_WRITE_AUTHENTICATION_ENABLE failed");
+    return l_retVal;
+  }
+  
+  usleep(50000);  //50 ms delay
+   
+  l_retVal = bta_hci_cmd(BTA_HCI_WRITE_ENCRYPTION_MODE_OGF,
+                         BTA_HCI_WRITE_ENCRYPTION_MODE_OCF,
+                         sizeof(cmd_write_encrpt_enable_params),
+                         cmd_write_encrpt_enable_params);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_WRITE_ENCRYPTION_MODE failed");
+    return l_retVal;
+  }
+  
+  usleep(50000);  //50 ms delay
+  
+  l_retVal = 1; //implies enable DUT mode is successful
+  LOGV("Enable DUT mode success");
+  
+  return l_retVal;
+}
+
+int bta_hci_tx_continuous(int hciCommand)
+{
+  int l_retVal = -1;
+  
+  
+  uint8_t cmd_NVM_ACCESS_SET_params[] =
+  {
+    //Sleep-enable mask, disable deep-sleep mode
+    0x01, 0x1B, 0x01, 0x00
+  };
+  uint8_t cmd_PROD_TEST_TX_CONTINUOUS_2402_params[] =
+  {
+    0x05, 0x00, 0x07, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00
+  };
+  uint8_t cmd_PROD_TEST_TX_CONTINUOUS_2440_params[] =
+  {
+    0x05, 0x27, 0x07, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00
+  };
+  uint8_t cmd_PROD_TEST_TX_CONTINUOUS_2480_params[] =
+  {
+    0x05, 0x4E, 0x07, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00
+  };
+  uint16_t l_tx_continuous_len = 0;
+  uint8_t *lp_tx_continuous_params = NULL;
+  
+  
+  switch (hciCommand)
+  {
+    case 1:
+    {
+      l_tx_continuous_len = sizeof(cmd_PROD_TEST_TX_CONTINUOUS_2402_params);
+      lp_tx_continuous_params = cmd_PROD_TEST_TX_CONTINUOUS_2402_params;
+      break;
+    }
+    case 2:
+    {
+      l_tx_continuous_len = sizeof(cmd_PROD_TEST_TX_CONTINUOUS_2440_params);
+      lp_tx_continuous_params = cmd_PROD_TEST_TX_CONTINUOUS_2440_params;
+      break;
+    }
+    case 3:
+    {
+      l_tx_continuous_len = sizeof(cmd_PROD_TEST_TX_CONTINUOUS_2480_params);
+      lp_tx_continuous_params = cmd_PROD_TEST_TX_CONTINUOUS_2480_params;
+      break;
+    }
+    default:
+    {
+      //parameter error
+      LOGE("bta_hci_tx_continuous(), parameter error");
+      return l_retVal;
+      break;
+    }
+  }
+  
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_NVM_ACCESS_SET_OGF,
+                         BTA_HCI_NVM_ACCESS_SET_OCF,
+                         sizeof(cmd_NVM_ACCESS_SET_params),
+                         cmd_NVM_ACCESS_SET_params);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_NVM_ACCESS_SET failed");
+    return l_retVal;
+  }
+  
+  usleep(200000);  //200 ms delay
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_RESET_OGF,
+                         BTA_HCI_RESET_OCF,
+                         0,  // No params
+                         NULL);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_RESET failed");
+    return l_retVal;
+  }
+  
+  usleep(300000);  //300 ms delay
+  
+  l_retVal = bta_hci_cmd(BTA_HCI_PROD_TEST_TX_CONTINUOUS_OGF,
+                         BTA_HCI_PROD_TEST_TX_CONTINUOUS_OCF,
+                         l_tx_continuous_len,
+                         lp_tx_continuous_params);
+  if (l_retVal < 0)
+  {
+    LOGE("BTA_HCI_PROD_TEST_TX_CONTINUOUS failed");
+    return l_retVal;
+  }
+  
+  l_retVal = 1;
+  LOGV("bta_hci_tx_continuous() success");
+  
+  return l_retVal;
+}
+
+static DBusMessage *bta_send_hci_command_by_id(DBusConnection *conn,
+                                        DBusMessage *msg,
+                                        void *data)
+{
+  DBusMessage *reply = NULL;
+	dbus_int32_t l_hciCommand = 0;
+  int l_hciCommandResult = -1;
+  
+  
+  LOGI("bta_send_hci_command_by_id()");
+  
+	if (!dbus_message_get_args(msg,
+                             NULL,
+                             DBUS_TYPE_INT32,
+                             &l_hciCommand,
+                             DBUS_TYPE_INVALID))
+  { 
+    return btd_error_invalid_args(msg);
+  }
+  
+  LOGV("bta_send_hci_command_by_id(), l_hciCommand = %d", l_hciCommand);
+  
+  switch (l_hciCommand)
+  {
+    case 0:  //HCI_COMMAND_ID_ENTER_DUT_MODE
+    {
+      l_hciCommandResult = bta_hci_dut_mode();
+      break;
+    }
+    case 1:  //HCI_COMMAND_ID_CONT_TX_2402
+    case 2:  //HCI_COMMAND_ID_CONT_TX_2440
+    case 3:  //HCI_COMMAND_ID_CONT_TX_2480
+    {
+      l_hciCommandResult = bta_hci_tx_continuous(l_hciCommand);
+      break;
+    }
+    default:
+    {
+      return btd_error_invalid_args(msg);
+      break;
+    }
+  }
+  
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_append_args(reply,
+                           DBUS_TYPE_INT32,
+                           &l_hciCommandResult,
+                           DBUS_TYPE_INVALID);
+  
+	return reply;
+}
+
+static DBusMessage *bta_send_hci_command_by_content(DBusConnection *conn,
+                                                 DBusMessage *msg,
+                                                 void *data)
+{
+  DBusMessage *reply = NULL;
+  int l_hciCommandResult = -1;
+  
+	uint8_t l_ogf;
+	int32_t l_ocf;
+	int32_t l_params_len;
+  uint8_t *lp_params = NULL;
+  int len = 0;
+
+	DBusMessageIter iter;
+	DBusMessageIter sub1, sub2;
+
+
+  LOGV("bta_send_hci_command_by_content()");
+
+
+//easy way for no variant data
+#if 0
+  if (!dbus_message_get_args(msg, NULL,
+                             DBUS_TYPE_BYTE, &l_ogf,
+                             DBUS_TYPE_UINT16, &l_ocf,
+                             DBUS_TYPE_UINT16, &l_params_len,
+                             DBUS_TYPE_INVALID))
+  { 
+    return btd_error_invalid_args(msg);
+  }
+#endif
+
+
+  if (!dbus_message_iter_init(msg, &iter))
+    return btd_error_invalid_args(msg);
+
+  if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_BYTE)
+   return btd_error_invalid_args(msg);
+
+  dbus_message_iter_get_basic(&iter, &l_ogf);
+  dbus_message_iter_next(&iter);
+
+
+  if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_INT32)
+   return btd_error_invalid_args(msg);
+
+  dbus_message_iter_get_basic(&iter, &l_ocf);
+  dbus_message_iter_next(&iter);
+
+
+  if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_INT32)
+   return btd_error_invalid_args(msg);
+
+  dbus_message_iter_get_basic(&iter, &l_params_len);
+  dbus_message_iter_next(&iter);
+
+
+  if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+    return btd_error_invalid_args(msg);
+
+  dbus_message_iter_recurse(&iter, &sub1);
+  
+  if (dbus_message_iter_get_arg_type(&sub1) != DBUS_TYPE_ARRAY ||
+      dbus_message_iter_get_element_type(&sub1) != DBUS_TYPE_BYTE)
+    return btd_error_invalid_args(msg);
+
+  dbus_message_iter_recurse(&sub1, &sub2);
+
+  dbus_message_iter_get_fixed_array(&sub2, &lp_params, &len);
+
+
+  LOGI("bta_send_hci_command_by_content(), l_ogf = 0x%02X, l_ocf = 0x%04X, l_params_len = %d, len = %d", l_ogf, l_ocf, l_params_len, len);
+
+
+  l_hciCommandResult = bta_hci_cmd(l_ogf,
+                                   (uint16_t)l_ocf,
+                                   (uint16_t)len,
+                                   lp_params);
+  
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_append_args(reply,
+                           DBUS_TYPE_INT32,
+                           &l_hciCommandResult,
+                           DBUS_TYPE_INVALID);
+  
+	return reply;
+}
+//- murphy 2012.02.17
+
 static GDBusMethodTable adapter_methods[] = {
 	{ "GetProperties",	"",	"a{sv}",get_properties		},
 	{ "SetProperty",	"sv",	"",	set_property,
@@ -3024,6 +3429,10 @@ static GDBusMethodTable adapter_methods[] = {
 	{ "AddReservedServiceRecords",   "au",    "au",    add_reserved_service_records  },
 	{ "RemoveReservedServiceRecords", "au",    "",	remove_reserved_service_records  },
 	{ "DisconnectAllConnections", "",    "",	adapter_disconnect_all_connections  },
+	//+ murphy 2012.02.17
+	{ "SendHciCommandById",	"i",	"i",	bta_send_hci_command_by_id },
+	{ "SendHciCommandByContent",	"yiiv",	"i",	bta_send_hci_command_by_content },
+	//- murphy 2012.02.17
 	{ }
 };
 

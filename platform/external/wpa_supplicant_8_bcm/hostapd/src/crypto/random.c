@@ -1,7 +1,6 @@
 /*
  * Random number generator
  * Copyright (c) 2010-2011, Jouni Malinen <j@w1.fi>
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -200,7 +199,7 @@ int random_pool_ready(void)
 #ifdef __linux__
 	int fd;
 	ssize_t res;
-    unsigned int i; //MTD_CONN_EC_Tapioca_ICS-01320+
+    unsigned int i; //Tamsui3_CONN_EC_Tapioca_ICS-01320+
 
 	/*
 	 * Make sure that there is reasonable entropy available before allowing
@@ -218,7 +217,7 @@ int random_pool_ready(void)
 	 */
 
     /*
-     * MTD_CONN_EC_Tapioca_ICS-01320
+     * Tamsui3_CONN_EC_Tapioca_ICS-01320
      * Symptom: hotspot can not be enabled
      * Ref: http://shoe.bocks.com/nlug/2003-Jul/3368.html
      *      http://zhidao.baidu.com/question/39364204
@@ -228,7 +227,7 @@ int random_pool_ready(void)
      * Use /dev/urandom instead
      * */
 
-//MTD_CONN_EC_Tapioca_ICS-01320*[
+//Tamsui3_CONN_EC_Tapioca_ICS-01320*[
 	fd = open("/dev/urandom", O_RDONLY | O_NONBLOCK);
 	if (fd < 0) {
 #ifndef CONFIG_NO_STDOUT_DEBUG
@@ -258,7 +257,7 @@ int random_pool_ready(void)
             break;
         }
     }
-//MTD_CONN_EC_Tapioca_ICS-01320*]
+//Tamsui3_CONN_EC_Tapioca_ICS-01320*]
 	close(fd);
 
 	if (dummy_key_avail == sizeof(dummy_key)) {

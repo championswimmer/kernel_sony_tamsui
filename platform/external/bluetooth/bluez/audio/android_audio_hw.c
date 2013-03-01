@@ -1,5 +1,6 @@
 /*
  *  Copyright (C) 2008-2011 The Android Open Source Project
+ *  Copyright (C) 2012, Code Aurora Forum. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -203,7 +204,7 @@ static int _out_init_locked(struct astream_out *out, const char *addr)
         return 0;
 
     /* XXX: shouldn't this use the sample_rate/channel_count from 'out'? */
-    ret = a2dp_init(44100, 2, &out->data);
+    ret = a2dp_init(48000, 2, &out->data);
     if (ret < 0) {
         LOGE("a2dp_init failed err: %d\n", ret);
         out->data = NULL;
@@ -519,15 +520,8 @@ static void *_out_buf_thread_func(void *context)
                 pthread_mutex_unlock(&out->lock);
 
                 if (ret < 0) {
-                	//MTD-Conn-JC-BluezPatch-AudioChoppy*[
-                    //LOGE("%s: a2dp_write failed (%d)\n", __func__, ret);
                     if (ret != -EINPROGRESS)   //not a Signaling start
                         LOGE("%s: a2dp_write failed (%d)\n", __func__, ret);
-                    if ( ret == -EINPROGRESS) {
-                        LOGE( "Sleep for frames/sampling freq %d",frames);
-                        usleep( (frames*1000)/ 48 ); //frames /sampling
-                    }
-                    //MTD-Conn-JC-BluezPatch-AudioChoppy*]
                     /* skip pending frames in case of write error */
                     _out_inc_rd_idx_locked(out, frames);
                     break;
@@ -650,8 +644,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->stream.write = out_write;
     out->stream.get_render_position = out_get_render_position;
 
-    out->sample_rate = 44100;
-    out->buffer_size = 512 * 20;
+    out->sample_rate = 48000;
+    out->buffer_size = 512 * 8;
     out->channels = AUDIO_CHANNEL_OUT_STEREO;
     out->format = AUDIO_FORMAT_PCM_16_BIT;
 

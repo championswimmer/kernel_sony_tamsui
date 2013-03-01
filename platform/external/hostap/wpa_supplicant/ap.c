@@ -3,14 +3,8 @@
  * Copyright (c) 2003-2009, Jouni Malinen <j@w1.fi>
  * Copyright (c) 2009, Atheros Communications
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "utils/includes.h"
@@ -23,7 +17,7 @@
 #include "ap/hostapd.h"
 #include "ap/ap_config.h"
 #include "ap/ap_drv_ops.h"
-#if  defined (NEED_AP_MLME) || defined (ANDROID_BRCM_P2P_PATCH)
+#ifdef NEED_AP_MLME
 #include "ap/ieee802_11.h"
 #endif /* NEED_AP_MLME */
 #include "ap/beacon.h"
@@ -80,21 +74,44 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 
 #ifdef CONFIG_IEEE80211N
 	/*
-	 * Enable HT20 if the driver supports it, by setting conf->ieee80211n.
+	 * Enable HT20 if the driver supports it, by setting conf->ieee80211n
+	 * and a mask of allowed capabilities within conf->ht_capab.
 	 * Using default config settings for: conf->ht_op_mode_fixed,
-	 * conf->ht_capab, conf->secondary_channel, conf->require_ht
+	 * conf->secondary_channel, conf->require_ht
 	 */
 	if (wpa_s->hw.modes) {
 		struct hostapd_hw_modes *mode = NULL;
-		int i;
+		int i, no_ht = 0;
 		for (i = 0; i < wpa_s->hw.num_modes; i++) {
 			if (wpa_s->hw.modes[i].mode == conf->hw_mode) {
 				mode = &wpa_s->hw.modes[i];
 				break;
 			}
 		}
-		if (mode && mode->ht_capab)
+
+#ifdef CONFIG_HT_OVERRIDES
+		if (ssid->disable_ht) {
+			conf->ieee80211n = 0;
+			conf->ht_capab = 0;
+			no_ht = 1;
+		}
+#endif /* CONFIG_HT_OVERRIDES */
+
+		if (!no_ht && mode && mode->ht_capab) {
 			conf->ieee80211n = 1;
+
+			/*
+			 * white-list capabilities that won't cause issues
+			 * to connecting stations, while leaving the current
+			 * capabilities intact (currently disabled SMPS).
+			 */
+			conf->ht_capab |= mode->ht_capab &
+				(HT_CAP_INFO_GREEN_FIELD |
+				 HT_CAP_INFO_SHORT_GI20MHZ |
+				 HT_CAP_INFO_SHORT_GI40MHZ |
+				 HT_CAP_INFO_RX_STBC_MASK |
+				 HT_CAP_INFO_MAX_AMSDU_SIZE);
+		}
 	}
 #endif /* CONFIG_IEEE80211N */
 
@@ -136,6 +153,8 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	bss->ssid.ssid[ssid->ssid_len] = '\0';
 	bss->ssid.ssid_len = ssid->ssid_len;
 	bss->ssid.ssid_set = 1;
+
+	bss->ignore_broadcast_ssid = ssid->ignore_broadcast_ssid;
 
 	if (ssid->auth_alg)
 		bss->auth_algs = ssid->auth_alg;
@@ -223,8 +242,17 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	if (bss->ssid.security_policy != SECURITY_WPA_PSK &&
 	    bss->ssid.security_policy != SECURITY_PLAINTEXT)
 		goto no_wps;
+#ifdef CONFIG_WPS2
+	if (bss->ssid.security_policy == SECURITY_WPA_PSK &&
+	    (!(pairwise & WPA_CIPHER_CCMP) || !(bss->wpa & 2)))
+		goto no_wps; /* WPS2 does not allow WPA/TKIP-only
+			      * configuration */
+#endif /* CONFIG_WPS2 */
 	bss->eap_server = 1;
-	bss->wps_state = 2;
+
+	if (!ssid->ignore_broadcast_ssid)
+		bss->wps_state = 2;
+
 	bss->ap_setup_locked = 2;
 	if (wpa_s->conf->config_methods)
 		bss->config_methods = os_strdup(wpa_s->conf->config_methods);
@@ -247,6 +275,7 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	else
 		os_memcpy(bss->uuid, wpa_s->conf->uuid, WPS_UUID_LEN);
 	os_memcpy(bss->os_version, wpa_s->conf->os_version, 4);
+	bss->pbc_in_m1 = wpa_s->conf->pbc_in_m1;
 no_wps:
 #endif /* CONFIG_WPS */
 
@@ -308,9 +337,9 @@ static void ap_wps_event_cb(void *ctx, enum wps_event event,
 
 
 static void ap_sta_authorized_cb(void *ctx, const u8 *mac_addr,
-				 int authorized)
+				 int authorized, const u8 *p2p_dev_addr)
 {
-	wpas_notify_sta_authorized(ctx, mac_addr, authorized);
+	wpas_notify_sta_authorized(ctx, mac_addr, authorized, p2p_dev_addr);
 }
 
 
@@ -446,6 +475,7 @@ int wpa_supplicant_create_ap(struct wpa_supplicant *wpa_s,
 		return -1;
 	hapd_iface->owner = wpa_s;
 	hapd_iface->drv_flags = wpa_s->drv_flags;
+	hapd_iface->probe_resp_offloads = wpa_s->probe_resp_offloads;
 
 	wpa_s->ap_iface->conf = conf = hostapd_config_defaults();
 	if (conf == NULL) {
@@ -505,9 +535,8 @@ int wpa_supplicant_create_ap(struct wpa_supplicant *wpa_s,
 		hapd_iface->bss[i]->sta_authorized_cb_ctx = wpa_s;
 #ifdef CONFIG_P2P
 		hapd_iface->bss[i]->p2p = wpa_s->global->p2p;
-		hapd_iface->bss[i]->p2p_group = wpas_p2p_group_init(
-			wpa_s, ssid->p2p_persistent_group,
-			ssid->mode == WPAS_MODE_P2P_GROUP_FORMATION);
+		hapd_iface->bss[i]->p2p_group = wpas_p2p_group_init(wpa_s,
+								    ssid);
 #endif /* CONFIG_P2P */
 		hapd_iface->bss[i]->setup_complete_cb = wpas_ap_configured_cb;
 		hapd_iface->bss[i]->setup_complete_cb_ctx = wpa_s;
@@ -526,14 +555,6 @@ int wpa_supplicant_create_ap(struct wpa_supplicant *wpa_s,
 		wpa_supplicant_ap_deinit(wpa_s);
 		return -1;
 	}
-
-#ifdef ANDROID_BRCM_P2P_PATCH
-	if (wpa_drv_probe_req_report(wpa_s, 1) < 0) {
-		wpa_printf(MSG_DEBUG, "P2P: Failed to request the driver to "
-			   "report received Probe Request frames");
-		return -1;
-	}
-#endif /* ANDROID_BRCM_P2P_PATCH */
 
 	return 0;
 }
@@ -604,7 +625,7 @@ void ap_rx_from_unknown_sta(void *ctx, const u8 *addr, int wds)
 
 void ap_mgmt_rx(void *ctx, struct rx_mgmt *rx_mgmt)
 {
-#if  defined (NEED_AP_MLME) || defined (ANDROID_BRCM_P2P_PATCH)
+#ifdef NEED_AP_MLME
 	struct wpa_supplicant *wpa_s = ctx;
 	struct hostapd_frame_info fi;
 	os_memset(&fi, 0, sizeof(fi));
@@ -612,7 +633,7 @@ void ap_mgmt_rx(void *ctx, struct rx_mgmt *rx_mgmt)
 	fi.ssi_signal = rx_mgmt->ssi_signal;
 	ieee802_11_mgmt(wpa_s->ap_iface->bss[0], rx_mgmt->frame,
 			rx_mgmt->frame_len, &fi);
-#endif /* defined (NEED_AP_MLME) || defined (ANDROID_BRCM_P2P_PATCH) */
+#endif /* NEED_AP_MLME */
 }
 
 
@@ -699,7 +720,7 @@ int wpa_supplicant_ap_wps_pin(struct wpa_supplicant *wpa_s, const u8 *bssid,
 
 	if (pin == NULL) {
 		unsigned int rpin = wps_generate_pin();
-		ret_len = os_snprintf(buf, buflen, "%d", rpin);
+		ret_len = os_snprintf(buf, buflen, "%08d", rpin);
 		pin = buf;
 	} else
 		ret_len = os_snprintf(buf, buflen, "%s", pin);
@@ -760,7 +781,7 @@ const char * wpas_wps_ap_pin_random(struct wpa_supplicant *wpa_s, int timeout)
 		return NULL;
 	hapd = wpa_s->ap_iface->bss[0];
 	pin = wps_generate_pin();
-	os_snprintf(pin_txt, sizeof(pin_txt), "%u", pin);
+	os_snprintf(pin_txt, sizeof(pin_txt), "%08u", pin);
 	os_free(hapd->conf->ap_pin);
 	hapd->conf->ap_pin = os_strdup(pin_txt);
 	if (hapd->conf->ap_pin == NULL)
@@ -863,6 +884,26 @@ int ap_ctrl_iface_sta_next(struct wpa_supplicant *wpa_s, const char *txtaddr,
 }
 
 
+int ap_ctrl_iface_sta_disassociate(struct wpa_supplicant *wpa_s,
+				   const char *txtaddr)
+{
+	if (wpa_s->ap_iface == NULL)
+		return -1;
+	return hostapd_ctrl_iface_disassociate(wpa_s->ap_iface->bss[0],
+					       txtaddr);
+}
+
+
+int ap_ctrl_iface_sta_deauthenticate(struct wpa_supplicant *wpa_s,
+				     const char *txtaddr)
+{
+	if (wpa_s->ap_iface == NULL)
+		return -1;
+	return hostapd_ctrl_iface_deauthenticate(wpa_s->ap_iface->bss[0],
+						 txtaddr);
+}
+
+
 int ap_ctrl_iface_wpa_get_status(struct wpa_supplicant *wpa_s, char *buf,
 				 size_t buflen, int verbose)
 {
@@ -900,7 +941,9 @@ int wpa_supplicant_ap_update_beacon(struct wpa_supplicant *wpa_s)
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
 	struct hostapd_data *hapd;
 
-	if (ssid == NULL || wpa_s->ap_iface == NULL)
+	if (ssid == NULL || wpa_s->ap_iface == NULL ||
+	    ssid->mode == WPAS_MODE_INFRA ||
+	    ssid->mode == WPAS_MODE_IBSS)
 		return -1;
 
 #ifdef CONFIG_P2P
@@ -911,8 +954,10 @@ int wpa_supplicant_ap_update_beacon(struct wpa_supplicant *wpa_s)
 			P2P_GROUP_FORMATION;
 #endif /* CONFIG_P2P */
 
-	ieee802_11_set_beacons(iface);
 	hapd = iface->bss[0];
+	if (hapd->drv_priv == NULL)
+		return -1;
+	ieee802_11_set_beacons(iface);
 	hostapd_set_ap_wps_ie(hapd);
 
 	return 0;

@@ -31,6 +31,7 @@
 #else
 #include "board-8930.h"
 #endif
+#include "board-storage-common-a.h"
 
 /* MSM8960 has 5 SDCC controllers */
 enum sdcc_controllers {
@@ -63,23 +64,19 @@ static struct msm_mmc_reg_data mmc_vdd_reg_data[MAX_SDCC_CONTROLLER] = {
 	}
 };
 
-/* Only slots having eMMC card will require VCCQ voltage */
-static struct msm_mmc_reg_data mmc_vccq_reg_data[1] = {
+/* All SDCC controllers may require voting for VDD PAD voltage */
+static struct msm_mmc_reg_data mmc_vdd_io_reg_data[MAX_SDCC_CONTROLLER] = {
 	/* SDCC1 : eMMC card connected */
 	[SDCC1] = {
-		.name = "sdc_vccq",
+		.name = "sdc_vdd_io",
 		.always_on = 1,
 		.high_vol_level = 1800000,
 		.low_vol_level = 1800000,
 		.hpm_uA = 200000, /* 200mA */
-	}
-};
-
-/* All SDCC controllers may require voting for VDD PAD voltage */
-static struct msm_mmc_reg_data mmc_vddp_reg_data[MAX_SDCC_CONTROLLER] = {
+	},
 	/* SDCC3 : External card slot connected */
 	[SDCC3] = {
-		.name = "sdc_vddp",
+		.name = "sdc_vdd_io",
 		.high_vol_level = 2950000,
 		.low_vol_level = 1850000,
 		.always_on = 1,
@@ -99,12 +96,12 @@ static struct msm_mmc_slot_reg_data mmc_slot_vreg_data[MAX_SDCC_CONTROLLER] = {
 	/* SDCC1 : eMMC card connected */
 	[SDCC1] = {
 		.vdd_data = &mmc_vdd_reg_data[SDCC1],
-		.vccq_data = &mmc_vccq_reg_data[SDCC1],
+		.vdd_io_data = &mmc_vdd_io_reg_data[SDCC1],
 	},
 	/* SDCC3 : External card slot connected */
 	[SDCC3] = {
 		.vdd_data = &mmc_vdd_reg_data[SDCC3],
-		.vddp_data = &mmc_vddp_reg_data[SDCC3],
+		.vdd_io_data = &mmc_vdd_io_reg_data[SDCC3],
 	}
 };
 
@@ -214,6 +211,9 @@ static struct msm_mmc_pin_data mmc_slot_pin_data[MAX_SDCC_CONTROLLER] = {
 	},
 };
 
+#define MSM_MPM_PIN_SDC1_DAT1	17
+#define MSM_MPM_PIN_SDC3_DAT1	21
+
 static unsigned int sdc1_sup_clk_rates[] = {
 	400000, 24000000, 48000000
 };
@@ -235,7 +235,9 @@ static struct mmc_platform_data msm8960_sdc1_data = {
 	.pclk_src_dfab	= 1,
 	.nonremovable	= 1,
 	.vreg_data	= &mmc_slot_vreg_data[SDCC1],
-	.pin_data	= &mmc_slot_pin_data[SDCC1]
+	.pin_data	= &mmc_slot_pin_data[SDCC1],
+	.mpm_sdiowakeup_int = MSM_MPM_PIN_SDC1_DAT1,
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 
@@ -267,6 +269,8 @@ static struct mmc_platform_data msm8960_sdc3_data = {
 	.uhs_caps	= (MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
 			MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_DDR50 |
 			MMC_CAP_MAX_CURRENT_600),
+	.mpm_sdiowakeup_int = MSM_MPM_PIN_SDC3_DAT1,
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 

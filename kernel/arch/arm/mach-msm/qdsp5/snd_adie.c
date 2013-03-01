@@ -10,7 +10,6 @@
  * GNU General Public License for more details.
  *
  */
- /* Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved. */
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -460,10 +459,8 @@ static int __init snd_adie_init(void)
 	char name[sizeof "msm_snd_adie"];
 
 	snprintf(name, sizeof name, "msm_snd_adie");
-        /* FIH-SW3-MM-YW-Change File Permission-00*[ */
-	dentry = debugfs_create_file(name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+	dentry = debugfs_create_file(name, S_IFREG | S_IRUGO | S_IWUGO,
 			NULL, NULL, &snd_adie_debug_fops);
-        /* FIH-SW3-MM-YW-Change File Permission-00*] */
 	if (IS_ERR(dentry))
 		MM_DBG("debugfs_create_file failed\n");
 #endif

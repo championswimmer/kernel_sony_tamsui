@@ -4,7 +4,6 @@
  * Copyright (C) 2003-2008 Alan Stern
  * Copyright (C) 2009 Samsung Electronics
  *                    Author: Michal Nazarewicz <m.nazarewicz@samsung.com>
- * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -298,9 +297,6 @@
 
 #include "gadget_chips.h"
 
-//MTD-CONN-MW-SUT-00+{
-#include "../../../arch/arm/mach-msm/proc_comm.h"
-//MTD-CONN-MW-SUT-00+}
 
 /*------------------------------------------------------------------------*/
 
@@ -321,30 +317,6 @@ static int write_error_after_csw_sent;
 static int csw_hack_sent;
 #endif
 /*-------------------------------------------------------------------------*/
-
-extern unsigned int fih_get_power_on_cause(void);/*MTD-CONN-EH-POWEROFFCHARGING-01+*/
-#define PWR_ON_EVENT_USB_CHG 0x20/*MTD-CONN-EH-POWEROFFCHARGING-01+*/
-
-//MTD-CONN-MW-SUT-00+{
-#define SC_READ_NV              		0xf0
-
-#define BUILD_ID "/system/build_id"
-//MTD-CONN-MW-SUT-00+}
-
-
-//MTD-CONN-EH-PCCOMPANION-01+{
-/* Storage mode */
-#define STORAGE_MODE_NONE	0
-#define STORAGE_MODE_MSC	1
-#define STORAGE_MODE_CDROM	2
-
-/* Length of inquiry string. Vendor (8 chars), product (16 chars),
- * release (4 hexadecimal digits) and NUL byte
- */
-#define INQUIRY_STRING_LEN	(8 + 16 + 4 + 1)
-
-/*-------------------------------------------------------------------------*/
-//MTD-CONN-EH-PCCOMPANION-01+}
 
 struct fsg_dev;
 struct fsg_common;
@@ -404,12 +376,6 @@ struct fsg_common {
 	struct fsg_lun		*luns;
 	struct fsg_lun		*curlun;
 
-        //MTD-CONN-EH-PCCOMPANION-01+{
-	int			storage_mode;
-	struct fsg_lun		*luns_all;
-	unsigned int		msc_nluns;
-	unsigned int		cdrom_nluns;
-        //MTD-CONN-EH-PCCOMPANION-01+}
 	unsigned int		bulk_out_maxpacket;
 	enum fsg_state		state;		/* For exception handling */
 	unsigned int		exception_req_tag;
@@ -441,16 +407,13 @@ struct fsg_common {
 	 * Vendor (8 chars), product (16 chars), release (4
 	 * hexadecimal digits) and NUL byte
 	 */
-	//MTD-CONN-EH-PCCOMPANION-01-char inquiry_string[8 + 16 + 4 + 1];
-        char inquiry_string[INQUIRY_STRING_LEN];//MTD-CONN-EH-PCCOMPANION-01+
-	char cdrom_inquiry_string[INQUIRY_STRING_LEN];//MTD-CONN-EH-PCCOMPANION-01+
+	char inquiry_string[8 + 16 + 4 + 1];
 
 	struct kref		ref;
 };
 
 struct fsg_config {
 	unsigned nluns;
-	unsigned cdrom_nluns;//MTD-CONN-EH-PCCOMPANION-01+
 	struct fsg_lun_config {
 		const char *filename;
 		char ro;
@@ -470,12 +433,6 @@ struct fsg_config {
 	const char *vendor_name;		/*  8 characters or less */
 	const char *product_name;		/* 16 characters or less */
 	u16 release;
-
-        //MTD-CONN-EH-PCCOMPANION-01+{
-	const char *cdrom_vendor_name;	/*  8 characters or less */
-	const char *cdrom_product_name;	/* 16 characters or less */
-	u16 cdrom_release;
-        //MTD-CONN-EH-PCCOMPANION-01+}
 
 	char			can_stall;
 };
@@ -534,39 +491,6 @@ static void set_bulk_out_req_length(struct fsg_common *common,
 		length += common->bulk_out_maxpacket - rem;
 	bh->outreq->length = length;
 }
-/* ++MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd++ */
-static u8 check_external_storage(void) {
-    /*
-        * Check external Strage state by /dev/block/mmcblk1 file node
-	*/
-	struct file *ext_storage_file = NULL;
-	static const char* ext_storage_file_node = "/dev/block/mmcblk1";
-	int ret = 0;  /* ++MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd_01 */
-
-    printk(KERN_INFO "%s(): start\n", __func__);
-
-	
-    ext_storage_file = filp_open(ext_storage_file_node, O_RDONLY, 0);
-	
-	if(IS_ERR(ext_storage_file))
-	{
-		printk(KERN_INFO "%s(): EXTERNAL_STORAGE_STATE doesn't exist\n", __func__);
-		return 0;  //MTD-CONN-EH-USBIF_WORKAROUND-00* /* ++MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd_01 */
-	}
-	else
-	{
-		printk(KERN_INFO "%s(): EXTERNAL_STORAGE_STATE exist \n",__func__);
-		ret = 1;  /* ++MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd_01 */
-	}
-
-	filp_close(ext_storage_file, NULL);
-
-	return ret;  /* ++MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd_01 */
-	
-
-	
-}
-/* --MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd-- */
 
 
 /*-------------------------------------------------------------------------*/
@@ -813,48 +737,8 @@ static int sleep_thread(struct fsg_common *common)
 	return rc;
 }
 
-//MTD-CONN-MW-SUT-00+{
-#define NV_FIH_VERSION_I 50030
-static int do_read_nv(struct fsg_common *common, struct fsg_buffhd *bh)
-{
-    struct file *gMD_filp = NULL;
-    u8 *buf = (u8 *) bh->buf;
-    char text[20];
-    int32_t smem_proc_comm_oem_cmd1 = PCOM_CUSTOMER_CMD1;
-    int32_t smem_proc_comm_oem_data1 = SMEM_PROC_COMM_OEM_NV_READ;
-    int32_t smem_proc_comm_oem_data2= NV_FIH_VERSION_I;
-    int32_t fih_version[32];
-    char ver_buf[128];
-    mm_segment_t oldfs;
-    memset(ver_buf, 0x0, sizeof(ver_buf));
-    if(msm_proc_comm_oem(smem_proc_comm_oem_cmd1, &smem_proc_comm_oem_data1, fih_version, &smem_proc_comm_oem_data2) == 0){
-        memcpy(ver_buf, fih_version, sizeof(ver_buf));
-        printk(KERN_DEBUG "fih_version=%s", ver_buf);
-    }
-    oldfs=get_fs();
-    set_fs(KERNEL_DS);
-    gMD_filp = filp_open(BUILD_ID, O_RDONLY, 0);
-
-    if(!IS_ERR(gMD_filp)) {
-        gMD_filp->f_op->read(gMD_filp, text, sizeof(text), &gMD_filp->f_pos);
-        printk(KERN_DEBUG "read build_id text = %s", text);
-        filp_close(gMD_filp, NULL);
-        memcpy(ver_buf+1,&text[5],1);
-        memcpy(ver_buf+2,&text[7],3);
-        sprintf(buf, ver_buf);
-        printk(KERN_DEBUG "fih_version = %s", ver_buf);
-    } else {
-        printk(KERN_DEBUG "open build_id file fail");
-    }
-
-    return 128;
-}
-//MTD-CONN-MW-SUT-00+}
-
 
 /*-------------------------------------------------------------------------*/
-
-//MTD-CONN-EH-MSCPERFORMANCE-01-static void invalidate_sub(struct fsg_lun *curlun);//MTD-CONN-EH-MSCPERFORMANCE-00+
 
 static int do_read(struct fsg_common *common)
 {
@@ -867,7 +751,6 @@ static int do_read(struct fsg_common *common)
 	unsigned int		amount;
 	unsigned int		partial_page;
 	ssize_t			nread;
-	//MTD-CONN-EH-MSCPERFORMANCE-01-static int           counter;//MTD-CONN-EH-MSCPERFORMANCE-00+
 #ifdef CONFIG_USB_MSC_PROFILING
 	ktime_t			start, diff;
 #endif
@@ -895,14 +778,7 @@ static int do_read(struct fsg_common *common)
 		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 		return -EINVAL;
 	}
-
-	//MTD-CONN-EH-PCCOMPANION-01*{
-	#if 0
 	file_offset = ((loff_t) lba) << 9;
-	#else
-        file_offset = ((loff_t) lba) << curlun->shift_size;
-	#endif
-	//MTD-CONN-EH-PCCOMPANION-01*}
 
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
@@ -943,14 +819,7 @@ static int do_read(struct fsg_common *common)
 		if (amount == 0) {
 			curlun->sense_data =
 					SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
-			//MTD-CONN-EH-PCCOMPANION-01*{
-			#if 0
 			curlun->sense_data_info = file_offset >> 9;
-			#else
-                        curlun->sense_data_info = file_offset >>
-						curlun->shift_size;
-			#endif
-			//MTD-CONN-EH-PCCOMPANION-01*}			
 			curlun->info_valid = 1;
 			bh->inreq->length = 0;
 			bh->state = BUF_STATE_FULL;
@@ -993,14 +862,7 @@ static int do_read(struct fsg_common *common)
 		/* If an error occurred, report it and its position */
 		if (nread < amount) {
 			curlun->sense_data = SS_UNRECOVERED_READ_ERROR;
-			//MTD-CONN-EH-PCCOMPANION-01*{
-			#if 0
 			curlun->sense_data_info = file_offset >> 9;
-			#else
-                        curlun->sense_data_info = file_offset >>
-						curlun->shift_size;
-			#endif
-			//MTD-CONN-EH-PCCOMPANION-01*}
 			curlun->info_valid = 1;
 			break;
 		}
@@ -1015,24 +877,6 @@ static int do_read(struct fsg_common *common)
 			return -EIO;
 		common->next_buffhd_to_fill = bh->next;
 	}
-
-	//MTD-CONN-EH-MSCPERFORMANCE-01-{
-	#if 0
-	//MTD-CONN-EH-MSCPERFORMANCE-00+
-	if (++counter == 128) {
-		/* Write out all the dirty buffers before invalidating them */
-		fsg_lun_fsync_sub(curlun);
-		if (signal_pending(current))
-			return -EINTR;
-
-		invalidate_sub(curlun);
-		if (signal_pending(current))
-			return -EINTR;
-		counter = 0;
-	}
-	//MTD-CONN-EH-MSCPERFORMANCE-00+
-	#endif
-	//MTD-CONN-EH-MSCPERFORMANCE-01-}
 
 	return -EIO;		/* No default reply */
 }
@@ -1052,8 +896,6 @@ static int do_write(struct fsg_common *common)
 	unsigned int		partial_page;
 	ssize_t			nwritten;
 	int			rc;
-	//MTD-CONN-EH-MSCPERFORMANCE-01- static int		counter;//MTD-CONN-EH-MSCPERFORMANCE-00+
-
 
 #ifdef CONFIG_USB_CSW_HACK
 	int			i;
@@ -1102,24 +944,9 @@ static int do_write(struct fsg_common *common)
 
 	/* Carry out the file writes */
 	get_some_more = 1;
-	//MTD-CONN-EH-PCCOMPANION-01*{
-	#if 0
 	file_offset = usb_offset = ((loff_t) lba) << 9;
-	#else
-        file_offset = usb_offset = ((loff_t) lba) << curlun->shift_size;
-        #endif
-        //MTD-CONN-EH-PCCOMPANION-01*}
 	amount_left_to_req = common->data_size_from_cmnd;
 	amount_left_to_write = common->data_size_from_cmnd;
-    /* MTD-Connectivity-FY-USB_WHQL_workaround++ */
-	if (curlun->random_write_count >= RANDOM_WRITE_COUNT_TO_BE_FLUSHED)
-		fsg_lun_fsync_sub(curlun);
-
-	/* Detect non-sequential write */
-	if (curlun->last_offset != file_offset)
-		curlun->random_write_count++;
-	curlun->last_offset = file_offset + amount_left_to_write;
-	/* MTD-Connectivity-FY-USB_WHQL_workaround-- */
 
 	while (amount_left_to_write > 0) {
 
@@ -1150,14 +977,7 @@ static int do_write(struct fsg_common *common)
 				get_some_more = 0;
 				curlun->sense_data =
 					SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
-				//MTD-CONN-EH-PCCOMPANION-01*{
-				#if 0
 				curlun->sense_data_info = usb_offset >> 9;
-				#else
-                                curlun->sense_data_info = usb_offset >>
-							curlun->shift_size;
-				#endif
-				//MTD-CONN-EH-PCCOMPANION-01*}			
 				curlun->info_valid = 1;
 				continue;
 			}
@@ -1215,14 +1035,7 @@ static int do_write(struct fsg_common *common)
 			/* Did something go wrong with the transfer? */
 			if (bh->outreq->status != 0) {
 				curlun->sense_data = SS_COMMUNICATION_FAILURE;
-				//MTD-CONN-EH-PCCOMPANION-01*{
-				#if 0
 				curlun->sense_data_info = file_offset >> 9;
-				#else
-                                curlun->sense_data_info = file_offset >>
-							curlun->shift_size;
-				#endif
-				//MTD-CONN-EH-PCCOMPANION-01*}
 				curlun->info_valid = 1;
 				break;
 			}
@@ -1272,14 +1085,7 @@ static int do_write(struct fsg_common *common)
 			/* If an error occurred, report it and its position */
 			if (nwritten < amount) {
 				curlun->sense_data = SS_WRITE_ERROR;
-				//MTD-CONN-EH-PCCOMPANION-01*{
-				#if 0
 				curlun->sense_data_info = file_offset >> 9;
-				#else
-                                curlun->sense_data_info = file_offset >>
-							curlun->shift_size;
-				#endif
-				//MTD-CONN-EH-PCCOMPANION-01*}
 				curlun->info_valid = 1;
 #ifdef CONFIG_USB_CSW_HACK
 				write_error_after_csw_sent = 1;
@@ -1324,25 +1130,6 @@ write_error:
 		if (rc)
 			return rc;
 	}
-
-	//MTD-CONN-EH-MSCPERFORMANCE-01-{
-	#if 0
-	//MTD-CONN-EH-MSCPERFORMANCE-00+
-	if (++counter == 128) 
-	{
-		/* Write out all the dirty buffers before invalidating them */
-		fsg_lun_fsync_sub(curlun);
-		if (signal_pending(current))
-			return -EINTR;
-
-		invalidate_sub(curlun);
-		if (signal_pending(current))
-			return -EINTR;
-		counter = 0;
-	}
-	//MTD-CONN-EH-MSCPERFORMANCE-00+
-	#endif
-	//MTD-CONN-EH-MSCPERFORMANCE-01-}
 
 	return -EIO;		/* No default reply */
 }
@@ -1411,15 +1198,8 @@ static int do_verify(struct fsg_common *common)
 		return -EIO;		/* No default reply */
 
 	/* Prepare to carry out the file verify */
-	//MTD-CONN-EH-PCCOMPANION-01*{
-	#if 0
 	amount_left = verification_length << 9;
 	file_offset = ((loff_t) lba) << 9;
-	#else
-        amount_left = verification_length << curlun->shift_size;
-	file_offset = ((loff_t) lba) << curlun->shift_size;
-	#endif
-	//MTD-CONN-EH-PCCOMPANION-01*}
 
 	/* Write out all the dirty buffers before invalidating them */
 	fsg_lun_fsync_sub(curlun);
@@ -1446,14 +1226,7 @@ static int do_verify(struct fsg_common *common)
 		if (amount == 0) {
 			curlun->sense_data =
 					SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
-			//MTD-CONN-EH-PCCOMPANION-01*{
-			#if 0
 			curlun->sense_data_info = file_offset >> 9;
-			#else
-                        curlun->sense_data_info = file_offset >>
-						curlun->shift_size;
-			#endif
-			//MTD-CONN-EH-PCCOMPANION-01*}
 			curlun->info_valid = 1;
 			break;
 		}
@@ -1479,14 +1252,7 @@ static int do_verify(struct fsg_common *common)
 		}
 		if (nread == 0) {
 			curlun->sense_data = SS_UNRECOVERED_READ_ERROR;
-			//MTD-CONN-EH-PCCOMPANION-01*{
-			#if 0
 			curlun->sense_data_info = file_offset >> 9;
-			#else
-                        curlun->sense_data_info = file_offset >>
-						curlun->shift_size;
-			#endif
-			//MTD-CONN-EH-PCCOMPANION-01*}
 			curlun->info_valid = 1;
 			break;
 		}
@@ -1520,21 +1286,7 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
-
-	//MTD-CONN-EH-PCCOMPANION-01*{
-	#if 0
 	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
-	#else
-        if (curlun->cdrom)
-		memcpy(buf + 8,
-			common->cdrom_inquiry_string,
-			sizeof common->cdrom_inquiry_string);
-	else
-		memcpy(buf + 8,
-			common->inquiry_string,
-			sizeof common->inquiry_string);
-	#endif
-	//MTD-CONN-EH-PCCOMPANION-01*}
 	return 36;
 }
 
@@ -1606,14 +1358,7 @@ static int do_read_capacity(struct fsg_common *common, struct fsg_buffhd *bh)
 
 	put_unaligned_be32(curlun->num_sectors - 1, &buf[0]);
 						/* Max logical block */
-	//MTD-CONN-EH-PCCOMPANION-01*{					
-	#if 0
 	put_unaligned_be32(512, &buf[4]);	/* Block length */
-	#else
-        put_unaligned_be32(1 << curlun->shift_size, &buf[4]);
-						/* Block length */
-	#endif
-	//MTD-CONN-EH-PCCOMPANION-01*}
 	return 8;
 }
 
@@ -1850,14 +1595,7 @@ static int do_read_format_capacities(struct fsg_common *common,
 
 	put_unaligned_be32(curlun->num_sectors, &buf[0]);
 						/* Number of blocks */
-	//MTD-CONN-EH-PCCOMPANION-01*{
-	#if 0
 	put_unaligned_be32(512, &buf[4]);	/* Block length */
-	#else
-        put_unaligned_be32(1 << curlun->shift_size, &buf[4]);
-						/* Block length */
-	#endif
-	//MTD-CONN-EH-PCCOMPANION-01*}
 	buf[4] = 0x02;				/* Current capacity */
 	return 12;
 }
@@ -2030,14 +1768,7 @@ static int finish_reply(struct fsg_common *common)
 			if (!start_in_transfer(common, bh))
 				rc = -EIO;
 			common->next_buffhd_to_fill = bh->next;
-			//MTD-CONN-EH-PCCOMPANION-01*{
-			#if 0
 			if (common->can_stall)
-			#else
-                        if (common->can_stall &&
-				common->residue == common->data_size_from_cmnd)
-			#endif	
-			//MTD-CONN-EH-PCCOMPANION-01*}	
 				rc = halt_bulk_in_endpoint(common->fsg);
 		}
 		break;
@@ -2283,13 +2014,7 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 	/* If the medium isn't mounted and the command needs to access
 	 * it, return an error. */
 	if (curlun && !fsg_lun_is_open(curlun) && needs_medium) {
-		if(curlun->attached_external_storage && (fih_get_power_on_cause() != PWR_ON_EVENT_USB_CHG)) {/*MTD-CONN-EH-POWEROFFCHARGING-01**/
-			printk(KERN_INFO "SCSI command:%s WARNING SS_SCSI_SENSE_OPERATION_IN_PROGRESS\n", __func__);
-		    curlun->sense_data = SS_SCSI_SENSE_OPERATION_IN_PROGRESS;
-		}else {
-			printk(KERN_INFO "SCSI command:%s WARNING SS_MEDIUM_NOT_PRESENT\n", __func__);
-			curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
-		}
+		curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
 		return -EINVAL;
 	}
 
@@ -2303,7 +2028,6 @@ static int do_scsi_command(struct fsg_common *common)
 	int			reply = -EINVAL;
 	int			i;
 	static char		unknown[16];
-	int			shift;//MTD-CONN-EH-PCCOMPANION-01+
 
 	dump_cdb(common);
 
@@ -2319,7 +2043,6 @@ static int do_scsi_command(struct fsg_common *common)
 	common->short_packet_received = 0;
 
 	down_read(&common->filesem);	/* We're using the backing file */
-	shift = (&common->luns[common->lun])->shift_size;//MTD-CONN-EH-PCCOMPANION-01+
 	switch (common->cmnd[0]) {
 
 	case INQUIRY:
@@ -2380,7 +2103,7 @@ static int do_scsi_command(struct fsg_common *common)
 
 	case READ_6:
 		i = common->cmnd[4];
-		common->data_size_from_cmnd = (i == 0 ? 256 : i) << shift;//MTD-CONN-EH-PCCOMPANION-01*
+		common->data_size_from_cmnd = (i == 0 ? 256 : i) << 9;
 		reply = check_command(common, 6, DATA_DIR_TO_HOST,
 				      (7<<1) | (1<<4), 1,
 				      "READ(6)");
@@ -2390,7 +2113,7 @@ static int do_scsi_command(struct fsg_common *common)
 
 	case READ_10:
 		common->data_size_from_cmnd =
-				get_unaligned_be16(&common->cmnd[7]) << shift;//MTD-CONN-EH-PCCOMPANION-01*
+				get_unaligned_be16(&common->cmnd[7]) << 9;
 		reply = check_command(common, 10, DATA_DIR_TO_HOST,
 				      (1<<1) | (0xf<<2) | (3<<7), 1,
 				      "READ(10)");
@@ -2400,7 +2123,7 @@ static int do_scsi_command(struct fsg_common *common)
 
 	case READ_12:
 		common->data_size_from_cmnd =
-				get_unaligned_be32(&common->cmnd[6]) << shift;//MTD-CONN-EH-PCCOMPANION-01*
+				get_unaligned_be32(&common->cmnd[6]) << 9;
 		reply = check_command(common, 12, DATA_DIR_TO_HOST,
 				      (1<<1) | (0xf<<2) | (0xf<<6), 1,
 				      "READ(12)");
@@ -2500,7 +2223,7 @@ static int do_scsi_command(struct fsg_common *common)
 
 	case WRITE_6:
 		i = common->cmnd[4];
-		common->data_size_from_cmnd = (i == 0 ? 256 : i) << shift;//MTD-CONN-EH-PCCOMPANION-01*
+		common->data_size_from_cmnd = (i == 0 ? 256 : i) << 9;
 		reply = check_command(common, 6, DATA_DIR_FROM_HOST,
 				      (7<<1) | (1<<4), 1,
 				      "WRITE(6)");
@@ -2510,7 +2233,7 @@ static int do_scsi_command(struct fsg_common *common)
 
 	case WRITE_10:
 		common->data_size_from_cmnd =
-				get_unaligned_be16(&common->cmnd[7]) << shift;//MTD-CONN-EH-PCCOMPANION-01*
+				get_unaligned_be16(&common->cmnd[7]) << 9;
 		reply = check_command(common, 10, DATA_DIR_FROM_HOST,
 				      (1<<1) | (0xf<<2) | (3<<7), 1,
 				      "WRITE(10)");
@@ -2520,25 +2243,13 @@ static int do_scsi_command(struct fsg_common *common)
 
 	case WRITE_12:
 		common->data_size_from_cmnd =
-				get_unaligned_be32(&common->cmnd[6]) << shift;//MTD-CONN-EH-PCCOMPANION-01*
+				get_unaligned_be32(&common->cmnd[6]) << 9;
 		reply = check_command(common, 12, DATA_DIR_FROM_HOST,
 				      (1<<1) | (0xf<<2) | (0xf<<6), 1,
 				      "WRITE(12)");
 		if (reply == 0)
 			reply = do_write(common);
 		break;
-
-	//MTD-CONN-MW-SUT-00+{	
-	case SC_READ_NV:
-        	printk(KERN_INFO "SC_READ_NV");
-        	if((common->cmnd[1] == 'F') && (common->cmnd[2] == 'I') && (common->cmnd[3] == 'H')) {
-            		common->data_size_from_cmnd = common->cmnd[4];
-            		if ((reply = check_command(common, 6, DATA_DIR_TO_HOST, (1<<4), 0, "READ NV")) == 0)
-                		reply = do_read_nv(common, bh);
-        	}
-        	break;
-	//MTD-CONN-MW-SUT-00+}
-	
 
 	/*
 	 * Some mandatory commands that we recognize but don't implement.
@@ -2773,19 +2484,8 @@ reset:
 	}
 
 	common->running = 1;
-	for (i = 0; i < common->nluns; ++i) {
+	for (i = 0; i < common->nluns; ++i)
 		common->luns[i].unit_attention_data = SS_RESET_OCCURRED;
-		/* ++MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd++ */
-		if(common->luns[i].cdrom) {
-			printk(KERN_INFO "%s(): luns[%d] is cdrom\n",__func__, i);
-			common->luns[i].attached_external_storage = 0x00;
-			
-		}else {
-		    printk(KERN_INFO "%s(): luns[%d] NOT cdrom\n",__func__, i);
-			common->luns[i].attached_external_storage = check_external_storage();
-		}
-		/* --MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd-- */
-	}
 	return rc;
 }
 
@@ -3097,6 +2797,9 @@ static DEVICE_ATTR(file, 0644, fsg_show_file, fsg_store_file);
 #ifdef CONFIG_USB_MSC_PROFILING
 static DEVICE_ATTR(perf, 0644, fsg_show_perf, fsg_store_perf);
 #endif
+// << FerryWu, 2012/08/05, support PC Companion
+static DEVICE_ATTR(cdrom, 0644, fsg_show_cdrom, fsg_store_cdrom);
+// >> FerryWu, 2012/08/05, support PC Companion
 
 /****************************** FSG COMMON ******************************/
 
@@ -3117,20 +2820,6 @@ static inline void fsg_common_put(struct fsg_common *common)
 	kref_put(&common->ref, fsg_common_release);
 }
 
-//MTD-CONN-EH-PCCOMPANION-01+{
-static void fsg_common_setup_luns(struct fsg_common *common)
-{
-	if (common->storage_mode == STORAGE_MODE_MSC ||
-		common->cdrom_nluns < 1) {
-		common->nluns = common->msc_nluns;
-		common->luns = common->luns_all;
-	} else {
-		common->nluns = common->cdrom_nluns;
-		common->luns = &common->luns_all[common->msc_nluns];
-	}
-}
-//MTD-CONN-EH-PCCOMPANION-01+}
-
 static struct fsg_common *fsg_common_init(struct fsg_common *common,
 					  struct usb_composite_dev *cdev,
 					  struct fsg_config *cfg)
@@ -3143,8 +2832,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	char *pathbuf;
 
 	/* Find out how many LUNs there should be */
-	//MTD-CONN-EH-PCCOMPANION-01-nluns = cfg->nluns;
-        nluns = cfg->nluns + cfg->cdrom_nluns;//MTD-CONN-EH-PCCOMPANION-01+
+	nluns = cfg->nluns;
 	if (nluns < 1 || nluns > FSG_MAX_LUNS) {
 		dev_err(&gadget->dev, "invalid number of LUNs: %u\n", nluns);
 		return ERR_PTR(-EINVAL);
@@ -3169,6 +2857,8 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	common->ep0req = cdev->req;
 	common->cdev = cdev;
 
+	// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+	#if 0
 	/* Maybe allocate device-global string IDs, and patch descriptors */
 	if (fsg_strings[FSG_STRING_INTERFACE].id == 0) {
 		rc = usb_string_id(cdev);
@@ -3177,6 +2867,8 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		fsg_strings[FSG_STRING_INTERFACE].id = rc;
 		fsg_intf_desc.iInterface = rc;
 	}
+	#endif
+	// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 
 	/*
 	 * Create the LUNs, open their backing files, and register the
@@ -3187,13 +2879,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		rc = -ENOMEM;
 		goto error_release;
 	}
-	common->luns_all = curlun;//MTD-CONN-EH-PCCOMPANION-01+
 	common->luns = curlun;
-        //MTD-CONN-EH-PCCOMPANION-01+{
-	common->msc_nluns = cfg->nluns;
-	common->cdrom_nluns = cfg->cdrom_nluns;
-	common->storage_mode = STORAGE_MODE_MSC;
-        //MTD-CONN-EH-PCCOMPANION-01+}
 
 	init_rwsem(&common->filesem);
 
@@ -3203,14 +2889,6 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		curlun->initially_ro = curlun->ro;
 		curlun->removable = lcfg->removable;
 		curlun->nofua = lcfg->nofua;
-                //MTD-CONN-EH-PCCOMPANION-01+{
-                if (!curlun->cdrom)
-			/* Mass storage lun */
-			curlun->shift_size = 9;
-		else
-			/* CD-ROM lun */
-			curlun->shift_size = 11;
-                //MTD-CONN-EH-PCCOMPANION-01+}
 		curlun->dev.release = fsg_lun_release;
 		curlun->dev.parent = &gadget->dev;
 		/* curlun->dev.driver = &fsg_driver.driver; XXX */
@@ -3244,6 +2922,11 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 			dev_err(&gadget->dev, "failed to create sysfs entry:"
 				"(dev_attr_perf) error: %d\n", rc);
 #endif
+		// << FerryWu, 2012/08/05, support PC Companion
+		rc = device_create_file(&curlun->dev, &dev_attr_cdrom);
+		if (rc)
+			goto error_luns;
+		// >> FerryWu, 2012/08/05, support PC Companion
 		if (lcfg->filename) {
 			rc = fsg_lun_open(curlun, lcfg->filename);
 			if (rc)
@@ -3285,8 +2968,6 @@ buffhds_first_it:
 			i = 0x0399;
 		}
 	}
-        //MTD-CONN-EH-PCCOMPANION-01*{
-        #if 0
 	snprintf(common->inquiry_string, sizeof common->inquiry_string,
 		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
 		 /* Assume product name dependent on the first LUN */
@@ -3294,21 +2975,6 @@ buffhds_first_it:
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
-	#else	
-        snprintf(common->inquiry_string, sizeof common->inquiry_string,
-		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
-		 /* Assume product name dependent on the first LUN */
-		 cfg->product_name ?: "File-Stor Gadget",
-		 i);
-	snprintf(common->cdrom_inquiry_string,
-		 sizeof common->cdrom_inquiry_string,
-		 "%-8s%-16s%04x",
-		 cfg->cdrom_vendor_name ?: "Linux   ",
-		 /* Assume product name dependent on the first LUN */
-		 cfg->cdrom_product_name ?: "File-CD Gadget  ",
-		 i);
-        #endif
-        //MTD-CONN-EH-PCCOMPANION-01*}
 
 	/*
 	 * Some peripheral controllers are known not to be able to
@@ -3358,8 +3024,6 @@ buffhds_first_it:
 	}
 	kfree(pathbuf);
 
-	fsg_common_setup_luns(common);//MTD-CONN-EH-PCCOMPANION-01+
-
 	DBG(common, "I/O thread pid: %d\n", task_pid_nr(common->thread_task));
 
 	wake_up_process(common->thread_task);
@@ -3384,17 +3048,11 @@ static void fsg_common_release(struct kref *ref)
 		raise_exception(common, FSG_STATE_EXIT);
 		wait_for_completion(&common->thread_notifier);
 	}
-        //MTD-CONN-EH-PCCOMPANION-01*{
-        #if 0
+
 	if (likely(common->luns)) {
 		struct fsg_lun *lun = common->luns;
 		unsigned i = common->nluns;
-        #else
-        if (likely(common->luns_all)) {
-		struct fsg_lun *lun = common->luns_all;
-		unsigned i = common->msc_nluns + common->cdrom_nluns;
-	#endif
-        //MTD-CONN-EH-PCCOMPANION-01*}
+
 		/* In error recovery common->nluns may be zero. */
 		for (; i; --i, ++lun) {
 #ifdef CONFIG_USB_MSC_PROFILING
@@ -3403,12 +3061,14 @@ static void fsg_common_release(struct kref *ref)
 			device_remove_file(&lun->dev, &dev_attr_nofua);
 			device_remove_file(&lun->dev, &dev_attr_ro);
 			device_remove_file(&lun->dev, &dev_attr_file);
+			// << FerryWu, 2012/08/05, support PC Companion
+			device_remove_file(&lun->dev, &dev_attr_cdrom);
+			// >> FerryWu, 2012/08/05, support PC Companion
 			fsg_lun_close(lun);
 			device_unregister(&lun->dev);
 		}
 
-		//MTD-CONN-EH-PCCOMPANION-01-kfree(common->luns);
-                kfree(common->luns_all);//MTD-CONN-EH-PCCOMPANION-01+
+		kfree(common->luns);
 	}
 
 	{
@@ -3430,7 +3090,6 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct fsg_dev		*fsg = fsg_from_func(f);
 	struct fsg_common	*common = fsg->common;
-	int i;//MTD-CONN-EH-PCCOMPANION-01+
 
 	DBG(fsg, "unbind\n");
 	if (fsg->common->fsg == fsg) {
@@ -3439,17 +3098,14 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 		/* FIXME: make interruptible or killable somehow? */
 		wait_event(common->fsg_wait, common->fsg != fsg);
 	}
-        //MTD-CONN-EH-PCCOMPANION-01+{
-	down_write(&common->filesem);
-	for (i = 0; i < common->nluns; i++)
-		if (fsg_lun_is_open(&common->luns[i]))
-			fsg_lun_close(&common->luns[i]);
-	up_write(&common->filesem);
-        //MTD-CONN-EH-PCCOMPANION-01+}
+
 	fsg_common_put(common);
 	usb_free_descriptors(fsg->function.descriptors);
 	usb_free_descriptors(fsg->function.hs_descriptors);
 	kfree(fsg);
+	// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+	fsg_strings[FSG_STRING_INTERFACE].id = 0;
+	// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 }
 
 static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
@@ -3524,6 +3180,19 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 	fsg = kzalloc(sizeof *fsg, GFP_KERNEL);
 	if (unlikely(!fsg))
 		return -ENOMEM;
+
+	// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+	/* Maybe allocate device-global string IDs, and patch descriptors */
+	if (fsg_strings[FSG_STRING_INTERFACE].id == 0) {
+		rc = usb_string_id(cdev);
+		if (unlikely(rc < 0)) {
+			kfree(fsg);
+			return rc;
+		}
+		fsg_strings[FSG_STRING_INTERFACE].id = rc;
+		fsg_intf_desc.iInterface = rc;
+	}
+	// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 
 	fsg->function.name        = "mass_storage";
 	fsg->function.strings     = fsg_strings_array;

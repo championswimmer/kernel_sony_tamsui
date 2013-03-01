@@ -252,6 +252,40 @@ static struct usb_gadget_strings *gser_strings[] = {
 	NULL,
 };
 
+// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+#ifdef CONFIG_MODEM_SUPPORT
+static struct usb_string modem_string_defs[] = {
+	[0].s = "Andriod Modem",
+	{  } /* end of list */
+};
+
+static struct usb_gadget_strings modem_string_table = {
+	.language =		0x0409,	/* en-us */
+	.strings =		modem_string_defs,
+};
+
+static struct usb_gadget_strings *modem_strings[] = {
+	&modem_string_table,
+	NULL,
+};
+
+static struct usb_string nmea_string_defs[] = {
+	[0].s = "NMEA",
+	{  } /* end of list */
+};
+
+static struct usb_gadget_strings nmea_string_table = {
+	.language =		0x0409,	/* en-us */
+	.strings =		nmea_string_defs,
+};
+
+static struct usb_gadget_strings *nmea_strings[] = {
+	&nmea_string_table,
+	NULL,
+};
+#endif
+// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
+
 static int gport_setup(struct usb_configuration *c)
 {
 	int ret = 0;
@@ -825,6 +859,14 @@ gser_unbind(struct usb_configuration *c, struct usb_function *f)
 	gs_free_req(gser->notify, gser->notify_req);
 #endif
 	kfree(func_to_gser(f));
+
+	// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+	gser_string_defs[0].id = 0;
+#ifdef CONFIG_MODEM_SUPPORT
+	modem_string_defs[0].id = 0;
+	nmea_string_defs[0].id = 0;
+#endif
+	// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 }
 
 /**
@@ -848,13 +890,35 @@ int gser_bind_config(struct usb_configuration *c, u8 port_num)
 	 * distinguish instances ...
 	 */
 
+// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+#ifdef CONFIG_MODEM_SUPPORT
+	if ((modem_string_defs[0].id == 0) && (port_num == 0)) {
+		status = usb_string_id(c->cdev);
+		if (status < 0)
+			return status;
+		modem_string_defs[0].id = status;
+		gser_interface_desc.iInterface = status;
+	}
+
+	if ((nmea_string_defs[0].id == 0) && (port_num != 0)) {
+		status = usb_string_id(c->cdev);
+		if (status < 0)
+			return status;
+		nmea_string_defs[0].id = status;
+		gser_interface_desc.iInterface = status;
+	}
+#else
 	/* maybe allocate device-global string ID */
 	if (gser_string_defs[0].id == 0) {
 		status = usb_string_id(c->cdev);
 		if (status < 0)
 			return status;
 		gser_string_defs[0].id = status;
+		gser_interface_desc.iInterface = status;
 	}
+
+#endif
+// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 
 	/* allocate and initialize one new instance */
 	gser = kzalloc(sizeof *gser, GFP_KERNEL);
@@ -868,6 +932,14 @@ int gser_bind_config(struct usb_configuration *c, u8 port_num)
 
 	gser->port.func.name = "gser";
 	gser->port.func.strings = gser_strings;
+// << FerryWu, 2012/08/07, Fix strings table of USB descriptor
+#ifdef CONFIG_MODEM_SUPPORT
+	if (port_num == 0)
+		gser->port.func.strings = modem_strings;
+	else
+		gser->port.func.strings = nmea_strings;
+#endif
+// >> FerryWu, 2012/08/07, Fix strings table of USB descriptor
 	gser->port.func.bind = gser_bind;
 	gser->port.func.unbind = gser_unbind;
 	gser->port.func.set_alt = gser_set_alt;

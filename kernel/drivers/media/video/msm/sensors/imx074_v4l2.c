@@ -38,7 +38,7 @@ static struct msm_camera_i2c_reg_conf imx074_groupoff_settings[] = {
 static struct msm_camera_i2c_reg_conf imx074_prev_settings[] = {
 	{0x0307, 0x2D}, /*pll_multiplier*/
 	{0x0340, 0x06}, /*frame_length_lines_hi*/
-	{0x0341, 0x2D}, /*frame_length_lines_lo*/
+	{0x0341, 0x34}, /*frame_length_lines_lo*/
 	{0x0342, 0x11}, /*line_length_pclk_hi*/
 	{0x0343, 0x78}, /*line_length_pclk_lo*/
 	{0x0347, 0x00}, /*y_addr_start*/
@@ -161,9 +161,9 @@ static struct msm_sensor_output_info_t imx074_dimensions[] = {
 		.x_output = 0x838,
 		.y_output = 0x618,
 		.line_length_pclk = 0x1178,
-		.frame_length_lines = 0x62D,
+		.frame_length_lines = 0x634,
 		.vt_pixel_clk = 216000000,
-		.op_pixel_clk = 216000000,
+		.op_pixel_clk = 108000000,
 		.binning_factor = 2,
 	},
 };
@@ -184,6 +184,7 @@ static struct msm_camera_csi_params *imx074_csic_params_array[] = {
 static struct msm_camera_csid_vc_cfg imx074_cid_cfg[] = {
 	{0, CSI_RAW10, CSI_DECODE_10BIT},
 	{1, CSI_EMBED_DATA, CSI_DECODE_8BIT},
+	{2, CSI_RESERVED_DATA_0, CSI_DECODE_8BIT},
 };
 
 static struct msm_camera_csi2_params imx074_csi_params = {
@@ -191,7 +192,7 @@ static struct msm_camera_csi2_params imx074_csi_params = {
 		.lane_assign = 0xe4,
 		.lane_cnt = 4,
 		.lut_params = {
-			.num_cid = 2,
+			.num_cid = ARRAY_SIZE(imx074_cid_cfg),
 			.vc_cfg = imx074_cid_cfg,
 		},
 	},
@@ -309,6 +310,7 @@ static struct msm_sensor_fn_t imx074_func_tbl = {
 	.sensor_config = msm_sensor_config,
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
+	.sensor_adjust_frame_lines = msm_sensor_adjust_frame_lines1,
 };
 
 static struct msm_sensor_reg_t imx074_regs = {

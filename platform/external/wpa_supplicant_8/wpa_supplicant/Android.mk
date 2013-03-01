@@ -78,9 +78,11 @@ INCLUDES += frameworks/base/cmds/keystore
 ifdef CONFIG_DRIVER_NL80211
 INCLUDES += external/libnl-headers
 endif
+#TPSW1_SoMC_2nd_Patches_Begin
 ifdef CONFIG_WAPI
 INCLUDES += $(LOCAL_PATH)/src/wapi
 endif
+#TPSW1_SoMC_2nd_Patches_End
 OBJS = config.c
 OBJS += notify.c
 OBJS += bss.c
@@ -613,12 +615,13 @@ ifdef CONFIG_WPS_STRICT
 L_CFLAGS += -DCONFIG_WPS_STRICT
 OBJS += src/wps/wps_validate.c
 endif
-
+#TPSW1_SoMC_2nd_Patches_Begin
 ifdef CONFIG_WAPI
 L_CFLAGS += -DWAPI 
 OBJS += src/wapi/wapi_asue.c
 OBJS += src/wapi/wapi_config.c
 endif
+TPSW1_SoMC_2nd_Patches_End
 ifdef CONFIG_WPS_TESTING
 L_CFLAGS += -DCONFIG_WPS_TESTING
 endif
@@ -1410,8 +1413,10 @@ LOCAL_MODULE := wpa_supplicant
 ifdef CONFIG_DRIVER_CUSTOM
 LOCAL_STATIC_LIBRARIES := libCustomWifi
 endif
+#TPSW1_SoMC_2nd_Patches_Begin
 ifdef CONFIG_WAPI
 LOCAL_STATIC_LIBRARIES := libwapi
+#TPSW1_SoMC_2nd_Patches_End
 endif
 ifneq ($(BOARD_WPA_SUPPLICANT_PRIVATE_LIB),)
 LOCAL_STATIC_LIBRARIES += $(BOARD_WPA_SUPPLICANT_PRIVATE_LIB)

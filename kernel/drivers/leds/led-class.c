@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2005 John Lenz <lenz@cs.wisc.edu>
  * Copyright (C) 2005-2007 Richard Purdie <rpurdie@openedhand.com>
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -93,6 +92,8 @@ static ssize_t led_max_brightness_show(struct device *dev,
 
 	return snprintf(buf, LED_BUFF_SIZE, "%u\n", led_cdev->max_brightness);
 }
+
+
 
 static struct device_attribute led_class_attrs[] = {
 	__ATTR(brightness, 0644, led_brightness_show, led_brightness_store),
@@ -203,12 +204,6 @@ EXPORT_SYMBOL_GPL(led_classdev_resume);
 static int led_suspend(struct device *dev, pm_message_t state)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-    printk(KERN_INFO "[PM]led suspend(): %s\n", led_cdev->name);
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 
 	if (led_cdev->flags & LED_CORE_SUSPENDRESUME)
 		led_classdev_suspend(led_cdev);

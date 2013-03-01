@@ -2350,9 +2350,21 @@ CacheBuilder::FoundState CacheBuilder::FindPartialEMail(const UChar* chars, unsi
             continue;
         const UChar* atLocation = chars - 1;
         // search for domain
+        /*   
         ch = *chars++ | 0x20; // convert uppercase to lower
         if (ch < 'a' || ch > 'z')
             continue;
+        */
+        //add skywu for number domain(ex:SSS@163.com)
+        ch = * chars++;
+        if (ch < '0' || ch > '9') //check number
+        {
+            ch = ch | 0x20;
+            if (ch < 'a' || ch > 'z') //check character
+                continue;
+        }
+        //add end.
+		
         while (chars < end) {
             ch = *chars++;
             if (IsDomainChar(ch) == false)
@@ -2433,7 +2445,7 @@ nextAt:
     return FOUND_NONE;
 }
 
-#define PHONE_PATTERN "(200) /-.\\ 100 -. 0000" // poor man's regex: parens optional, any one of punct, digit smallest allowed
+#define PHONE_PATTERN "+00 - (0000) - 000 - 0 - 0000 - 000000000" // poor man's regex: parens optional, any one of punct, digit smallest allowed
 
 CacheBuilder::FoundState CacheBuilder::FindPartialNumber(const UChar* chars, unsigned length, 
     FindState* s)
@@ -2443,8 +2455,10 @@ CacheBuilder::FoundState CacheBuilder::FindPartialNumber(const UChar* chars, uns
     const UChar* start = chars;
     const UChar* end = chars + length;
     const UChar* lastDigit = NULL;
+    bool openParen = false;
     do {
         bool initialized = s->mInitialized;
+	    openParen = false;
         while (chars < end) {
             if (initialized == false) {
                 s->mBackTwo = s->mBackOne;
@@ -2454,15 +2468,28 @@ CacheBuilder::FoundState CacheBuilder::FindPartialNumber(const UChar* chars, uns
             do {
                 char patternChar = *pattern;
                 switch (patternChar) {
-                    case '2':
-                            if (initialized == false) {
-                                s->mStartResult = chars - start;
-                                initialized = true;
-                            }
+                    case '+':
+					    if (ch == patternChar) {
+					        s->mStartResult = chars - start;
+					        initialized = true;
+					        *store++ = ch;
+					        pattern++;
+					        lastDigit = chars;
+					        goto nextChar;
+				        }
+					    pattern = pattern + 5;
+					    goto commonPunctuation;
                     case '0':
-                    case '1':
-                        if (ch < patternChar || ch > '9')
+                        if (initialized == false) {
+                            s->mStartResult = chars - start;
+                            initialized = true;
+                        }
+                        if (ch < patternChar || ch > '9') {
+                            // Handle 0000 0000 case.
+                            if ((pattern - s->mPattern == 10) && (ch == ' ' || ch == '-' || ch == ')'))
+                                goto commonPunctuation;
                             goto resetPattern;
+                        }
                         *store++ = ch;
                         pattern++;
                         lastDigit = chars;
@@ -2479,14 +2506,18 @@ CacheBuilder::FoundState CacheBuilder::FindPartialNumber(const UChar* chars, uns
                         break;
                     case '(':
                         if (ch == patternChar) {
-                            s->mStartResult = chars - start;
-                            initialized = true;
+				            if (initialized == false) {
+                                s->mStartResult = chars - start;
+                                initialized = true;
+				            }
                             s->mOpenParen = true;
                         }
                         goto commonPunctuation;
                     case ')':
                         if ((ch == patternChar) ^ s->mOpenParen)
                             goto resetPattern;
+                        else if ((ch == patternChar) && s->mOpenParen)
+                            openParen = true;
                     default:
                     commonPunctuation:
                         if (ch == patternChar) {
@@ -2502,20 +2533,82 @@ CacheBuilder::FoundState CacheBuilder::FindPartialNumber(const UChar* chars, uns
 resetPattern:
         if (s->mContinuationNode)
             return FOUND_NONE;
+        int testSize = store - (s->mStore);
+        bool b = false;
+        // The longest number is 20.
+        if (*pattern == '0') {
+            // With parentheses, the shortest number is 3 + 7 = 10.
+            if (openParen) {
+                if (s->mStore[0] == '+') {
+                    // +86 (000) 0000000 ==> 3 + 3 + 7 = 13
+                    if (testSize >= 13 && testSize <= 23)
+                        b = true;
+                } else {
+                    // (000) 0000000 ==> 3 + 7 = 10
+                    if (testSize >= 10 && testSize <= 20)
+                        b = true;
+                }
+            } else { // Without parentheses, the shortest number is 7.
+                if (s->mStore[0] == '+') {
+                    // At first I think that +86 0000000 ==> 3 + 7 = 10 is not phone number
+                    // and must add state number: +86 000 0000000 ==> 3 + 3 + 7 = 13.
+                    // But this style phone number exist, so we use 10 not 13.
+                    if (testSize >= 10 && testSize <= 23)
+                        b = true; 
+                } else {
+                    // 0000000 ==> 7
+                    if (testSize >= 7 && testSize <= 20)
+                        b = true;
+                }
+            }
+            if (b)
+                goto checkMatch;
+        }
         FindResetNumber(s);
         pattern = s->mPattern;
         store = s->mStorePtr;
     } while (++chars < end);
 checkMatch:
-    if (WTF::isASCIIDigit(s->mBackOne != '1' ? s->mBackOne : s->mBackTwo))
+    /*if (WTF::isASCIIDigit(s->mBackOne != '1' ? s->mBackOne : s->mBackTwo))
+        return FOUND_NONE;*/
+    if (WTF::isASCIIDigit(s->mBackOne))
         return FOUND_NONE;
     *store = '\0';
     s->mStorePtr = store;
     s->mPattern = pattern;
     s->mEndResult = lastDigit - start + 1;
     char pState = pattern[0];
-    return pState == '\0' ? FOUND_COMPLETE : pState == '(' || (WTF::isASCIIDigit(pState) && WTF::isASCIIDigit(pattern[-1])) ? 
-        FOUND_NONE : FOUND_PARTIAL;
+    int size = store - (s->mStore);
+    bool bSize = false;
+    // With parentheses, the shortest number is 3 + 7 = 10.
+    if (openParen) {
+        if (s->mStore[0] == '+') {
+            // +86 (000) 0000000 ==> 3 + 3 + 7 = 13
+            if (size >= 13 && size <= 23)
+                bSize = true;
+        } else {
+            // (000) 0000000 ==> 3 + 7 = 10
+            if (size >= 10 && size <= 20)
+                bSize = true;
+        }
+    } else { // Without parentheses, the shortest number is 7.
+        if (s->mStore[0] == '+') {
+            // At first I think that +86 0000000 ==> 3 + 7 = 10 is not phone number
+            // and must add state number: +86 000 0000000 ==> 3 + 3 + 7 = 13.
+            // But this style phone number exist, so we use 10 not 13.
+            if (size >= 10 && size <= 23)
+                bSize = true;
+        } else {
+            // 0000000 ==> 7
+            if (size >= 7 && size <= 20)
+                bSize = true;
+        }
+    }
+    //return pState == '\0' || bSize ? FOUND_COMPLETE : pState == '+' || (WTF::isASCIIDigit(pState) && WTF::isASCIIDigit(pattern[-1])) ? 
+        //FOUND_NONE : FOUND_PARTIAL;
+    return pState == '\0' ? FOUND_COMPLETE : pState == '+' || (WTF::isASCIIDigit(pState) && WTF::isASCIIDigit(pattern[-1]) && (bSize == false)) ? 
+        FOUND_NONE : (WTF::isASCIIDigit(pState) && WTF::isASCIIDigit(pattern[-1]) && bSize) ? FOUND_COMPLETE : 
+	(((!WTF::isASCIIDigit(pState) && WTF::isASCIIDigit(pattern[-1])) || (WTF::isASCIIDigit(pState) && !WTF::isASCIIDigit(pattern[-1])))&& bSize) ? FOUND_COMPLETE : FOUND_PARTIAL;
 }
 
 CacheBuilder::FoundState CacheBuilder::FindPhoneNumber(const UChar* chars, unsigned length, 

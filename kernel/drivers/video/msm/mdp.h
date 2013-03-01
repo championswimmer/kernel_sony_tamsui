@@ -38,9 +38,6 @@
 
 #include "msm_fb_panel.h"
 
-/* FIH-SW-MM-VH-DISPLAY-27+ */
-#include <mach/msm_iomap.h>
-
 extern uint32 mdp_hw_revision;
 extern ulong mdp4_display_intf;
 extern spinlock_t mdp_spin_lock;
@@ -701,30 +698,9 @@ extern struct mdp_hist_mgmt *mdp_hist_mgmt_array[];
 #define MDP_DMA_P_LUT_C2_EN   BIT(2)
 #define MDP_DMA_P_LUT_POST    BIT(4)
 
-/* FIH-SW-MM-VH-DISPLAY-27*+[ */
-#define VIC_REG(off) (MSM_VIC_BASE + (off))
-#define MSM_VIC_BASE        IOMEM(0xFA000000)
-#define VIC_INT_SELECT0     VIC_REG(0x0000)  /* 1: FIQ, 0: IRQ */
-#define VIC_INT_SELECT1     VIC_REG(0x0004)  /* 1: FIQ, 0: IRQ */
-#define VIC_INT_EN0         VIC_REG(0x0010)
-#define VIC_INT_EN1         VIC_REG(0x0014)
-#define VIC_INT_ENCLEAR0    VIC_REG(0x0020)
-#define VIC_INT_ENCLEAR1    VIC_REG(0x0024)
-#define VIC_INT_ENSET0      VIC_REG(0x0030)
-#define VIC_INT_ENSET1      VIC_REG(0x0034)
-#define VIC_INT_TYPE0       VIC_REG(0x0040)  /* 1: EDGE, 0: LEVEL  */
-#define VIC_INT_TYPE1       VIC_REG(0x0044)  /* 1: EDGE, 0: LEVEL  */
-#define VIC_INT_POLARITY0   VIC_REG(0x0050)  /* 1: NEG, 0: POS */
-#define VIC_INT_POLARITY1   VIC_REG(0x0054)  /* 1: NEG, 0: POS */
-#define VIC_INT_MASTEREN    VIC_REG(0x0064)  /* 1: IRQ, 2: FIQ     */
-#define VIC_PROTECTION      VIC_REG(0x006C)  /* 1: ENABLE          */
-#define VIC_CONFIG          VIC_REG(0x0068)  /* 1: USE ARM1136 VIC */
-void mdp_dump(void);
-/* FIH-SW-MM-VH-DISPLAY-27+] */
 void mdp_hw_init(void);
 int mdp_ppp_pipe_wait(void);
-/* FIH-SW-MM-VH-DISPLAY-41* */
-void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd, struct mdp_blit_req *req);
+void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd);
 void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 		   boolean isr);
 void mdp_set_dma_pan_info(struct fb_info *info, struct mdp_dirty_region *dirty,
@@ -846,7 +822,6 @@ static inline int mdp4_overlay_dsi_state_get(void)
 }
 #endif
 
-void mdp_vid_quant_set(void);
 #ifndef CONFIG_FB_MSM_MDP40
 static inline void mdp_dsi_cmd_overlay_suspend(void)
 {
@@ -854,4 +829,12 @@ static inline void mdp_dsi_cmd_overlay_suspend(void)
 }
 #endif
 
+#ifdef CONFIG_FB_MSM_DTV
+void mdp_vid_quant_set(void);
+#else
+static inline void mdp_vid_quant_set(void)
+{
+	/* empty */
+}
+#endif
 #endif /* MDP_H */

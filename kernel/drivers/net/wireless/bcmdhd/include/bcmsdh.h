@@ -4,7 +4,6 @@
  *     abstract OS and BUS specific details of SDIO
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -208,13 +207,5 @@ extern uint32 bcmsdh_cur_sbwad(void *sdh);
 /* Function to pass chipid and rev to lower layers for controlling pr's */
 extern void bcmsdh_chipinfo(void *sdh, uint32 chip, uint32 chiprev);
 
-
-extern int bcmsdh_sleep(void *sdh, bool enab);
-
-/* GPIO support */
-extern int bcmsdh_gpio_init(void *sd);
-extern bool bcmsdh_gpioin(void *sd, uint32 gpio);
-extern int bcmsdh_gpioouten(void *sd, uint32 gpio);
-extern int bcmsdh_gpioout(void *sd, uint32 gpio, bool enab);
 
 #endif	/* _bcmsdh_h_ */

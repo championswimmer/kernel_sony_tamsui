@@ -1,6 +1,5 @@
 /* Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
  *
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -153,10 +152,7 @@ struct msm_panel_info {
 	__u32 clk_max;
 	__u32 frame_count;
 	__u32 is_3d_panel;
-/* FIH-SW3-MM-NC-LCM-10-[+ */
-	__u32 width;
-	__u32 height;
-/* FIH-SW3-MM-NC-LCM-10-]- */
+	__u32 frame_rate;
 
 
 	struct mddi_panel_info mddi;
@@ -164,8 +160,6 @@ struct msm_panel_info {
 	struct lcdc_panel_info lcdc;
 
 	struct mipi_panel_info mipi;
-/* FIH-SW-MM-VH-DISPLAY-40+ */
-	__u32 lcm_model;
 };
 
 #define MSM_FB_SINGLE_MODE_PANEL(pinfo)		\
@@ -180,31 +174,13 @@ struct msm_fb_panel_data {
 	void (*set_rect) (int x, int y, int xres, int yres);
 	void (*set_vsync_notifier) (msm_fb_vsync_handler_type, void *arg);
 	void (*set_backlight) (struct msm_fb_data_type *);
-
+	int (*vreg_control) (int on);   //tracy 20121024 fix sleep current
 	/* function entry chain */
 	int (*on) (struct platform_device *pdev);
 	int (*off) (struct platform_device *pdev);
 	int (*power_ctrl) (boolean enable);
 	struct platform_device *next;
 	int (*clk_func) (int enable);
-/* FIH-SW-MM-VH-DISPLAY-40*[ */
-#if defined(CONFIG_FIH_SW_DISPLAY_LCM_ID_CHECK)
-	int (*get_id) (struct msm_fb_data_type *);
-#endif
-
-#ifdef CONFIG_FIH_SW_DISPLAY_CABC
-	int (*set_cabc_mode) (char mode);
-#endif
-
-#ifdef CONFIG_FIH_SW_DISPLAY_LCM_DIMMING
-	int (*set_dimming) (char enable);
-#endif
-
-#ifdef CONFIG_FIH_SW_DISPLAY_AUO_LCM_HEALTHY_CHECK
-	int (*get_healthy) (struct msm_fb_data_type *);
-#endif
-/* FIH-SW-MM-VH-DISPLAY-40*] */
-
 };
 
 /*===========================================================================

@@ -1,7 +1,6 @@
 /* i2c-core.c - a device driver for the iic-bus interface		     */
 /* ------------------------------------------------------------------------- */
 /*   Copyright (C) 1995-99 Simon G. Vogl
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -41,12 +40,8 @@
 #include <linux/pm_runtime.h>
 #include <asm/uaccess.h>
 
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-#include <linux/kallsyms.h>
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 #include "i2c-core.h"
+
 
 /* core_lock protects i2c_adapter_idr, and guarantees
    that device detection, deletion of detected devices, and attach_adapter
@@ -181,11 +176,6 @@ static int i2c_legacy_suspend(struct device *dev, pm_message_t mesg)
 	driver = to_i2c_driver(dev->driver);
 	if (!driver->suspend)
 		return 0;
-	/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-       printk(KERN_ERR "[PM]i2c-core:  i2c legacy suspend: [%s] \n", driver->driver.name);
-	#endif
-	/*FIH-SW3-KERNEL-JC-Porting-02+] */
 	return driver->suspend(client, mesg);
 }
 
@@ -199,33 +189,15 @@ static int i2c_legacy_resume(struct device *dev)
 	driver = to_i2c_driver(dev->driver);
 	if (!driver->resume)
 		return 0;
-	/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-	 printk(KERN_ERR "[PM]i2c-core:  i2c legacy resume: [%s] \n", driver->driver.name);
-	#endif
-	/*FIH-SW3-KERNEL-JC-Porting-02+] */
 	return driver->resume(client);
 }
 
 static int i2c_device_pm_suspend(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-	/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-	const struct dev_pm_ops *temp ;
-	#endif
-	/*FIH-SW3-KERNEL-JC-Porting-02+] */
 
 	if (pm)
-	{
-		/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-		#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-		temp  = dev->driver->pm;
-   	 	print_symbol("[PM]i2c pm suspend: %s\n", (unsigned long)temp->suspend);
-		#endif
-		/*FIH-SW3-KERNEL-JC-Porting-02+] */
 		return pm_generic_suspend(dev);
-	}
 	else
 		return i2c_legacy_suspend(dev, PMSG_SUSPEND);
 }
@@ -233,22 +205,9 @@ static int i2c_device_pm_suspend(struct device *dev)
 static int i2c_device_pm_resume(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-	/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-	const struct dev_pm_ops *temp ;
-	#endif
-	/*FIH-SW3-KERNEL-JC-Porting-02+] */
 
 	if (pm)
-	{
-		/*FIH-SW3-KERNEL-JC-Porting-01+[ */
-		#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-        temp  = dev->driver->pm;
-   	 	print_symbol("i2c pm resume: %s\n", (unsigned long)temp->resume);
-		#endif
-		/*FIH-SW3-KERNEL-JC-Porting-01+] */
 		return pm_generic_resume(dev);
-	}
 	else
 		return i2c_legacy_resume(dev);
 }
@@ -1362,6 +1321,18 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	 */
 
 	if (adap->algo->master_xfer) {
+//+ murphy 2011.11.07
+//I2C debug info, to see read & write action.
+#if 0
+    for (ret = 0; ret < num; ret++) {
+      printk(KERN_INFO "master_xfer[%d] %c, addr=0x%02x, len=%d%s\n",
+        ret,
+        (msgs[ret].flags & I2C_M_RD) ? 'R' : 'W',
+        msgs[ret].addr,
+        msgs[ret].len,
+        (msgs[ret].flags & I2C_M_RECV_LEN) ? "+" : "");
+    }
+#else
 #ifdef DEBUG
 		for (ret = 0; ret < num; ret++) {
 			dev_dbg(&adap->dev, "master_xfer[%d] %c, addr=0x%02x, "
@@ -1370,6 +1341,8 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 				(msgs[ret].flags & I2C_M_RECV_LEN) ? "+" : "");
 		}
 #endif
+#endif
+//- murphy 2011.11.07
 
 		if (in_atomic() || irqs_disabled()) {
 			ret = i2c_trylock_adapter(adap);
@@ -2159,6 +2132,7 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
 	return res;
 }
 EXPORT_SYMBOL(i2c_smbus_xfer);
+
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus main module");
 MODULE_LICENSE("GPL");

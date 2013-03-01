@@ -65,6 +65,9 @@ static struct msm_rpc_endpoint *rpc_cb_server_client;
 static struct msm_adsp_module *adsp_modules;
 static int adsp_open_count;
 
+/*++ Kevin Shiu - 20111026 Avoid conflict with other APPs ++*/
+int *APPs_count;
+/*-- Kevin Shiu - 20111026 Avoid conflict with other APPs --*/
 static uint32_t rpc_adsp_rtos_atom_prog;
 static uint32_t rpc_adsp_rtos_atom_vers;
 static uint32_t rpc_adsp_rtos_atom_vers_comp;
@@ -858,7 +861,8 @@ static int adsp_rtos_read_ctrl_word_cmd_tast_to_h_v(
 	unsigned msg_id;
 	unsigned msg_length;
 #ifdef CONFIG_DEBUG_FS
-	uint16_t *ptr;
+	uint16_t *ptr16;
+	uint32_t *ptr32;
 	int ii;
 #endif /* CONFIG_DEBUG_FS */
 	void (*func)(void *, size_t);
@@ -902,12 +906,20 @@ static int adsp_rtos_read_ctrl_word_cmd_tast_to_h_v(
 		return 0;
 	}
 #ifdef CONFIG_DEBUG_FS
-	if (rdump > 0) {
-		ptr = read_event_addr;
+	if (rdump > 0 &&
+		(dsp_addr >= (void *)(MSM_AD5_BASE + QDSP_RAMC_OFFSET))) {
+		ptr32 = read_event_addr;
+		pr_info("D->A\n");
+		pr_info("m_id = %x id = %x\n", module->id, msg_id);
+		for (ii = 0; ii < msg_length/4; ii++)
+			pr_info("%x ", ptr32[ii]);
+		pr_info("\n");
+	} else if (rdump > 0) {
+		ptr16 = read_event_addr;
 		pr_info("D->A\n");
 		pr_info("m_id = %x id = %x\n", module->id, msg_id);
 		for (ii = 0; ii < msg_length/2; ii++)
-			pr_info("%x ", ptr[ii]);
+			pr_info("%x ", ptr16[ii]);
 		pr_info("\n");
 	}
 #endif /* CONFIG_DEBUG_FS */
@@ -1389,6 +1401,11 @@ static int __init adsp_init(void)
 	msm_adsp_driver.driver.name = msm_adsp_driver_name;
 	rc = platform_driver_register(&msm_adsp_driver);
 	MM_INFO("%s -- %d\n", msm_adsp_driver_name, rc);
+	
+	/*++ Kevin Shiu - 20111026 Avoid conflict with other APPs ++*/
+	APPs_count = &adsp_open_count;
+	/*++ Kevin Shiu - 20111026 Avoid conflict with other APPs ++*/
+	
 	return rc;
 }
 

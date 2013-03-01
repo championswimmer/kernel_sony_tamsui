@@ -555,14 +555,14 @@ osl_pktget_static(osl_t *osh, uint len)
 	int i;
 	struct sk_buff *skb;
 
-	if (!bcm_static_skb || (len > (PAGE_SIZE * 4))) { //MTD_CONN_EC_HOTSPOT-EnlargeStaticBuffer-01*
+	if (len > (PAGE_SIZE * 2)) {
 		printk("%s: attempt to allocate huge packet (0x%x)\n", __FUNCTION__, len);
 		return osl_pktget(osh, len);
 	}
 
 	down(&bcm_static_skb->osl_pkt_sem);
 
-	if (len <= (PAGE_SIZE * 2)) {  //MTD_CONN_EC_HOTSPOT-EnlargeStaticBuffer-01*
+	if (len <= PAGE_SIZE) {
 		for (i = 0; i < STATIC_PKT_MAX_NUM; i++) {
 			if (bcm_static_skb->pkt_use[i] == 0)
 				break;
@@ -570,10 +570,10 @@ osl_pktget_static(osl_t *osh, uint len)
 
 		if (i != STATIC_PKT_MAX_NUM) {
 			bcm_static_skb->pkt_use[i] = 1;
+			up(&bcm_static_skb->osl_pkt_sem);
 			skb = bcm_static_skb->skb_4k[i];
 			skb->tail = skb->data + len;
 			skb->len = len;
-			up(&bcm_static_skb->osl_pkt_sem);  //MTD_CONN_EC_HOTSPOT-EnlargeStaticBuffer-01*
 			return skb;
 		}
 	}
@@ -586,10 +586,10 @@ osl_pktget_static(osl_t *osh, uint len)
 
 	if (i != STATIC_PKT_MAX_NUM) {
 		bcm_static_skb->pkt_use[i+STATIC_PKT_MAX_NUM] = 1;
+		up(&bcm_static_skb->osl_pkt_sem);
 		skb = bcm_static_skb->skb_8k[i];
 		skb->tail = skb->data + len;
 		skb->len = len;
-		up(&bcm_static_skb->osl_pkt_sem);  //MTD_CONN_EC_HOTSPOT-EnlargeStaticBuffer-01*
 		return skb;
 	}
 

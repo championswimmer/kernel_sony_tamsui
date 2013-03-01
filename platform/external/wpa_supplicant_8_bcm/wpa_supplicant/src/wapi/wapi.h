@@ -2,7 +2,6 @@
  *  @brief This header file contains data structures and function declarations of wapi
  *
  *  Copyright (C) 2001-2008, Iwncomm Ltd.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #ifndef WAPI_H

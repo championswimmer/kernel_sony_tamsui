@@ -719,6 +719,8 @@ void XMLDocumentParser::parseDtd()
             setIsXHTMLDocument(true);
     }
 #endif
+// Arima Rockyang marked 20120613 - do not check DTD public ID due to error tolerance
+/*
 #if ENABLE(WML)
     else if (document()->isWMLDocument()
              && publicId != QLatin1String("-//WAPFORUM//DTD WML 1.3//EN")
@@ -727,6 +729,8 @@ void XMLDocumentParser::parseDtd()
              && publicId != QLatin1String("-//WAPFORUM//DTD WML 1.0//EN"))
         handleError(fatal, "Invalid DTD Public ID", lineNumber(), columnNumber());
 #endif
+*/
+// Arima Rockyang marked end
     if (!m_parsingFragment)
         document()->parserAddChild(DocumentType::create(document(), name, publicId, systemId));
 

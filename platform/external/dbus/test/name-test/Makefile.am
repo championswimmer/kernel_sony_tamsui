@@ -4,7 +4,7 @@ INCLUDES=-I$(top_srcdir) $(DBUS_CLIENT_CFLAGS) $(DBUS_GLIB_CFLAGS) $(DBUS_TEST_C
 ## so if adding tests not to be run in make check, don't add them to 
 ## TESTS
 if DBUS_BUILD_TESTS
-TESTS_ENVIRONMENT=DBUS_TOP_BUILDDIR=@abs_top_builddir@ DBUS_TOP_SRCDIR=@abs_top_srcdir@
+TESTS_ENVIRONMENT=DBUS_TOP_BUILDDIR=@abs_top_builddir@ DBUS_TOP_SRCDIR=@abs_top_srcdir@ PYTHON=@PYTHON@
 TESTS=run-test.sh run-test-systemserver.sh
 else
 TESTS=
@@ -16,7 +16,7 @@ if DBUS_BUILD_TESTS
 
 ## we use noinst_PROGRAMS not check_PROGRAMS for TESTS so that we
 ## build even when not doing "make check"
-noinst_PROGRAMS=test-pending-call-dispatch test-pending-call-timeout test-threads-init test-ids test-shutdown test-privserver test-privserver-client
+noinst_PROGRAMS=test-pending-call-dispatch test-pending-call-timeout test-threads-init test-ids test-shutdown test-privserver test-privserver-client test-autolaunch
 
 AM_CPPFLAGS = -DDBUS_STATIC_BUILD
 test_pending_call_dispatch_SOURCES =		\
@@ -63,5 +63,12 @@ test_privserver_client_SOURCES =            \
 test_privserver_client_CFLAGS=
 test_privserver_client_LDADD=$(top_builddir)/dbus/libdbus-internal.la ../libdbus-testutils.la $(DBUS_TEST_LIBS)
 test_privserver_client_LDFLAGS=@R_DYNAMIC_LDFLAG@
+
+test_autolaunch_SOURCES =            \
+	test-autolaunch.c
+
+test_autolaunch_CFLAGS=
+test_autolaunch_LDADD=$(top_builddir)/dbus/libdbus-internal.la ../libdbus-testutils.la $(DBUS_TEST_LIBS)
+test_autolaunch_LDFLAGS=@R_DYNAMIC_LDFLAG@
 
 endif

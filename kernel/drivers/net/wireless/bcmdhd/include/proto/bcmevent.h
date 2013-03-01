@@ -2,7 +2,6 @@
  * Broadcom Event  protocol definitions
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -226,8 +225,6 @@ extern const int		bcmevent_names_size;
 #define WLC_E_REASON_DIRECTED_ROAM	6	
 #define WLC_E_REASON_TSPEC_REJECTED	7	
 #define WLC_E_REASON_BETTER_AP		8	
-
-#define WLC_E_REASON_REQUESTED_ROAM 11	
 
 
 #define WLC_E_PRUNE_ENCR_MISMATCH	1	

@@ -771,13 +771,15 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 				params->capability_id = ERROR_INVALID_PARAMETER;
 			}
 		} else if (params->pdu_id == PDU_GET_ELEMENT_ATTRIBUTES) {
-			//MTD-Conn-JC-AVRCP-ELEMENT_ATTRIBUTES-[
+			 //TPSW1_SoMC_SS_4th_Patches_Begin
+                        //Tamsui3-Conn-JC-AVRCP-ELEMENT_ATTRIBUTES-[
 			DBG(" Pdu id is PDU_GET_ELEMENT_ATTRIBUTES, reject this request");
 				avctp->cr = AVCTP_RESPONSE;
 				avrcp->code = CTYPE_REJECTED;
 				params->param_len = htons(0x1);
 				params->capability_id = ERROR_INVALID_PARAMETER;
 			/*
+		
 			operands = (unsigned char *)params;
 			operands += AVRCP_PKT_PARAMS_LEN;
 			operands += 7;
@@ -804,7 +806,8 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 			send_meta_data(control, avctp->transaction, att_mask, att_count);
 			return TRUE;
 			*/
-			//MTD-Conn-JC-AVRCP-ELEMENT_ATTRIBUTES-]
+		        //TPSW1_SoMC_SS_4th_Patches_End
+                  	//Tamsui3-Conn-JC-AVRCP-ELEMENT_ATTRIBUTES-]
 		} else if (params->pdu_id == PDU_REQ_CONTINUE_RSP_ID) {
 			if (mdata->remaining_mdata_len == 0) {
 				avctp->cr = AVCTP_RESPONSE;
@@ -831,14 +834,6 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 				packet_size -= 1;
 			}
 		} else if (params->pdu_id == PDU_RGR_NOTIFICATION_ID) {
-			//MTD-Conn-JC-AVRCP-RGR_NOTIFICATION-[
-			DBG("[JC] Pdu id is PDU_RGR_NOTIFICATION_ID, capability id : [%x], reject",params->capability_id);
-			avctp->cr = AVCTP_RESPONSE;
-			avrcp->code = CTYPE_REJECTED;
-			params->param_len = htons(0x1);
-			params->capability_id = ERROR_INVALID_PARAMETER;
-			//Reject this request to avoid IOT issue on FZ709
-			/*
 			avctp->cr = AVCTP_RESPONSE;
 			if (params->capability_id == EVENT_TRACK_CHANGED) {
 				mdata->trans_id_event_track = avctp->transaction;
@@ -870,8 +865,7 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 				avrcp->code = CTYPE_REJECTED;
 				params->param_len = htons(0x1);
 				params->capability_id = ERROR_INVALID_PARAMETER;
-			}*/
-			//MTD-Conn-JC-AVRCP-RGR_NOTIFICATION-]
+			}
 		} else if (params->pdu_id == PDU_GET_PLAY_STATUS_ID) {
 			g_dbus_emit_signal(control->dev->conn, control->dev->path,
 					AUDIO_CONTROL_INTERFACE, "GetPlayStatus",
@@ -1028,6 +1022,8 @@ static void auth_cb(DBusError *derr, void *user_data)
 {
 	struct control *control = user_data;
 	GError *err = NULL;
+	struct audio_device *dev = control->dev;
+	struct avdtp *session;
 
 	if (control->io_id) {
 		g_source_remove(control->io_id);
@@ -1038,6 +1034,15 @@ static void auth_cb(DBusError *derr, void *user_data)
 		error("Access denied: %s", derr->message);
 		avctp_set_state(control, AVCTP_STATE_DISCONNECTED);
 		return;
+	}
+	if (dev->sink &&
+		!avdtp_is_connected(&dev->src, &dev->dst)) {
+		session = avdtp_get(&dev->src, &dev->dst);
+		if (session) {
+			DBG("sending connect");
+			sink_setup_stream(dev->sink, session);
+			avdtp_unref(session);
+		}
 	}
 
 	if (!bt_io_accept(control->io, avctp_connect_cb, control,
@@ -1409,11 +1414,13 @@ static DBusMessage *update_notification(DBusConnection *conn, DBusMessage *msg,
 
 	DBG("Notification data is %d %d", (int)event_id, (int)event_data);
 
-	if (control->state != AVCTP_STATE_CONNECTED)
+	if (control->state != AVCTP_STATE_CONNECTED) {
+		if (event_id == EVENT_PLAYBACK_STATUS_CHANGED && mdata != NULL)
+			mdata->current_play_status = (uint8_t)event_data;
 		return g_dbus_create_error(msg,
 			ERROR_INTERFACE ".NotConnected",
 				"Device not Connected");
-
+	}
 	send_notification(control, event_id, event_data);
 
 	return dbus_message_new_method_return(msg);

@@ -126,12 +126,11 @@ static void mdp_dma_s_update_lcd(struct msm_fb_data_type *mfd)
 
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-/* FIH-SW-MM-VH-DISPLAY-41*[ */
 	if (mfd->panel_info.type == MDDI_PANEL)
-		mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd, NULL);
+		mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd);
 	else
-		mdp_pipe_kickoff(MDP_DMA_E_TERM, mfd, NULL);
-/* FIH-SW-MM-VH-DISPLAY-41*] */
+		mdp_pipe_kickoff(MDP_DMA_E_TERM, mfd);
+
 }
 
 void mdp_dma_s_update(struct msm_fb_data_type *mfd)

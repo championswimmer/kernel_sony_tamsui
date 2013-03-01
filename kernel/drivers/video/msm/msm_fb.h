@@ -1,5 +1,4 @@
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +23,7 @@
 #include "linux/proc_fs.h"
 
 #include <mach/hardware.h>
+#include <mach/msm_subsystem_map.h>
 #include <linux/io.h>
 #include <mach/board.h>
 
@@ -34,6 +34,7 @@
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 #include <linux/hrtimer.h>
+#include <linux/wakelock.h>
 
 #include <linux/fb.h>
 #include <linux/list.h>
@@ -43,6 +44,9 @@
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
+
+/*  Idle wakelock to prevent PC between wake up and Vsync */
+extern struct wake_lock mdp_idle_wakelock;
 
 #include "msm_fb_panel.h"
 #include "mdp.h"
@@ -146,6 +150,7 @@ struct msm_fb_data_type {
 	__u32 var_xres;
 	__u32 var_yres;
 	__u32 var_pixclock;
+	__u32 var_frame_rate;
 
 #ifdef MSM_FB_ENABLE_DBGFS
 	struct dentry *sub_dir;
@@ -172,6 +177,7 @@ struct msm_fb_data_type {
 	struct list_head writeback_register_queue;
 	wait_queue_head_t wait_q;
 	struct ion_client *iclient;
+	struct msm_mapped_buffer *map_buffer;
 	struct mdp_buf_type *ov0_wb_buf;
 	struct mdp_buf_type *ov1_wb_buf;
 	u32 ov_start;
@@ -180,11 +186,6 @@ struct msm_fb_data_type {
 	u32 use_ov0_blt, ov0_blt_state;
 	u32 use_ov1_blt, ov1_blt_state;
 	u32 writeback_state;
-/* FIH-SW-MM-VH-DISPLAY-18+[ */
-#ifdef CONFIG_FIH_SW_DISPLAY_CABC
-	char cabc_mode;
-#endif
-/* FIH-SW-MM-VH-DISPLAY-18+] */
 	int cont_splash_done;
 };
 
@@ -212,46 +213,12 @@ void msm_fb_config_backlight(struct msm_fb_data_type *mfd);
 
 void fill_black_screen(void);
 void unfill_black_screen(void);
+int msm_fb_check_frame_rate(struct msm_fb_data_type *mfd,
+				struct fb_info *info);
 
-/* FIH-SW-MM-VH-DISPLAY-15*[ */
-#ifdef CONFIG_FIH_SW_DISPLAY_CABC
-enum{
-	FB_PATTERN_DISABLE,
-	FB_PATTERN_GAMMA,
-	FB_PATTERN_RGB,
-	FB_PATTERN_R,
-	FB_PATTERN_G,
-	FB_PATTERN_B,
-	FB_PATTERN_WHITE,
-	FB_PATTERN_GRAY,
-	FB_PATTERN_BLACK,
-	FB_PATTERN_GRAYFF,
-	FB_PATTERN_GRAYEF,
-	FB_PATTERN_GRAYDF,
-	FB_PATTERN_GRAYCF,
-	FB_PATTERN_GRAYBF,
-	FB_PATTERN_GRAYAF,
-	FB_PATTERN_GRAY9F,
-	FB_PATTERN_GRAY8F,
-	FB_PATTERN_GRAY7F,
-	FB_PATTERN_GRAY6F,
-	FB_PATTERN_GRAY5F,
-	FB_PATTERN_GRAY4F,
-	FB_PATTERN_GRAY3F,
-	FB_PATTERN_GRAY2F,
-	FB_PATTERN_GRAY1F,
-	FB_PATTERN_GRAY0F,
-	FB_PATTERN_GRAY00
-};
-/* FIH-SW-MM-VH-DISPLAY-21+[ */
-enum
-{
-	FB_CABC_MODE_DISABLE,
-	FB_CABC_MODE_UI,
-	FB_CABC_MODE_STILL_IMAGE,
-	FB_CABC_MODE_MOVING_IMAGE,
-};
-/* FIH-SW-MM-VH-DISPLAY-21+] */
+#ifdef CONFIG_FB_MSM_LOGO
+#define INIT_IMAGE_FILE "/initlogo.rle"
+int load_565rle_image(char *filename, bool bf_supported);
 #endif
-/* FIH-SW-MM-VH-DISPLAY-15*] */
+
 #endif /* MSM_FB_H */

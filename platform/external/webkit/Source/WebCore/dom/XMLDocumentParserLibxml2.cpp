@@ -1062,6 +1062,8 @@ void XMLDocumentParser::internalSubset(const xmlChar* name, const xmlChar* exter
 #if ENABLE(WML) || ENABLE(XHTMLMP)
         String extId = toString(externalID);
 #endif
+// Arima Rockyang marked 20120613 - do not check DTD public ID due to error tolerance
+/*
 #if ENABLE(WML)
         if (isWMLDocument()
             && extId != "-//WAPFORUM//DTD WML 1.3//EN"
@@ -1070,6 +1072,8 @@ void XMLDocumentParser::internalSubset(const xmlChar* name, const xmlChar* exter
             && extId != "-//WAPFORUM//DTD WML 1.0//EN")
             handleError(fatal, "Invalid DTD Public ID", lineNumber(), columnNumber());
 #endif
+*/
+// Arima Rockyang marked end
 #if ENABLE(XHTMLMP)
         String dtdName = toString(name);
         if (extId == "-//WAPFORUM//DTD XHTML Mobile 1.0//EN"

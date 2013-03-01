@@ -105,8 +105,12 @@ struct FieldIds {
 #endif
         mBlockNetworkLoads = env->GetFieldID(clazz, "mBlockNetworkLoads", "Z");
         mJavaScriptEnabled = env->GetFieldID(clazz, "mJavaScriptEnabled", "Z");
+        //TPSW1_SoMC_SS_3rd_Patches_Begin	
+	//<2012/06/15-stevenshi start, for cts testBrowserPrivateDataAccess.
         mAllowUniversalAccessFromFileURLs = env->GetFieldID(clazz, "mAllowUniversalAccessFromFileURLs", "Z");
         mAllowFileAccessFromFileURLs = env->GetFieldID(clazz, "mAllowFileAccessFromFileURLs", "Z");
+		//>2012/06/15-stevenshi end.
+        //TPSW1_SoMC_SS_3rd_Patches_End 
         mPluginState = env->GetFieldID(clazz, "mPluginState",
                 "Landroid/webkit/WebSettings$PluginState;");
 #if ENABLE(DATABASE)
@@ -164,8 +168,10 @@ struct FieldIds {
         env->DeleteLocalRef(autoFillProfileClass);
 #endif
 #if USE(CHROME_NETWORK_STACK)
-        mUserAgentProfile = env->GetFieldID(clazz, "mUserAgentProfile",
+      // BU1SW1_SoMC_SS_Patches ....... begin 
+      mUserAgentProfile = env->GetFieldID(clazz, "mUserAgentProfile",
                 "Ljava/lang/String;");
+ // BU1SW1_SoMC_SS_Patches ....... end 
         mOverrideCacheMode = env->GetFieldID(clazz, "mOverrideCacheMode", "I");
 #endif
 
@@ -190,11 +196,15 @@ struct FieldIds {
 #endif
         LOG_ASSERT(mBlockNetworkLoads, "Could not find field mBlockNetworkLoads");
         LOG_ASSERT(mJavaScriptEnabled, "Could not find field mJavaScriptEnabled");
+       //TPSW1_SoMC_SS_3rd_Patches_Begin 	
+ 	//<2012/06/15-stevenshi start, for cts testBrowserPrivateDataAccess.
         LOG_ASSERT(mAllowUniversalAccessFromFileURLs,
                     "Could not find field mAllowUniversalAccessFromFileURLs");
         LOG_ASSERT(mAllowFileAccessFromFileURLs,
                     "Could not find field mAllowFileAccessFromFileURLs");
-        LOG_ASSERT(mPluginState, "Could not find field mPluginState");
+		//>2012/06/15-stevenshi end.
+          //TPSW1_SoMC_SS_3rd_Patches_End  
+         LOG_ASSERT(mPluginState, "Could not find field mPluginState");
 #if ENABLE(OFFLINE_WEB_APPLICATIONS)
         LOG_ASSERT(mAppCacheEnabled, "Could not find field mAppCacheEnabled");
         LOG_ASSERT(mAppCachePath, "Could not find field mAppCachePath");
@@ -242,9 +252,13 @@ struct FieldIds {
 #endif
     jfieldID mBlockNetworkLoads;
     jfieldID mJavaScriptEnabled;
+    //TPSW1_SoMC_SS_3rd_Patches_Begin 
+	//<2012/06/15-stevenshi start, for cts testBrowserPrivateDataAccess.
     jfieldID mAllowUniversalAccessFromFileURLs;
     jfieldID mAllowFileAccessFromFileURLs;
-    jfieldID mPluginState;
+	//>2012/06/15-stevenshi end.
+        //TPSW1_SoMC_SS_3rd_Patches_End 
+     jfieldID mPluginState;
 #if ENABLE(OFFLINE_WEB_APPLICATIONS)
     jfieldID mAppCacheEnabled;
     jfieldID mAppCachePath;
@@ -295,7 +309,9 @@ struct FieldIds {
     jfieldID mAutoFillProfilePhoneNumber;
 #endif
 #if USE(CHROME_NETWORK_STACK)
+    // BU1SW1_SoMC_SS_Patches ....... begin
     jfieldID mUserAgentProfile;
+    // BU1SW1_SoMC_SS_Patches ....... end
     jfieldID mOverrideCacheMode;
 #endif
 #ifdef PROTEUS_DEVICE_API
@@ -403,11 +419,11 @@ public:
         WebFrame::getWebFrame(pFrame)->setUserAgent(jstringToWtfString(env, str));
 #if USE(CHROME_NETWORK_STACK)
         WebViewCore::getWebViewCore(pFrame->view())->setWebRequestContextUserAgent();
-
+       // BU1SW1_SoMC_SS_Patches ....... begin
         str = (jstring)env->GetObjectField(obj, gFieldIds->mUserAgentProfile);
         WebFrame::getWebFrame(pFrame)->setUserAgentProfile(jstringToWtfString(env, str));
         WebViewCore::getWebViewCore(pFrame->view())->setWebRequestContextUserAgentProfile();
-
+       // BU1SW1_SoMC_SS_Patches ....... end
         jint cacheMode = env->GetIntField(obj, gFieldIds->mOverrideCacheMode);
         WebViewCore::getWebViewCore(pFrame->view())->setWebRequestContextCacheMode(cacheMode);
 
@@ -444,13 +460,15 @@ public:
 
         flag = env->GetBooleanField(obj, gFieldIds->mJavaScriptEnabled);
         s->setJavaScriptEnabled(flag);
-
+	//TPSW1_SoMC_SS_3rd_Patches_Begin 	
+		//<2012/06/15-stevenshi start, for cts testBrowserPrivateDataAccess.
         flag = env->GetBooleanField(obj, gFieldIds->mAllowUniversalAccessFromFileURLs);
         s->setAllowUniversalAccessFromFileURLs(flag);
 
         flag = env->GetBooleanField(obj, gFieldIds->mAllowFileAccessFromFileURLs);
         s->setAllowFileAccessFromFileURLs(flag);
-
+		//>2012/06/15-stevenshi end.
+        //TPSW1_SoMC_SS_3rd_Patches_End 
         // ON = 0
         // ON_DEMAND = 1
         // OFF = 2

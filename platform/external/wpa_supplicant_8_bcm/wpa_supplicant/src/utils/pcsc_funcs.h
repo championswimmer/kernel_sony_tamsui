@@ -42,7 +42,7 @@ typedef enum {
 } scard_sim_type;
 
 
-#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_FIH)
+#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_Tamsui1)
 struct scard_data * scard_init(scard_sim_type sim_type, char *socket);
 void scard_deinit(struct scard_data *scard);
 
@@ -55,7 +55,7 @@ int scard_umts_auth(struct scard_data *scard, const unsigned char *_rand,
 		    unsigned char *res, size_t *res_len,
 		    unsigned char *ik, unsigned char *ck, unsigned char *auts);
 
-#else /* defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_FIH)*/
+#else /* defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_Tamsui1)*/
 
 #define scard_init(s) NULL
 #define scard_deinit(s) do { } while (0)

@@ -43,6 +43,12 @@ ifeq ($(ENABLE_SVG), true)
     FEATURE_DEFINES += ENABLE_SVG=1
 endif
 
+# Arima Rockyang added 20120608 - WML support
+ifeq ($(ENABLE_WML),true)
+    FEATURE_DEFINES += ENABLE_WML=1
+endif
+# Arima Rockyang added end
+
 # conditionally compile proteus bindings
 ifeq ($(PROTEUS_DEVICE_API), true)
     FEATURE_DEFINES += PROTEUS_DEVICE_API
@@ -786,3 +792,16 @@ $(GEN): PRIVATE_CUSTOM_TOOL = perl -I $(PRIVATE_PATH)/bindings/scripts $< --tags
 $(GEN): $(LOCAL_PATH)/dom/make_names.pl $(LOCAL_PATH)/mathml/mathtags.in $(LOCAL_PATH)/mathml/mathattrs.in
 	$(transform-generated-source)
 LOCAL_GENERATED_SOURCES += $(GEN)
+
+# Arima Rockyang added 20120608 - WML support
+ifeq ($(ENABLE_WML),true)
+GEN:= $(intermediates)/WMLNames.cpp $(intermediates)/WMLNames.h $(intermediates)/WMLElementFactory.cpp $(intermediates)/WMLElementFactory.h
+$(GEN): PRIVATE_PATH := $(LOCAL_PATH)
+$(GEN): PRIVATE_CUSTOM_TOOL = perl -I $(PRIVATE_PATH)/bindings/scripts $< --tags $(wml_tag) --attrs $(wml_attrs) --factory --wrapperFactory --output $(dir $@)
+$(GEN): wml_tag := $(LOCAL_PATH)/wml/WMLTagNames.in
+$(GEN): wml_attrs := $(LOCAL_PATH)/wml/WMLAttributeNames.in
+$(GEN): $(LOCAL_PATH)/dom/make_names.pl $(wml_tag) $(wml_attrs)
+	$(transform-generated-source)
+LOCAL_GENERATED_SOURCES += $(GEN)
+endif
+# Arima Rockyang added end

@@ -144,6 +144,13 @@ static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
 		return;
 	}
 
+	if (!io) {
+		printf("connect error io NULL\n");
+		set_state(STATE_DISCONNECTED);
+		return;
+	}
+
+	iochannel = io;
 	attrib = g_attrib_new(iochannel);
 	g_attrib_register(attrib, ATT_OP_HANDLE_NOTIFY, events_handler,
 							attrib, NULL);

@@ -1,3 +1,11 @@
+# Copyright (c) 2011-2012 Qualcomm Atheros, Inc.
+# All Rights Reserved.
+# Qualcomm Atheros Confidential and Proprietary.
+# Notifications and licenses are retained for attribution purposes only
+
+# For this file, which was received with alternative licensing options for
+# distribution, Qualcomm Atheros, Inc. has selected the BSD license.
+
 ifndef CC
 CC=gcc
 endif
@@ -15,12 +23,13 @@ CFLAGS += -I../src/utils
 
 -include .config
 
-ALL=wpa_supplicant wpa_cli
+BINALL=wpa_supplicant wpa_cli
 
 ifndef CONFIG_NO_WPA_PASSPHRASE
-ALL += wpa_passphrase
+BINALL += wpa_passphrase
 endif
 
+ALL = $(BINALL)
 ALL += systemd/wpa_supplicant.service
 ALL += systemd/wpa_supplicant@.service
 ALL += systemd/wpa_supplicant-nl80211@.service
@@ -48,9 +57,10 @@ mkconfig:
 	echo CONFIG_DRIVER_HOSTAP=y >> .config
 	echo CONFIG_DRIVER_WEXT=y >> .config
 
-install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	for i in $(ALL); do cp $$i $(DESTDIR)$(BINDIR)/$$i; done
+$(DESTDIR)$(BINDIR)/%: %
+	install -D $(<) $(@)
+
+install: $(addprefix $(DESTDIR)$(BINDIR)/,$(BINALL))
 	$(MAKE) -C ../src install
 
 OBJS = config.o
@@ -106,9 +116,17 @@ endif
 OBJS += ../src/utils/$(CONFIG_ELOOP).o
 OBJS_c += ../src/utils/$(CONFIG_ELOOP).o
 
+ifdef CONFIG_ELOOP_POLL
+CFLAGS += -DCONFIG_ELOOP_POLL
+endif
+
 
 ifdef CONFIG_EAPOL_TEST
 CFLAGS += -Werror -DEAPOL_TEST
+endif
+
+ifdef CONFIG_HT_OVERRIDES
+CFLAGS += -DCONFIG_HT_OVERRIDES
 endif
 
 ifndef CONFIG_BACKEND
@@ -215,14 +233,6 @@ CONFIG_AP=y
 ifdef CONFIG_P2P_STRICT
 CFLAGS += -DCONFIG_P2P_STRICT
 endif
-endif
-
-ifdef CONFIG_WFD
-OBJS += wfd_supplicant.o
-OBJS += ./src/wfd/wfd.o
-OBJS += ./src/wfd/wfd_parse.o
-OBJS += ./src/wfd/wfd_build.o
-CFLAGS += -DCONFIG_WFD
 endif
 
 ifdef CONFIG_INTERWORKING
@@ -439,6 +449,12 @@ endif
 CONFIG_IEEE8021X_EAPOL=y
 CONFIG_EAP_SIM_COMMON=y
 NEED_AES_CBC=y
+endif
+
+ifeq ($(BOARD_HAS_QCOM_WLAN), true)
+CFLAGS += -DSIM_AKA_QUALCOMM
+OBJS += eap_proxy.o
+CONFIG_IEEE8021X_EAPOL=y
 endif
 
 ifdef CONFIG_EAP_AKA_PRIME
@@ -664,6 +680,9 @@ endif
 ifdef CONFIG_IEEE8021X_EAPOL
 # IEEE 802.1X/EAPOL state machines (e.g., for RADIUS authentication)
 CFLAGS += -DIEEE8021X_EAPOL
+ifeq ($(BOARD_HAS_QCOM_WLAN), true)
+CFLAGS += -DSIM_AKA_QUALCOMM
+endif
 OBJS += ../src/eapol_supp/eapol_supp_sm.o
 OBJS += ../src/eap_peer/eap.o ../src/eap_peer/eap_methods.o
 NEED_EAP_COMMON=y
@@ -725,6 +744,9 @@ ifdef CONFIG_WPS
 CFLAGS += -DEAP_SERVER_WSC
 OBJS += ../src/ap/wps_hostapd.o
 OBJS += ../src/eap_server/eap_server_wsc.o
+endif
+ifdef CONFIG_INTERWORKING
+OBJS += ../src/ap/gas_serv.o
 endif
 endif
 
@@ -1169,17 +1191,6 @@ endif
 ifndef DBUS_INCLUDE
 DBUS_INCLUDE := $(shell $(PKG_CONFIG) --cflags dbus-1)
 endif
-dbus_version=$(subst ., ,$(shell $(PKG_CONFIG) --modversion dbus-1))
-DBUS_VERSION_MAJOR=$(word 1,$(dbus_version))
-DBUS_VERSION_MINOR=$(word 2,$(dbus_version))
-ifeq ($(DBUS_VERSION_MAJOR),)
-DBUS_VERSION_MAJOR=0
-endif
-ifeq ($(DBUS_VERSION_MINOR),)
-DBUS_VERSION_MINOR=0
-endif
-DBUS_INCLUDE += -DDBUS_VERSION_MAJOR=$(DBUS_VERSION_MAJOR)
-DBUS_INCLUDE += -DDBUS_VERSION_MINOR=$(DBUS_VERSION_MINOR)
 DBUS_CFLAGS += $(DBUS_INCLUDE)
 endif
 
@@ -1383,6 +1394,14 @@ OBJS += $(OBJS_d) ../src/drivers/drivers.o
 OBJS += $(OBJS_l2)
 endif
 
+ifdef CONFIG_WAPI
+CFLAGS += -DCONFIG_WAPI
+OBJS += wapi.o
+EXTRALIBS += -liwnwai_asue -lsms4 -lecc
+LDFLAGS += -L./wapi/LIB
+EXTRA_progs += wapilib
+endif
+
 ifdef CONFIG_NDIS_EVENTS_INTEGRATED
 CFLAGS += -DCONFIG_NDIS_EVENTS_INTEGRATED
 OBJS += ../src/drivers/ndis_events.o
@@ -1418,6 +1437,9 @@ BCHECK=../src/drivers/build.wpa_supplicant
 wpa_priv: $(BCHECK) $(OBJS_priv)
 	$(Q)$(LDO) $(LDFLAGS) -o wpa_priv $(OBJS_priv) $(LIBS)
 	@$(E) "  LD " $@
+
+wapilib:
+	$(MAKE) -C wapi
 
 $(OBJS_c) $(OBJS_t) $(OBJS_t2) $(OBJS) $(BCHECK) $(EXTRA_progs): .config
 
@@ -1484,6 +1506,9 @@ eap_ikev2.so: ../src/eap_peer/eap_ikev2.c ../src/eap_peer/ikev2.c ../src/eap_com
 %.service: %.service.in
 	sed -e 's|\@BINDIR\@|$(BINDIR)|g' $< >$@
 
+%@.service: %.service.arg.in
+	sed -e 's|\@BINDIR\@|$(BINDIR)|g' $< >$@
+
 wpa_supplicant.exe: wpa_supplicant
 	mv -f $< $@
 wpa_cli.exe: wpa_cli
@@ -1525,6 +1550,9 @@ tests: test-eap_sim_common
 
 clean:
 	$(MAKE) -C ../src clean
+	@if [ -e wapi ]; then \
+		$(MAKE) -C wapi clean; \
+	fi
 	$(MAKE) -C dbus clean
 	rm -f core *~ *.o *.d eap_*.so $(ALL) $(WINALL) eapol_test preauth_test
 	rm -f wpa_priv

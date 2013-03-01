@@ -5,7 +5,6 @@
  * Definitions subject to change without notice.
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -556,10 +555,6 @@ typedef enum sup_auth_status {
 #define CRYPTO_ALGO_AES_OCB_MSDU    5
 #define CRYPTO_ALGO_AES_OCB_MPDU    6
 #define CRYPTO_ALGO_NALG        7
-
-#ifdef BCMWAPI_WPI
-#define CRYPTO_ALGO_SMS4        11
-#endif /* BCMWAPI_WPI */
 #define CRYPTO_ALGO_PMK			12
 
 #define WSEC_GEN_MIC_ERROR  0x0001
@@ -612,9 +607,6 @@ typedef struct {
 #define WSEC_SWFLAG     0x0008
 #define SES_OW_ENABLED      0x0040  
 
-#ifdef BCMWAPI_WPI
-#define SMS4_ENABLED        0x0100
-#endif /* BCMWAPI_WPI */
 
 #define WPA_AUTH_DISABLED   0x0000  
 #define WPA_AUTH_NONE       0x0001  
@@ -625,13 +617,6 @@ typedef struct {
 #define WPA2_AUTH_PSK       0x0080  
 #define BRCM_AUTH_PSK           0x0100  
 #define BRCM_AUTH_DPT       0x0200  
-#ifdef BCMWAPI_WAI
-#define WPA_AUTH_WAPI           0x0400
-#define WAPI_AUTH_NONE      WPA_AUTH_NONE   /* none (IBSS) */
-#define WAPI_AUTH_UNSPECIFIED   0x0400  /* over AS */
-#define WAPI_AUTH_PSK       0x0800  /* Pre-shared key */
-#endif /* BCMWAPI_WAI */
-
 #define WPA2_AUTH_MFP           0x1000
 #define WPA2_AUTH_TPK		0x2000
 #define WPA2_AUTH_FT		0x4000
@@ -1306,11 +1291,6 @@ typedef struct wl_po {
 #define WL_CHAN_FREQ_RANGE_5GML_5BAND    6
 #define WL_CHAN_FREQ_RANGE_5GMH_5BAND    7
 #define WL_CHAN_FREQ_RANGE_5GH_5BAND     8
-
-#define WL_CHAN_FREQ_RANGE_5G_BAND0     1
-#define WL_CHAN_FREQ_RANGE_5G_BAND1     2
-#define WL_CHAN_FREQ_RANGE_5G_BAND2     3
-#define WL_CHAN_FREQ_RANGE_5G_BAND3     4
 
 
 #define WLC_PHY_TYPE_A      0
@@ -2444,20 +2424,6 @@ typedef struct assertlog_results {
 #define LOGRRC_FIX_LEN  8
 #define IOBUF_ALLOWED_NUM_OF_LOGREC(type, len) ((len - LOGRRC_FIX_LEN)/sizeof(type))
 
-#ifdef BCMWAPI_WAI
-#define IV_LEN 16 /* XXX, same as SMS4_WPI_PN_LEN */
-struct wapi_sta_msg_t
-{
-	uint16  msg_type;
-	uint16  datalen;
-	uint8   vap_mac[6];
-	uint8   reserve_data1[2];
-	uint8   sta_mac[6];
-	uint8   reserve_data2[2];
-	uint8   gsn[IV_LEN];
-	uint8   wie[256];
-};
-#endif /* BCMWAPI_WAI */
 
 
 

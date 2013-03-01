@@ -802,13 +802,13 @@ bool FrameLoaderClientAndroid::canShowMIMEType(const String& mimeType) const {
     // FIXME: This looks like it has to do with whether or not a type can be
     // shown "internally" (i.e. inside the browser) regardless of whether
     // or not the browser is doing the rendering, e.g. a full page plugin.
-
+   // BU1SW1_SoMC_SS_Patches ....... begin
     //always download OMA-DL mimeTypes and not try to load them even if they end with +xml
     //this change is made because of the addition of DOMImplementation::isXMLMIMEType
     //in the condition below
     if (mimeType == "application/vnd.oma.dd+xml")
         return false;
-
+    // BU1SW1_SoMC_SS_Patches ....... end
     if (MIMETypeRegistry::isSupportedImageResourceMIMEType(mimeType) ||
             MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType) ||
             MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType) ||

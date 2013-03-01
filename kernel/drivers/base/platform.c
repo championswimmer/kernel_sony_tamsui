@@ -3,7 +3,6 @@
  *
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This file is released under the GPLv2
  *
@@ -22,11 +21,6 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-#include <linux/kallsyms.h>
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 #include "base.h"
 
 #define to_platform_driver(drv)	(container_of((drv), struct platform_driver, \
@@ -656,14 +650,7 @@ static int platform_legacy_suspend(struct device *dev, pm_message_t mesg)
 	int ret = 0;
 
 	if (dev->driver && pdrv->suspend)
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	{
 		ret = pdrv->suspend(pdev, mesg);
-        #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-		print_symbol("[PM]platform_legacy_suspend: %s\n", (unsigned long)pdrv->suspend);
-        #endif
-	}
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 
 	return ret;
 }
@@ -675,14 +662,7 @@ static int platform_legacy_resume(struct device *dev)
 	int ret = 0;
 
 	if (dev->driver && pdrv->resume)
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	{
 		ret = pdrv->resume(pdev);
-        #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-		print_symbol("[PM]platform_legacy_resume: %s\n", (unsigned long)pdrv->resume);
-        #endif
-	}
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 
 	return ret;
 }

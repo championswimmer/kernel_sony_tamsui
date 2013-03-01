@@ -38,41 +38,6 @@
 #include <mach/msm_serial_pdata.h>
 #include "msm_serial.h"
 
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+] */ 
-#ifdef CONFIG_FEATURE_FIH_SW3_REMOVE_SERIAL_DYNAMICALLY
-
-#include <mach/dbgcfgtool.h>
-#include <mach/msm_smd.h>  
-#include <mach/gpio.h>
-
-extern struct platform_device msm_device_uart_dm2;
-extern int cached_read_fihdbg( unsigned char* fih_debug );
-
-static unsigned int fih_read_uart_switch_from_nv(void)
-{
-    int ret = 0;
-    
-    char tempcfg[16] = {0};
-    
-    ret = cached_read_fihdbg(tempcfg);
-
-    if( ret < 0 )/* fail here */
-	{
-        /* if we fail, we don't open UART*/
-        ret = 0;
-    }
-    else
-    {
-    	ret = tempcfg[DEBUG_UART_GROUP] & (1 << (DEBUG_UARTMSG_CFG % GROUP_SIZE));
-    }
-
-	return ret;
-}
-
-
-#endif
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+] */ 
-
 
 #ifdef CONFIG_SERIAL_MSM_CLOCK_CONTROL
 enum msm_clk_states_e {
@@ -1194,18 +1159,6 @@ static int __init msm_serial_init(void)
 {
 	int ret;
 
-#ifdef CONFIG_FEATURE_FIH_SW3_REMOVE_SERIAL_DYNAMICALLY
-	int enable_uart = 0;
-
-	enable_uart = fih_read_uart_switch_from_nv(); 
-
-	if( !enable_uart )
-	{
-		pr_info("%s(): Disable UART console\n", __func__);
-		return 0;
-	}
-#endif
-
 	ret = uart_register_driver(&msm_uart_driver);
 	if (unlikely(ret))
 		return ret;
@@ -1221,19 +1174,6 @@ static int __init msm_serial_init(void)
 
 static void __exit msm_serial_exit(void)
 {
-
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_REMOVE_SERIAL_DYNAMICALLY
-	int enable_uart = 0;
-	enable_uart = fih_read_uart_switch_from_nv(); 
-
-	if( !enable_uart )
-	{
-		return;
-	}
-#endif
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+] */ 
-
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 	unregister_console(&msm_console);
 #endif

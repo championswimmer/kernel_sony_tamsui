@@ -171,14 +171,13 @@ void adreno_drawctxt_destroy(struct kgsl_device *device,
 			  struct kgsl_context *context)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	struct adreno_context *drawctxt = NULL;
+	struct adreno_context *drawctxt = context->devctxt;
 
-	if (unlikely(!context || !context->devctxt))
+	if (drawctxt == NULL)
 		return;
 
-	drawctxt = context->devctxt;
 	/* deactivate context */
-	if (unlikely(adreno_dev->drawctxt_active == drawctxt)) {
+	if (adreno_dev->drawctxt_active == drawctxt) {
 		/* no need to save GMEM or shader, the context is
 		 * being destroyed.
 		 */
@@ -234,7 +233,7 @@ void adreno_drawctxt_switch(struct adreno_device *adreno_dev,
 	struct kgsl_device *device = &adreno_dev->dev;
 
 	if (drawctxt) {
-		if (unlikely(flags & KGSL_CONTEXT_SAVE_GMEM))
+		if (flags & KGSL_CONTEXT_SAVE_GMEM)
 			/* Set the flag in context so that the save is done
 			* when this context is switched out. */
 			drawctxt->flags |= CTXT_FLAGS_GMEM_SAVE;
@@ -244,8 +243,13 @@ void adreno_drawctxt_switch(struct adreno_device *adreno_dev,
 	}
 
 	/* already current? */
-	if (adreno_dev->drawctxt_active == drawctxt)
+	if (adreno_dev->drawctxt_active == drawctxt) {
+		if (adreno_dev->gpudev->ctxt_draw_workaround &&
+			adreno_is_a225(adreno_dev))
+				adreno_dev->gpudev->ctxt_draw_workaround(
+					adreno_dev);
 		return;
+	}
 
 	KGSL_CTXT_INFO(device, "from %p to %p flags %d\n",
 			adreno_dev->drawctxt_active, drawctxt, flags);
@@ -254,6 +258,6 @@ void adreno_drawctxt_switch(struct adreno_device *adreno_dev,
 	adreno_dev->gpudev->ctxt_save(adreno_dev, adreno_dev->drawctxt_active);
 
 	/* Set the new context */
-	adreno_dev->gpudev->ctxt_restore(adreno_dev, drawctxt);
 	adreno_dev->drawctxt_active = drawctxt;
+	adreno_dev->gpudev->ctxt_restore(adreno_dev, drawctxt);
 }

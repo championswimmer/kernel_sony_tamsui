@@ -2,7 +2,6 @@
  * The input core
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 /*
@@ -70,21 +69,6 @@ static int input_defuzz_abs_event(int value, int old_val, int fuzz)
 	return value;
 }
 
-//FIH-SW1-PERIPHERAL-FG-SENSOR_CPUFREQ-00+[
-static int is_sensor_input(const char *dev_name)
-{
-	if (strcmp(dev_name, "accelerometer") == 0 || strcmp(dev_name, "proximity") == 0 ||
-		strcmp(dev_name, "akm8975_dev") == 0 || strcmp(dev_name, "compass") == 0)
-	{
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
-//FIH-SW1-PERIPHERAL-FG-SENSOR_CPUFREQ-00+]
-
 /*
  * Pass event first through all filters and then, if event has not been
  * filtered out, through all open handles. This function is called with
@@ -113,15 +97,7 @@ static void input_pass_event(struct input_dev *dev,
 				if (filtered)
 					break;
 
-				//FIH-SW1-PERIPHERAL-FG-SENSOR_CPUFREQ-00*[
-				if (is_sensor_input(dev->name) && strcmp(handler->name, "cpufreq_ond")==0)
-				{
-					//Do not call cpufreq_ondemand to change cpu freq to max.
-					//printk(KERN_INFO "[INPUT]Do not call cpufreq_ondemand.c(%s)\n", dev->name);
-				}
-				else
-					handler->event(handle, type, code, value);
-				//FIH-SW1-PERIPHERAL-FG-SENSOR_CPUFREQ-00*]
+				handler->event(handle, type, code, value);
 
 			} else if (handler->filter(handle, type, code, value))
 				filtered = true;

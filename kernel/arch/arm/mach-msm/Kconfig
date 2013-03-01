@@ -22,7 +22,7 @@ config ARCH_MSM7X25
 config ARCH_MSM7X27
 	bool "MSM7x27"
 	select ARCH_MSM_ARM11 if MSM_SOC_REV_NONE
-	select ARCH_HAS_BARRIERS
+	select ARCH_HAS_BARRIERS if MSM_SOC_REV_NONE
 	select ARCH_MSM_CORTEX_A5 if MSM_SOC_REV_A
 	select MSM_VIC
 	select CPU_V6 if MSM_SOC_REV_NONE
@@ -33,7 +33,9 @@ config ARCH_MSM7X27
 	select MULTI_IRQ_HANDLER
 	select MSM_PROC_COMM_REGULATOR
 	select CLEANCACHE
+	select QCACHE
 	select MSM_PM2 if PM
+	select DONT_MAP_HOLE_AFTER_MEMBANK0
 
 config ARCH_MSM7X30
 	bool "MSM7x30"
@@ -257,6 +259,10 @@ config ARCH_MSM9615
 	select MSM_RPM_REGULATOR
 	select MULTI_IRQ_HANDLER
 	select MSM_PM8X60 if PM
+	select MSM_XO
+	select MSM_QDSP6_APR
+	select MSM_AUDIO_QDSP6 if SND_SOC
+	select FIQ
 
 endmenu
 
@@ -2059,6 +2065,15 @@ config MSM_L2_ERP_PRINT_ACCESS_ERRORS
 	  interrupt rather than as an exception, meaning that the backtrace may
 	  have some skid. This option may help with debugging, though production
 	  builds should probably say 'N' here.
+config MSM_L1_ERR_LOG
+	bool "Log CPU ERP events to system memory"
+	depends on MSM_CACHE_ERP
+	help
+	  Enable logging CPU ERP events to an area of memory that will be
+	  preserved across a system reset. This may be useful for detecting and
+	  troubleshooting ERP-related system crashes in the field.
+
+	  For production builds, you may want to say 'Y' here.
 
 config MSM_L2_ERP_PORT_PANIC
 	bool "Panic on L2 master port errors"
@@ -2125,5 +2140,20 @@ config MSM_CACHE_DUMP_ON_PANIC
 	  look at them in a RAM dump will give useless data. Select this if you
 	  want to dump the L1 and L2 caches on panic before any flush occurs.
 	  If unsure, say N
+
+config MSMHW_PDP_BOARD
+	bool "MSMHW_PDP_BOARD"
+
+config SEMC_S1
+	bool "SEMC S1 solution"
+	help
+	  Select this if you want to use SEMC S1 solution.
+
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode.
 
 endif

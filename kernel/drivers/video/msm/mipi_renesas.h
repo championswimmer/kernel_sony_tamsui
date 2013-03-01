@@ -14,6 +14,12 @@
 #define MIPI_RENESAS_H
 
 #define RENESAS_FWVGA_TWO_LANE
+//<<Skies, Implement LCM backlight function
+#define DRIVER_MAX_BACKLIGHT_LEVEL 100
+#define FAN_LIGHT_MAX_LEVEL	32
+#define FAN_LIGHT_CURRENT_OUTPUT_MAX 25
+#define FAN_LIGHT_CURRENT_OUTPUT_LIMIT 20
+//>>Skies, Implement LCM backlight function
 
 int mipi_renesas_device_register(struct msm_panel_info *pinfo,
 					u32 channel, u32 panel);

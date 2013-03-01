@@ -486,6 +486,7 @@ void wpa_clear_keys(struct wpa_supplicant *wpa_s, const u8 *addr)
 	wpa_s->keys_cleared = 1;
 }
 
+
 /**
  * wpa_supplicant_state_txt - Get the connection state name as a text string
  * @state: State (wpa_state; WPA_*)
@@ -1050,6 +1051,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 
 	return 0;
 }
+
 
 /**
  * wpa_supplicant_associate - Request association
@@ -2012,6 +2014,7 @@ int wpa_supplicant_driver_init(struct wpa_supplicant *wpa_s)
 		if (addr)
 			os_memcpy(wpa_s->own_addr, addr, ETH_ALEN);
 	}
+
 	if (wpa_s->l2 && l2_packet_get_own_addr(wpa_s->l2, wpa_s->own_addr)) {
 		wpa_msg(wpa_s, MSG_ERROR, "Failed to get own L2 address");
 		return -1;
@@ -2659,6 +2662,7 @@ void wpa_supplicant_deinit(struct wpa_global *global)
 #ifdef CONFIG_P2P
 	wpas_p2p_deinit_global(global);
 #endif /* CONFIG_P2P */
+
 	while (global->ifaces)
 		wpa_supplicant_remove_iface(global, global->ifaces, 1);
 

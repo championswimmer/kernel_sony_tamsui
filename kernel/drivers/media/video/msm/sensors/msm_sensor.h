@@ -133,6 +133,8 @@ struct msm_sensor_fn_t {
 		(struct msm_sensor_ctrl_t *);
 	int (*sensor_power_up) (struct msm_sensor_ctrl_t *);
 	int32_t (*sensor_match_id)(struct msm_sensor_ctrl_t *s_ctrl);
+	int (*sensor_adjust_frame_lines)
+		(struct msm_sensor_ctrl_t *s_ctrl, uint16_t res);
 };
 
 struct msm_sensor_ctrl_t {
@@ -153,6 +155,8 @@ struct msm_sensor_ctrl_t {
 
 	uint16_t curr_line_length_pclk;
 	uint16_t curr_frame_length_lines;
+	uint16_t prev_gain;
+	uint16_t prev_line;
 
 	uint32_t fps_divider;
 	enum msm_sensor_resolution_t curr_res;
@@ -223,6 +227,12 @@ int msm_sensor_write_res_settings
 int32_t msm_sensor_write_output_settings(struct msm_sensor_ctrl_t *s_ctrl,
 	uint16_t res);
 
+int32_t msm_sensor_adjust_frame_lines1(struct msm_sensor_ctrl_t *s_ctrl,
+	uint16_t res);
+
+int32_t msm_sensor_adjust_frame_lines2(struct msm_sensor_ctrl_t *s_ctrl,
+	uint16_t res);
+
 int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 			int update_type, int res);
 
@@ -238,5 +248,8 @@ struct msm_sensor_ctrl_t *get_sctrl(struct v4l2_subdev *sd);
 
 #define VIDIOC_MSM_SENSOR_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 10, void __user *)
+
+#define VIDIOC_MSM_SENSOR_RELEASE \
+	_IO('V', BASE_VIDIOC_PRIVATE + 11)
 
 #endif

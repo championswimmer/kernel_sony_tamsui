@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+Copyright (c) 2012, Code Aurora Forum. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -54,6 +54,10 @@ WTF::Mutex CanvasLayerAndroid::s_mutex;
 std::map<uint32_t, int> CanvasLayerAndroid::s_texture_usage;
 std::list<int> CanvasLayerAndroid::s_canvas_oom;
 int CanvasLayerAndroid::s_maxTextureThreshold = 1;     //Aggressive collection of resources
+std::map<int, IntSize> CanvasLayerAndroid::s_canvas_dimensions;
+
+std::map<int, SkPicture> CanvasLayerAndroid::s_picture_map;
+std::map<int, SkBitmap> CanvasLayerAndroid::s_bitmap_map;
 
 CanvasLayerAndroid::CanvasLayerAndroid()
     : LayerAndroid((RenderLayer*)0)
@@ -65,12 +69,6 @@ CanvasLayerAndroid::CanvasLayerAndroid(const CanvasLayerAndroid& layer)
     : LayerAndroid(layer)
     , m_canvas_id(layer.m_canvas_id)
 {
-    SkPicture copy_picture = layer.getPicture();
-    m_currentPicture.swap(copy_picture);
-
-    m_currentBitmap = layer.m_currentBitmap;
-
-    m_r = layer.getRect();
 }
 
 void CanvasLayerAndroid::markGLAssetsForRemoval(int id)
@@ -96,6 +94,23 @@ void CanvasLayerAndroid::cleanupAssets()
     for(int ii=0; ii<s_deleted_canvases.size(); ++ii)
     {
         int& canvas_id = s_deleted_canvases[ii];
+
+        //Got canvas id -- delete skpicture and bitmap associated with this canvas
+        std::map<int, SkPicture>::iterator pic_it = s_picture_map.find(canvas_id);
+        std::map<int, SkBitmap>::iterator bmp_it = s_bitmap_map.find(canvas_id);
+        std::map<int, IntSize>::iterator dim_it = s_canvas_dimensions.find(canvas_id);
+        if(pic_it != s_picture_map.end())
+        {
+            s_picture_map.erase(canvas_id);
+        }
+        if(bmp_it != s_bitmap_map.end())
+        {
+            s_bitmap_map.erase(canvas_id);
+        }
+        if(dim_it != s_canvas_dimensions.end())
+        {
+            s_canvas_dimensions.erase(canvas_id);
+        }
 
         //Get generation ids
         std::map<int, std::vector<uint32_t> >::iterator gen_it = s_canvas_textures.find(canvas_id);
@@ -216,18 +231,51 @@ void CanvasLayerAndroid::cleanupUnusedAssets(std::vector<uint32_t>& deleteIds)
     }
 }
 
-void CanvasLayerAndroid::setPicture(SkPicture& picture)
+void CanvasLayerAndroid::setPicture(SkPicture& picture, IntSize& size)
 {
-    MutexLocker locker(m_mutex);
-    m_currentPicture.swap(picture);
-    if(m_currentBitmap.width() != m_currentPicture.width() || m_currentBitmap.height() != m_currentPicture.height())
-    {
-        if(!(m_currentBitmap.isNull() || m_currentBitmap.empty()))
-            m_currentBitmap.reset();
-        m_currentBitmap.setConfig(SkBitmap::kARGB_8888_Config, picture.width(), picture.height());
-        m_currentBitmap.allocPixels();
-    }
+    MutexLocker locker(s_mutex);
 
+    std::map<int, SkPicture>::iterator pic_it = s_picture_map.find(m_canvas_id);
+    std::map<int, SkBitmap>::iterator bmp_it = s_bitmap_map.find(m_canvas_id);
+    std::map<int, IntSize>::iterator dim_it = s_canvas_dimensions.find(m_canvas_id);
+    if(pic_it == s_picture_map.end() || bmp_it == s_bitmap_map.end() || dim_it == s_canvas_dimensions.end())
+    {
+        //Create a picture
+        SkPicture currentPicture;
+        currentPicture.swap(picture);
+        s_picture_map.insert(std::make_pair(m_canvas_id, currentPicture));
+
+        SkBitmap bitmap;
+        if(bitmap.width() != picture.width() || bitmap.height() != picture.height())
+        {
+            if(!(bitmap.isNull() || bitmap.empty()))
+                bitmap.reset();
+            bitmap.setConfig(SkBitmap::kARGB_8888_Config, picture.width(), picture.height());
+            bitmap.allocPixels();
+        }
+        s_bitmap_map.insert(std::make_pair(m_canvas_id, bitmap));
+
+        s_canvas_dimensions.insert(std::make_pair(m_canvas_id, size));
+
+    }
+    else
+    {
+        SkPicture& currentPicture = pic_it->second;
+        currentPicture.swap(picture);
+
+        SkBitmap& bitmap = bmp_it->second;
+        if(bitmap.width() != currentPicture.width() || bitmap.height() != currentPicture.height())
+        {
+            if(!(bitmap.isNull() || bitmap.empty()))
+                bitmap.reset();
+            bitmap.setConfig(SkBitmap::kARGB_8888_Config, currentPicture.width(), currentPicture.height());
+            bitmap.allocPixels();
+        }
+
+        IntSize& currentSize = dim_it->second;
+        currentSize.setWidth(size.width());
+        currentSize.setHeight(size.height());
+    }
 }
 
 SkBitmap CanvasLayerAndroid::ScaleBitmap(SkBitmap src, float sx, float sy)
@@ -252,19 +300,30 @@ SkBitmap CanvasLayerAndroid::ScaleBitmap(SkBitmap src, float sx, float sy)
 
 bool CanvasLayerAndroid::drawGL()
 {
-    SkAltCanvas canvas(m_currentBitmap);
-    if(m_currentBitmap.isNull() || m_currentBitmap.empty())
-        return drawChildrenGL();
-
     std::vector<uint32_t> generationIDs;
     std::vector<uint32_t> generationIDsUsed;
 
     //Need to lock since we track oom canvases here
+    //Also need to lock because we transfer skpictures directly through the map now
+    //instead of relying on the copying of the layers
     MutexLocker locker(s_mutex);
+    std::map<int, SkPicture>::iterator pic_it = s_picture_map.find(m_canvas_id);
+    std::map<int, SkBitmap>::iterator bmp_it = s_bitmap_map.find(m_canvas_id);
+    std::map<int, IntSize>::iterator dim_it = s_canvas_dimensions.find(m_canvas_id);
+    if(pic_it == s_picture_map.end() || bmp_it == s_bitmap_map.end() || dim_it == s_canvas_dimensions.end())
+        return drawChildrenGL();
+
+    SkBitmap& currentBitmap = bmp_it->second;
+    SkPicture& currentPicture = pic_it->second;
+    IntSize& currentSize = dim_it->second;
+
+    SkAltCanvas canvas(currentBitmap);
+    if(currentBitmap.isNull() || currentBitmap.empty())
+        return drawChildrenGL();
 
     //if(m_canvas_id >= 0 && m_canvas != NULL)
     {
-        m_currentPicture.drawAltCanvas(&canvas);
+        currentPicture.drawAltCanvas(&canvas);
         int numBitmaps = canvas.getNumBitmaps();
         int numPrimitives = canvas.getNumPrimitives();
         int bitmap_height, bitmap_width;
@@ -370,6 +429,9 @@ bool CanvasLayerAndroid::drawGL()
         s_shader.setScale(TilesManager::instance()->shader()->getScale());
         s_shader.setRepositionMatrix(TilesManager::instance()->shader()->getRepositionMatrix());
         s_shader.setWebViewMatrix(TilesManager::instance()->shader()->getWebViewMatrix());
+
+        FloatRect clippingRect = TilesManager::instance()->shader()->rectInScreenCoord(m_drawTransform, currentSize);
+        TilesManager::instance()->shader()->clip(clippingRect);
 
         std::map<int, std::vector<SkRect> > primitives_map;
         std::map<int, std::vector<FloatRect> > primTexCoord_map;

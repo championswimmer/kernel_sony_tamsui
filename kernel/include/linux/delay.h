@@ -3,7 +3,6 @@
 
 /*
  * Copyright (C) 1993 Linus Torvalds
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * Delay routines, using a pre-computed "loops_per_jiffy" value.
  */
@@ -46,12 +45,6 @@ extern unsigned long lpj_fine;
 void calibrate_delay(void);
 void msleep(unsigned int msecs);
 unsigned long msleep_interruptible(unsigned int msecs);
-/*FIH-KERNEL-SC-sleep-func-00+[*/
-#ifdef CONFIG_FIH_HR_MSLEEP
-void hr_msleep(unsigned int msecs);
-unsigned long hr_msleep_interruptible(unsigned int msecs);
-#endif
-/*FIH-KERNEL-SC-sleep-func-00+]*/
 void usleep_range(unsigned long min, unsigned long max);
 
 static inline void usleep(unsigned long usecs)

@@ -1,7 +1,6 @@
 /* kernel/power/earlysuspend.c
  *
  * Copyright (C) 2005-2008 Google, Inc.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -21,25 +20,7 @@
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
 
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-#include <linux/syscalls.h> /* sys_sync */
-#include <linux/ktime.h>
-#include <linux/hrtimer.h>
-#include <linux/kallsyms.h>
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 #include "power.h"
-
-
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+[*/
-#ifdef CONFIG_FIH_SUSPEND_HANG_TIMER
-#include <linux/timer.h>
-extern struct timer_list suspend_hang_timer;
-extern pid_t pid_suspend;
-extern int suspend_dump_counter;
-#endif
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+]*/
 
 enum {
 	DEBUG_USER_STATE = 1U << 0,
@@ -47,18 +28,11 @@ enum {
 	DEBUG_VERBOSE = 1U << 3,
 };
 
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-  static int debug_mask = DEBUG_USER_STATE | DEBUG_SUSPEND;
-#else
-  static int debug_mask = DEBUG_USER_STATE;
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+//[Arima Edison] open early suspend log ++ 
+static int debug_mask = DEBUG_USER_STATE ;
+//[Arima Edison] open early suspend log --
 
-//MTD-kernel-BH-PowerKeySuspendLock-00+[
-atomic_t gKeySuspendLock= ATOMIC_INIT(0); 
-EXPORT_SYMBOL(gKeySuspendLock);
-//MTD-kernel-BH-PowerKeySuspendLock-00+]
+
 
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
@@ -75,7 +49,6 @@ enum {
 	SUSPEND_REQUESTED_AND_SUSPENDED = SUSPEND_REQUESTED | SUSPENDED,
 };
 static int state;
-void check_power_key_skip_count( void ); //MTD-kernel-BH-PowerKeySuspendLock-01+
 
 void register_early_suspend(struct early_suspend *handler)
 {
@@ -108,25 +81,10 @@ static void early_suspend(struct work_struct *work)
 	struct early_suspend *pos;
 	unsigned long irqflags;
 	int abort = 0;
-
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-    ktime_t calltime, delta, rettime;
-    unsigned long long duration;
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
-
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+[*/
-#ifdef CONFIG_FIH_SUSPEND_HANG_TIMER
-	pr_info("early_suspend: add suspend_hang_timer\n");
-	pid_suspend = (pid_t) current->pid;
-	suspend_dump_counter = 0;
-	suspend_hang_timer.data = EARLY_SUSPEND_HANG;
-	mod_timer(&suspend_hang_timer, (jiffies + (POLLING_DUMP_SUSPEND_HANG_SECS*HZ)));
-#endif
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+]*/
-
-	atomic_set(&gKeySuspendLock,1); //MTD-kernel-BH-PowerKeySuspendLock-00+
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE"%s \n",__func__);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	mutex_lock(&early_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
@@ -137,70 +95,44 @@ static void early_suspend(struct work_struct *work)
 	spin_unlock_irqrestore(&state_lock, irqflags);
 
 	if (abort) {
-		if (debug_mask & DEBUG_SUSPEND)
-			pr_info("early_suspend: abort, state %d\n", state);
+		if (debug_mask & DEBUG_SUSPEND) 
+			pr_emerg("early_suspend: abort, state %d\n", state);
+		//[Arima Edison] add log to capture black screen issue 20121019++	
+		else if(console_printk[4]>0)
+			pr_emerg("early_suspend: abort, state %d\n", state);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		mutex_unlock(&early_suspend_lock);
 		goto abort;
 	}
 
-	if (debug_mask & DEBUG_SUSPEND)
+	if (debug_mask & DEBUG_SUSPEND) 
 		pr_info("early_suspend: call handlers\n");
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	else if(console_printk[4]>0)
+		pr_info("early_suspend: call handlers\n");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 	list_for_each_entry(pos, &early_suspend_handlers, link) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
 		if (pos->suspend != NULL) {
-            calltime = ktime_get();
-            pr_info("[PM]early suspend function: %pf\n", pos->suspend);
-
-			pos->suspend(pos);
-
-            rettime = ktime_get();
-            delta = ktime_sub(rettime, calltime);
-            duration = (unsigned long long) ktime_to_ns(delta) >> 10;
-            pr_info("[PM]takes %Ld usecs\n", duration);
-        }
-#else
-		if (pos->suspend != NULL) {
-			if (debug_mask & DEBUG_VERBOSE)
+			if (debug_mask & DEBUG_VERBOSE) 
 				pr_info("early_suspend: calling %pf\n", pos->suspend);
+			//[Arima Edison] add log to capture black screen issue 20121019++	
+			else if(console_printk[4]>0)
+				pr_info("early_suspend: calling %pf\n", pos->suspend);
+			//[Arima Edison] add log to capture black screen issue 20121019--	
 			pos->suspend(pos);
 		}
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 	}
 	mutex_unlock(&early_suspend_lock);
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-	if (debug_mask & DEBUG_SUSPEND)
-		pr_info("[PM]early_suspend: sync\n");
-if (state & SUSPEND_REQUESTED) {
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-	calltime = ktime_get();
 	suspend_sys_sync_queue();
-	rettime = ktime_get();
-	delta = ktime_sub(rettime, calltime);
-	duration = (unsigned long long) ktime_to_ns(delta) >> 10;
-	pr_info("[PM]early suspend sync: takes %Ld usecs\n", duration);
-#else
-	suspend_sys_sync_queue();
-#endif
-	}
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "early_suspend done!! \n ");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 abort:
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
 		wake_unlock(&main_wake_lock);
 	spin_unlock_irqrestore(&state_lock, irqflags);
-
-	atomic_set(&gKeySuspendLock,0); //MTD-kernel-BH-PowerKeySuspendLock-00+
-	check_power_key_skip_count();   //MTD-kernel-BH-PowerKeySuspendLock-01+
- 
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+[*/
-#ifdef CONFIG_FIH_SUSPEND_HANG_TIMER
-	pr_info("early_suspend: del suspend_hang_timer\n");
-	del_timer(&suspend_hang_timer);
-#endif
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+]*/
-
 }
 
 static void late_resume(struct work_struct *work)
@@ -208,24 +140,10 @@ static void late_resume(struct work_struct *work)
 	struct early_suspend *pos;
 	unsigned long irqflags;
 	int abort = 0;
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-    ktime_t calltime, delta, rettime;
-    unsigned long long duration;
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
-
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+[*/
-#ifdef CONFIG_FIH_SUSPEND_HANG_TIMER
-	pr_info("late_resume: add suspend_hang_timer\n");
-	pid_suspend = (pid_t) current->pid;
-	suspend_dump_counter = 0;
-	suspend_hang_timer.data = LATE_RESUME_HANG;
-	mod_timer(&suspend_hang_timer, (jiffies + (POLLING_DUMP_SUSPEND_HANG_SECS*HZ)));
-#endif
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+]*/
-
-	atomic_set(&gKeySuspendLock,1); //MTD-kernel-BH-PowerKeySuspendLock-00+
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "%s \n",__func__);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	mutex_lock(&early_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
@@ -238,54 +156,49 @@ static void late_resume(struct work_struct *work)
 	if (abort) {
 		if (debug_mask & DEBUG_SUSPEND)
 			pr_info("late_resume: abort, state %d\n", state);
+		//[Arima Edison] add log to capture black screen issue 20121019++	
+		else if(console_printk[4]>0)
+			pr_info("late_resume: abort, state %d\n", state);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		goto abort;
 	}
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("late_resume: call handlers\n");
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	else if(console_printk[4]>0)
+		pr_info("late_resume: call handlers\n");		
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 	list_for_each_entry_reverse(pos, &early_suspend_handlers, link) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-		if (pos->resume != NULL) {
-            calltime = ktime_get();
-            pr_info("[PM]late_resume function: %pf\n", pos->resume);
-
-			pos->resume(pos);
-
-            rettime = ktime_get();
-            delta = ktime_sub(rettime, calltime);
-            duration = (unsigned long long) ktime_to_ns(delta) >> 10;
-            pr_info("[PM]takes %Ld usecs\n", duration);
-        }
-#else
 		if (pos->resume != NULL) {
 			if (debug_mask & DEBUG_VERBOSE)
-				pr_info("late_resume: calling %pf\n", pos->resume);
-
+				pr_emerg("late_resume: calling %pf\n", pos->resume);
+			//[Arima Edison] add log to capture black screen issue 20121019++	
+			else if(console_printk[4]>0)
+				pr_emerg("late_resume: calling %pf\n", pos->resume);
+			//[Arima Edison] add log to capture black screen issue 20121019--	
 			pos->resume(pos);
 		}
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */	
 	}
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("late_resume: done\n");
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	else if(console_printk[4]>0)
+		pr_info("late_resume: done\n");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 abort:
 	mutex_unlock(&early_suspend_lock);
-
-	atomic_set(&gKeySuspendLock,0); //MTD-kernel-BH-PowerKeySuspendLock-00+
-	check_power_key_skip_count();   //MTD-kernel-BH-PowerKeySuspendLock-01+
-	
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+[*/
-#ifdef CONFIG_FIH_SUSPEND_HANG_TIMER
-	pr_info("late_resume: del suspend_hang_timer\n");
-	del_timer(&suspend_hang_timer);
-#endif
-/*FIH-KERNEL-SC-Suspend_Hang_Timer-00+]*/
 }
 
 void request_suspend_state(suspend_state_t new_state)
 {
 	unsigned long irqflags;
 	int old_sleep;
+	//[Arima Edison] add log for debug black screen issue++
+	static int state_temp=0;
+	static int old_sleep_temp=0;
+	static suspend_state_t new_state_temp=0;
+	static u8 state_abnormal_flag=0;
+	//[Arima Edison] add log for debug black screen issue--
 
 	spin_lock_irqsave(&state_lock, irqflags);
 	old_sleep = state & SUSPEND_REQUESTED;
@@ -302,23 +215,41 @@ void request_suspend_state(suspend_state_t new_state)
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 	}
-	if (!old_sleep && new_state != PM_SUSPEND_ON) {
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE"old_sleep = %d \n",old_sleep);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
+
+	
+	if (!old_sleep && new_state != PM_SUSPEND_ON) {  //~0xX1
 		state |= SUSPEND_REQUESTED;
+		//[Arima Edison] add a queue to separate suspend work and earlysuspend work to test back screen issue++
+		#ifdef CONFIG_SET_EARLYSUSPEND_WORK_QUEUE 
+		queue_work(earlysuspend_work_queue, &early_suspend_work);
+		#else
 		queue_work(suspend_work_queue, &early_suspend_work);
-	} else if (old_sleep && new_state == PM_SUSPEND_ON) {
+		#endif
+		//[Arima Edison] add a queue to separate suspend work and earlysuspend work to test back screen issue--
+	} else if (old_sleep && new_state == PM_SUSPEND_ON) {  // 0x01
 		state &= ~SUSPEND_REQUESTED;
 		wake_lock(&main_wake_lock);
+		//[Arima Edison] add a queue to separate suspend work and earlysuspend work to test back screen issue++
+		#ifdef CONFIG_SET_EARLYSUSPEND_WORK_QUEUE 
+		queue_work(earlysuspend_work_queue, &late_resume_work);
+		#else
 		queue_work(suspend_work_queue, &late_resume_work);
+		#endif
+		//[Arima Edison] add a queue to separate suspend work and earlysuspend work to test back screen issue--
+	}else if(!state_abnormal_flag){
+		old_sleep_temp = old_sleep;
+		new_state_temp = new_state;
+		state_temp = state;
+		state_abnormal_flag = 1;		
 	}
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-	else
-	{
-		pr_info("[PM]request_suspend_state failed: old_sleep = %d, new_state = %d\n",
-			old_sleep, new_state);
-	}
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "old_sleep_temp=%d, new_state_temp=%d, state_temp=%d \n",old_sleep_temp,new_state_temp,state_temp);
+	//[Arima Edison] add log to capture black screen issue 20121019--
 	requested_suspend_state = new_state;
 	spin_unlock_irqrestore(&state_lock, irqflags);
 }

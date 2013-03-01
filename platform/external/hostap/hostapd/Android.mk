@@ -1,3 +1,9 @@
+# Copyright (C) 2008 The Android Open Source Project
+#
+# This software may be distributed under the terms of the BSD license.
+# See README for more details.
+#
+
 LOCAL_PATH := $(call my-dir)
 
 WPA_BUILD_HOSTAPD := false
@@ -8,28 +14,18 @@ endif
 
 ifeq ($(WPA_BUILD_HOSTAPD),true)
 
-include $(LOCAL_PATH)/.config
+include $(LOCAL_PATH)/android.config
 
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
+
+L_CFLAGS += -DVERSION_STR_POSTFIX=\"-$(PLATFORM_VERSION)\"
 
 # Set Android log name
 L_CFLAGS += -DANDROID_LOG_NAME=\"hostapd\"
 
 ifeq ($(BOARD_WLAN_DEVICE), bcmdhd)
 L_CFLAGS += -DANDROID_BRCM_P2P_PATCH
-endif
-
-ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
-L_CFLAGS += -DANDROID_QCOM_P2P_PATCH
-endif
-
-# Use Android specific directory for control interface sockets
-L_CFLAGS += -DCONFIG_CTRL_IFACE_CLIENT_DIR=\"/data/misc/wifi/sockets\"
-L_CFLAGS += -DCONFIG_CTRL_IFACE_DIR=\"/data/misc/wifi/hostapd\"
-
-ifdef CONFIG_AP
-L_CFLAGS += -DCONFIG_AP
 endif
 
 # To force sizeof(enum) = 4
@@ -833,7 +829,7 @@ ifneq ($(BOARD_HOSTAPD_PRIVATE_LIB),)
 endif
 LOCAL_SHARED_LIBRARIES := libc libcutils libcrypto libssl
 ifdef CONFIG_DRIVER_NL80211
-LOCAL_STATIC_LIBRARIES += libnl_2
+LOCAL_SHARED_LIBRARIES += libnl_2
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)

@@ -15,13 +15,13 @@
 #
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(WPA_SUPPLICANT_VERSION),VER_0_8_X_BCM)
+ifeq ($(WPA_SUPPLICANT_VERSION),VER_0_8_X)
 
 ifneq ($(BOARD_WPA_SUPPLICANT_DRIVER),)
   CONFIG_DRIVER_$(BOARD_WPA_SUPPLICANT_DRIVER) := y
 endif
 
-WPA_SUPPL_DIR = external/wpa_supplicant_8_bcm
+WPA_SUPPL_DIR = external/wpa_supplicant_8
 WPA_SRC_FILE :=
 
 include $(WPA_SUPPL_DIR)/wpa_supplicant/.config
@@ -37,10 +37,6 @@ WPA_SUPPL_DIR_INCLUDE = $(WPA_SUPPL_DIR)/src \
 ifdef CONFIG_DRIVER_NL80211
 WPA_SUPPL_DIR_INCLUDE += external/libnl-headers
 WPA_SRC_FILE += driver_cmd_nl80211.c
-endif
-
-ifdef CONFIG_WAPI
-WPA_SUPPL_DIR_INCLUDE += $(WPA_SUPPL_DIR)/src/wapi
 endif
 
 ifdef CONFIG_DRIVER_WEXT

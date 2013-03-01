@@ -254,6 +254,104 @@ int read_local_name(bdaddr_t *bdaddr, char *name)
 	return 0;
 }
 
+
+int write_le_params(bdaddr_t *src, bdaddr_t *dst, struct bt_le_params *params)
+{
+	char filename[PATH_MAX + 1];
+	char peer[18];
+	char value[sizeof(struct bt_le_params) * 3];
+
+	create_filename(filename, PATH_MAX, src, "le_params");
+	ba2str(dst, peer);
+
+	if (!params) {
+		return textfile_del(filename, peer);
+	}
+
+	memset(value, 0, sizeof(value));
+
+	snprintf(value, sizeof(value), "%2.2X %2.2X %4.4X %4.4X %4.4X "
+					"%4.4X %4.4X %4.4X %4.4X %4.4X %4.4X",
+					params->prohibit_remote_chg,
+					params->filter_policy,
+					params->scan_interval,
+					params->scan_window,
+					params->interval_min,
+					params->interval_max,
+					params->latency,
+					params->supervision_timeout,
+					params->min_ce_len,
+					params->max_ce_len,
+					params->conn_timeout);
+
+	create_file(filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+	return textfile_put(filename, peer, value);
+}
+
+struct bt_le_params *read_le_params(bdaddr_t *src, bdaddr_t *dst)
+{
+	char filename[PATH_MAX + 1], *value;
+	char peer[18];
+	struct bt_le_params *params = NULL;
+	int cnt;
+	int prohibit_remote_chg;
+	int filter_policy;
+	int scan_interval;
+	int scan_window;
+	int interval_min;
+	int interval_max;
+	int latency;
+	int supervision_timeout;
+	int min_ce_len;
+	int max_ce_len;
+	int conn_timeout;
+
+	create_filename(filename, PATH_MAX, src, "le_params");
+	ba2str(dst, peer);
+
+	value = textfile_get(filename, peer);
+	if (!value)
+		return NULL;
+
+	/* cnt must == number of members (10) or is invalid */
+	cnt = sscanf(value, "%2X %2X %4X %4X %4X %4X %4X %4X %4X %4X %4X",
+				&prohibit_remote_chg,
+				&filter_policy,
+				&scan_interval,
+				&scan_window,
+				&interval_min,
+				&interval_max,
+				&latency,
+				&supervision_timeout,
+				&min_ce_len,
+				&max_ce_len,
+				&conn_timeout);
+
+	if (cnt != 10)
+		goto done;
+
+	params = g_malloc(sizeof(struct bt_le_params));
+	if (!params)
+		goto done;
+
+	params->prohibit_remote_chg = (uint8_t) prohibit_remote_chg;
+	params->filter_policy = (uint8_t) filter_policy;
+	params->scan_interval = (uint16_t) scan_interval;
+	params->scan_window = (uint16_t) scan_window;
+	params->interval_min = (uint16_t) interval_min;
+	params->interval_max = (uint16_t) interval_max;
+	params->latency = (uint16_t) latency;
+	params->supervision_timeout = (uint16_t) supervision_timeout;
+	params->min_ce_len = (uint16_t) min_ce_len;
+	params->max_ce_len = (uint16_t) max_ce_len;
+	params->conn_timeout = (uint16_t) conn_timeout;
+
+done:
+	g_free(value);
+	return params;
+}
+
 int write_local_class(bdaddr_t *bdaddr, uint8_t *class)
 {
 	char filename[PATH_MAX + 1], str[9];

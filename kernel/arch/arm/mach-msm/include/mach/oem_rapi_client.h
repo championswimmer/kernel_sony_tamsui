@@ -28,6 +28,26 @@ enum {
 	 * list of oem rapi client events
 	 */
 
+	/*++ Huize - 20120308 Add for proximity threshold ++*/
+	OEM_RAPI_CLIENT_EVENT_PROXIMITY_THRESHOLD_GET,
+	OEM_RAPI_CLIENT_EVENT_PROXIMITY_THRESHOLD_SET,
+	/*-- Huize - 20120308 Add for proximity threshold --*/
+
+	/*++ FelexChing - 20120505 Add for wlan mac ++*/
+	OEM_RAPI_CLIENT_EVENT_WLAN_MAC_GET,
+	OEM_RAPI_CLIENT_EVENT_WLAN_MAC_SET,
+	/*-- FelexChing - 20120505 Add for wlan mac --*/
+
+	/*++ Huize - 20120613 Add for acceleromert axis calibrate ++*/
+	OEM_RAPI_CLIENT_EVENT_ACCELEROMETER_AXIS_OFFSET_GET,
+	OEM_RAPI_CLIENT_EVENT_ACCELEROMETER_AXIS_OFFSET_SET,
+	/*-- Huize - 20120613 Add for acceleromert axis calibrate --*/
+
+	/*++ FelexChing - 20120807 Add for wifi calibrate ++*/
+	OEM_RAPI_CLIENT_EVENT_WIFI_CALI_GET,
+	OEM_RAPI_CLIENT_EVENT_WIFI_CALI_SET,
+	/*-- FelexChing - 20120807 Add for wifi calibrate --*/
+
 	OEM_RAPI_CLIENT_EVENT_MAX
 
 };

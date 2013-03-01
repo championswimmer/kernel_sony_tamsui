@@ -1202,18 +1202,6 @@ handle_server_data_anonymous_mech (DBusAuth         *auth,
         {
           _dbus_verbose ("%s: Received invalid UTF-8 trace data from ANONYMOUS client\n",
                          DBUS_AUTH_NAME (auth));
-
-          {
-            DBusString plaintext;
-            DBusString encoded;
-            _dbus_string_init_const (&plaintext, "D-Bus " DBUS_VERSION_STRING);
-            _dbus_string_init (&encoded);
-            _dbus_string_hex_encode (&plaintext, 0,
-                                     &encoded,
-                                     0);
-              _dbus_verbose ("%s: try '%s'\n",
-                             DBUS_AUTH_NAME (auth), _dbus_string_get_const_data (&encoded));
-          }
           return send_rejected (auth);
         }
       
@@ -2079,7 +2067,7 @@ handle_client_state_waiting_for_agree_unix_fd(DBusAuth         *auth,
     case DBUS_AUTH_COMMAND_AGREE_UNIX_FD:
       _dbus_assert(auth->unix_fd_possible);
       auth->unix_fd_negotiated = TRUE;
-      _dbus_verbose("Sucessfully negotiated UNIX FD passing\n");
+      _dbus_verbose("Successfully negotiated UNIX FD passing\n");
       return send_begin (auth);
 
     case DBUS_AUTH_COMMAND_ERROR:
@@ -2806,7 +2794,7 @@ _dbus_auth_set_unix_fd_possible(DBusAuth *auth, dbus_bool_t b)
 }
 
 /**
- * Queries whether unix fd passing was sucessfully negotiated.
+ * Queries whether unix fd passing was successfully negotiated.
  *
  * @param auth the auth conversion
  * @returns #TRUE when unix fd passing was negotiated.

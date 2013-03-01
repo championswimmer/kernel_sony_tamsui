@@ -1,9 +1,11 @@
 
 configdir=$(sysconfdir)/dbus-1
 
-INCLUDES=-I$(top_builddir) -I$(top_srcdir) $(DBUS_CLIENT_CFLAGS) @PIC_CFLAGS@ -DDBUS_COMPILATION	\
-	-DDBUS_MACHINE_UUID_FILE=\""$(localstatedir)/lib/dbus/machine-id"\"		\
-	-DDBUS_SYSTEM_CONFIG_FILE=\""$(configdir)/system.conf"\"			\
+INCLUDES = -I$(top_builddir) -I$(top_srcdir) \
+	$(DBUS_CLIENT_CFLAGS) \
+	-DDBUS_COMPILATION \
+	-DDBUS_MACHINE_UUID_FILE=\""$(localstatedir)/lib/dbus/machine-id"\" \
+	-DDBUS_SYSTEM_CONFIG_FILE=\""$(configdir)/system.conf"\" \
 	-DDBUS_SESSION_CONFIG_FILE=\""$(configdir)/session.conf"\"
 
 dbusincludedir=$(includedir)/dbus-1.0/dbus
@@ -73,6 +75,13 @@ DBUS_UTIL_arch_sources =			\
 	dbus-sysdeps-util-win.c			\
 	dbus-spawn-win.c
 else
+
+if DBUS_ENABLE_LAUNCHD
+launchd_source = dbus-server-launchd.h dbus-server-launchd.c
+else
+launchd_source =
+endif
+
 DBUS_LIB_arch_sources = 			\
 	dbus-uuidgen.c				\
 	dbus-uuidgen.h				\
@@ -80,6 +89,7 @@ DBUS_LIB_arch_sources = 			\
 	dbus-server-unix.h
 
 DBUS_SHARED_arch_sources = 			\
+	$(launchd_source)			\
 	dbus-file-unix.c 			\
 	dbus-pipe-unix.c 			\
 	dbus-sysdeps-unix.c 			\
@@ -117,7 +127,7 @@ dbusinclude_HEADERS=				\
 	dbus-types.h
 
 
-dbusarchinclude_HEADERS=			\
+nodist_dbusarchinclude_HEADERS=			\
 	dbus-arch-deps.h
 
 ### source code that goes in the installed client library
@@ -244,9 +254,8 @@ libdbus_internal_la_SOURCES=			\
 	$(DBUS_SHARED_SOURCES)			\
 	$(DBUS_UTIL_SOURCES)
 
-BUILT_SOURCES=$(dbusarchinclude_HEADERS)
+BUILT_SOURCES=$(nodist_dbusarchinclude_HEADERS)
 EXTRA_DIST=dbus-arch-deps.h.in
-
 
 ## this library is the same as libdbus, but exports all the symbols
 ## and is only used for static linking within the dbus package.
@@ -254,25 +263,18 @@ noinst_LTLIBRARIES=libdbus-internal.la
 
 libdbus_1_la_CPPFLAGS= -Ddbus_1_EXPORTS
 libdbus_1_la_LIBADD= $(DBUS_CLIENT_LIBS)
-libdbus_1_la_LDFLAGS= $(export_symbols) -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) -no-undefined @R_DYNAMIC_LDFLAG@ @PIC_LDFLAGS@
+libdbus_1_la_LDFLAGS= $(export_symbols) -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) -no-undefined @R_DYNAMIC_LDFLAG@
 
 libdbus_internal_la_CPPFLAGS = -DDBUS_STATIC_BUILD
 libdbus_internal_la_LIBADD=$(DBUS_CLIENT_LIBS)
 libdbus_internal_la_LDFLAGS=$(export_symbols_internal) @R_DYNAMIC_LDFLAG@
 
-## note that TESTS has special meaning (stuff to use in make check)
-## so if adding tests not to be run in make check, don't add them to
-## TESTS
-if DBUS_BUILD_TESTS
-TESTS_ENVIRONMENT=DBUS_TEST_DATA=$(top_builddir)/test/data DBUS_TEST_HOMEDIR=$(top_builddir)/dbus
-TESTS=dbus-test
-else
-TESTS=
-endif
+noinst_PROGRAMS =
 
-## we use noinst_PROGRAMS not check_PROGRAMS so that we build
-## even when not doing "make check"
-noinst_PROGRAMS=$(TESTS)
+if DBUS_BUILD_TESTS
+# We can't actually run this til we've reached test/
+noinst_PROGRAMS += dbus-test
+endif
 
 dbus_test_SOURCES=				\
 	dbus-test-main.c

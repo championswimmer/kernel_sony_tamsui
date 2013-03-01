@@ -59,6 +59,10 @@
 #define GATT_SERVER_INTERFACE	"org.bluez.GattServer"
 #define REQUEST_TIMEOUT (5 * 1000)		/* 5 seconds */
 
+#define CARRIER_NO_RESTRICTION	0
+#define CARRIER_LE_ONLY		1
+#define CARRIER_BR_ONLY		2
+
 const char *gatt_sdp_prefix = "gatt_sdp_";
 const char *gatt_adv_prefix = "gatt_adv_";
 const char *serial_num_str = "SerialNum";
@@ -82,6 +86,7 @@ struct gatt_server {
 	struct gatt_adv_handles	*adv;
 	uint16_t		count;
 	uint16_t		base;
+	uint8_t			carrier;
 	char			*path;
 	char			name[0];
 } *gatt_server_list = NULL, *gatt_server_last = NULL;
@@ -479,28 +484,22 @@ static uint8_t client_set_configurations(struct attribute *attr,
 static struct attribute *client_cfg_attribute(struct gatt_channel *channel,
 						struct attribute *orig_attr)
 {
-	guint handle = orig_attr->handle;
-	static struct attribute *a = NULL;
+	static uint8_t static_attribute[sizeof(struct attribute) + 2];
+	struct attribute *a = (void *) &static_attribute;
 
 	if (bt_uuid_cmp(&orig_attr->uuid, &clicfg_uuid) != 0)
 		return NULL;
 
 	/* permanent memory for passing client Config data */
-	if (!a) {
-		a = g_malloc0(sizeof(struct attribute) + 2);
-		if (!a)
-			return NULL;
-
-		a->uuid = clicfg_uuid;
-		a->read_reqs = ATT_NONE;
-		a->write_reqs = ATT_AUTHORIZATION;
-		a->read_cb = client_get_configurations;
-		a->write_cb = client_set_configurations;
-		a->len = 2;
-	}
+	a->uuid = clicfg_uuid;
+	a->read_reqs = ATT_NONE;
+	a->write_reqs = ATT_AUTHORIZATION;
+	a->read_cb = client_get_configurations;
+	a->write_cb = client_set_configurations;
+	a->len = 2;
 
 	a->cb_user_data = channel;
-	a->handle = handle;
+	a->handle = orig_attr->handle;
 
 	return a;
 }
@@ -615,6 +614,9 @@ static int massage_payload(bt_uuid_t *uuid, uint16_t base, uint16_t limit,
 	} else if (!bt_uuid_cmp(uuid, &aggr_uuid)) {
 		int i;
 
+		if (!dlen)
+			dlen = ATT_DEFAULT_LE_MTU;
+
 		if (plen > dlen || !payload)
 			return -1;
 
@@ -648,23 +650,23 @@ static const char *sec_level_to_auth(struct gatt_channel *channel)
 
 const char *att_err_map[] = {
 	"",				/* 0x00 */
-	"ATT_ERR_INVALID_HANDLE",	/* 0x01 */
-	"ATT_ERR_READ_NOT_PERM",	/* 0x02 */
-	"ATT_ERR_WRITE_NOT_PERM",	/* 0x03 */
-	"ATT_ERR_INVALID_PDU",		/* 0x04 */
-	"ATT_ERR_AUTHENTICATION",	/* 0x05 */
-	"ATT_ERR_REQ_NOT_SUPP",		/* 0x06 */
-	"ATT_ERR_INVALID_OFFSET",	/* 0x07 */
-	"ATT_ERR_AUTHORIZATION",	/* 0x08 */
-	"ATT_ERR_PREP_QUEUE_FULL",	/* 0x09 */
-	"ATT_ERR_ATTR_NOT_FOUND",	/* 0x0A */
-	"ATT_ERR_ATTR_NOT_LONG",	/* 0x0B */
-	"ATT_ERR_INSUFF_ENCR_KEY_SIZE",	/* 0x0C */
-	"ATT_ERR_INVAL_ATTR_VALUE_LEN",	/* 0x0D */
-	"ATT_ERR_UNLIKELY",		/* 0x0E */
-	"ATT_ERR_INSUFF_ENC",		/* 0x0F */
-	"ATT_ERR_UNSUPP_GRP_TYPE",	/* 0x10 */
-	"ATT_ERR_INSUFF_RESOURCES",	/* 0x11 */
+	ATT_INVALID_HANDLE,		/* 0x01 */
+	ATT_READ_NOT_PERM,		/* 0x02 */
+	ATT_WRITE_NOT_PERM,		/* 0x03 */
+	ATT_INVALID_PDU,		/* 0x04 */
+	ATT_INSUFF_AUTHENTICATION,	/* 0x05 */
+	ATT_REQ_NOT_SUPP,		/* 0x06 */
+	ATT_INVALID_OFFSET,		/* 0x07 */
+	ATT_INSUFF_AUTHORIZATION,	/* 0x08 */
+	ATT_PREP_QUEUE_FULL,		/* 0x09 */
+	ATT_ATTR_NOT_FOUND,		/* 0x0A */
+	ATT_ATTR_NOT_LONG,		/* 0x0B */
+	ATT_INSUFF_ENCR_KEY_SIZE,	/* 0x0C */
+	ATT_INVAL_ATTR_VALUE_LEN,	/* 0x0D */
+	ATT_UNLIKELY,			/* 0x0E */
+	ATT_INSUFF_ENCRYPTION,		/* 0x0F */
+	ATT_UNSUPP_GRP_TYPE,		/* 0x10 */
+	ATT_INSUFF_RESOURCES,		/* 0x11 */
 };
 
 static const char *map_att_error(uint8_t status)
@@ -672,36 +674,60 @@ static const char *map_att_error(uint8_t status)
 	if (status < sizeof(att_err_map)/sizeof(att_err_map[0]))
 		return att_err_map[status];
 
-	return "ATT_ERR_UNLIKELY";
+	return att_err_map[ATT_ECODE_UNLIKELY];
 }
 
-static uint8_t map_dbus_error(DBusError *err)
+static uint8_t map_dbus_error(DBusError *err, uint16_t *handle)
 {
-	if (dbus_error_has_name(err, ATT_ATTR_NOT_FOUND))
-		return ATT_ECODE_ATTR_NOT_FOUND;
+	const char *app_err = "ATT_0x";
+	size_t len;
+	int i, j, array_len;
 
-	if (dbus_error_has_name(err, ATT_INVALID_HANDLE))
-		return ATT_ECODE_INVALID_HANDLE;
+	array_len = sizeof(att_err_map)/sizeof(att_err_map[0]);
 
-	if (dbus_error_has_name(err, ATT_READ_NOT_PERM))
-		return ATT_ECODE_READ_NOT_PERM;
+	/* Standard ATT Error codes */
+	for (i = ATT_ECODE_INVALID_HANDLE; i < array_len; i++) {
+		len = strlen(att_err_map[i]);
 
-	if (dbus_error_has_name(err, ATT_WRITE_NOT_PERM))
-		return ATT_ECODE_WRITE_NOT_PERM;
+		if (strncmp(err->message, att_err_map[i], len) == 0) {
+			if (sscanf(&err->message[len], ".%x", &j) != 1)
+				j = 0xffff;
 
-	if (dbus_error_has_name(err, ATT_INSUFF_AUTHENTICATION))
-		return ATT_ECODE_AUTHENTICATION;
+			*handle = (uint16_t) j;
+			return (uint8_t) i;
+		}
+	}
 
-	if (dbus_error_has_name(err, ATT_INSUFF_AUTHORIZATION))
-		return ATT_ECODE_AUTHORIZATION;
+	/* Extended and Application Error codes */
+	len = strlen(app_err);
+	if (strncmp(err->message, app_err, len) == 0) {
+		if (sscanf(&err->message[len], "%x.%x", &i, &j) != 2) {
+			*handle = 0xffff;
+			return ATT_ECODE_UNLIKELY;
+		}
 
-	if (dbus_error_has_name(err, ATT_INSUFF_ENCRYPTION))
-		return ATT_ECODE_INSUFF_ENC;
+		*handle = (uint16_t) j;
+		if (((uint8_t) i) & 0xFF)
+			return (uint8_t) i;
+	}
 
-	if (dbus_error_has_name(err, ATT_INSUFF_RESOURCES))
-		return ATT_ECODE_INSUFF_RESOURCES;
-
+	/* Unrecognized Error code */
+	*handle = 0xffff;
 	return ATT_ECODE_UNLIKELY;
+}
+
+static gboolean is_channel_valid(gpointer data)
+{
+	GSList *l;
+
+	for (l = clients; l; l = l->next) {
+		if (l->data == data) {
+			DBG("Channel found :%p", data);
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 static void dbus_read_by_group(struct gatt_channel *channel, uint16_t start,
@@ -728,6 +754,11 @@ static void read_by_group_reply(DBusPendingCall *call, void *user_data)
 	/* steal_reply will always return non-NULL since the callback
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
+
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
 
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
@@ -1137,6 +1168,11 @@ static void read_by_chr_reply(DBusPendingCall *call, void *user_data)
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
 
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
 		error("Server replied with an error: %s, %s",
@@ -1288,6 +1324,11 @@ static void read_by_inc_reply(DBusPendingCall *call, void *user_data)
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
 
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
 		error("Server replied with an error: %s, %s",
@@ -1413,8 +1454,8 @@ static void read_by_type_reply(DBusPendingCall *call, void *user_data)
 	struct gatt_server *server = channel->op.server;
 	DBusMessage *message;
 	DBusError err;
-	uint16_t length, handle;
-	uint8_t *value, dst[23];
+	uint16_t length, handle, err_handle = 0;
+	uint8_t *value, dst[ATT_DEFAULT_LE_MTU];
 	uint8_t att_err = ATT_ECODE_ATTR_NOT_FOUND;
 	const uint8_t *payload;
 	dbus_int32_t cnt;
@@ -1430,12 +1471,32 @@ static void read_by_type_reply(DBusPendingCall *call, void *user_data)
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
 
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
 		error("Server replied with an error: %s, %s",
 				err.name, err.message);
 
+		att_err = map_dbus_error(&err, &err_handle);
 		dbus_error_free(&err);
+
+		/* Ensure server didn't return handle outside it's range */
+		if (err_handle >= server->count)
+			err_handle = server->count - 1;
+
+		err_handle += server->base;
+
+		/* Ensure error handle within requested range */
+		if (err_handle < channel->op.u.read_by_type.start)
+			err_handle = channel->op.u.read_by_type.start;
+
+		if (err_handle > channel->op.u.read_by_type.end)
+			err_handle = channel->op.u.read_by_type.end;
+
 		goto cleanup_dbus;
 	}
 
@@ -1514,6 +1575,11 @@ cleanup_dbus:
 		goto done;
 	}
 
+	if (att_err != ATT_ECODE_ATTR_NOT_FOUND) {
+		terminated = TRUE;
+		goto done;
+	}
+
 	/* See if any other servers could provide results */
 	while (server && (handle >= (server->base + server->count)))
 		server = server->next;
@@ -1534,10 +1600,10 @@ done:
 	}
 
 	if (terminated) {
-		/* Or send NOT FOUND */
+		/* Or send Error */
 		length = enc_error_resp(ATT_OP_READ_BY_TYPE_REQ,
-					channel->op.u.read_by_type.start,
-					att_err, channel->opdu, channel->mtu);
+					err_handle, att_err,
+					channel->opdu, channel->mtu);
 
 		channel->op.opcode = 0;
 		server_resp(channel->attrib, 0, channel->opdu[0],
@@ -1559,6 +1625,9 @@ static void dbus_read_by_type(struct gatt_channel *channel, uint16_t start,
 	uint16_t type = 0;
 	int err;
 
+	/* To avoid needless recursion */
+restart_read_by_type:
+
 	DBG("start:0x%04x end:0x%04x", start, end);
 
 	while (server && (server->base + server->count) <= start)
@@ -1566,6 +1635,14 @@ static void dbus_read_by_type(struct gatt_channel *channel, uint16_t start,
 
 	if (!server)
 		goto failed;
+
+	/* Apply Carrier restriction if appropriate */
+	if ((server->carrier == CARRIER_BR_ONLY && channel->le) ||
+			(server->carrier == CARRIER_LE_ONLY && !channel->le)) {
+
+		server = server->next;
+		goto restart_read_by_type;
+	}
 
 	if (start > server->base)
 		norm_start = start - server->base;
@@ -1657,13 +1734,9 @@ failed_dbus:
 	/* Attempt on next server, if one exists */
 	if (server != gatt_server_last && server->next) {
 		server = server->next;
-		start = server->base;
-
-		DBG(" Try Next %s, %s 0x%04x,0x%04x", server->name, server->path, start, end);
-
-		dbus_read_by_type(channel, start, end, uuid);
-		return;
+		goto restart_read_by_type;
 	}
+
 	DBG(" Server List End");
 
 failed:
@@ -1718,12 +1791,12 @@ static int read_by_type(struct gatt_channel *channel, uint16_t start,
 		if (bt_uuid_cmp(&a->uuid, uuid) != 0)
 			continue;
 
-		status = att_check_reqs(channel, ATT_OP_READ_BY_TYPE_REQ,
-								a->read_reqs);
-
 		client_attr = client_cfg_attribute(channel, a);
 		if (client_attr)
 			a = client_attr;
+
+		status = att_check_reqs(channel, ATT_OP_READ_BY_TYPE_REQ,
+								a->read_reqs);
 
 		if (status == 0x00 && a->read_cb)
 			status = a->read_cb(a, a->cb_user_data);
@@ -1828,6 +1901,11 @@ static void find_info_reply(DBusPendingCall *call, void *user_data)
 	/* steal_reply will always return non-NULL since the callback
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
+
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
 
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
@@ -2158,6 +2236,11 @@ static void find_by_type_reply(DBusPendingCall *call, void *user_data)
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
 
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
 		error("Server replied with an error: %s, %s",
@@ -2394,9 +2477,10 @@ static int find_by_type(struct gatt_channel *channel, uint16_t start,
 	struct att_data_list *adl = NULL;
 	struct att_range *range;
 	GSList *l, *matches;
+	bt_uuid_t srch_uuid, tmp_uuid;
 	uint16_t length;
 	int i;
-	gboolean terminated = FALSE;
+	gboolean compare, terminated = FALSE;
 
 	DBG("start:0x%04x end:0x%04x", start, end);
 
@@ -2404,7 +2488,8 @@ static int find_by_type(struct gatt_channel *channel, uint16_t start,
 		return enc_error_resp(ATT_OP_FIND_BY_TYPE_REQ, start,
 					ATT_ECODE_INVALID_HANDLE, opdu, len);
 
-	if (vlen != 2 && vlen != 16)
+	if (vlen != sizeof(struct server_def_val16) &&
+			vlen != sizeof(struct server_def_val128))
 		return enc_error_resp(ATT_OP_FIND_BY_TYPE_REQ, start,
 					ATT_ECODE_INVALID_PDU, opdu, len);
 
@@ -2414,6 +2499,11 @@ static int find_by_type(struct gatt_channel *channel, uint16_t start,
 
 	if (gatt_server_list && gatt_server_list->base <= start)
 		goto empty_list;
+
+	if (vlen == sizeof(struct server_def_val128))
+		bt_uuid128_create(&srch_uuid, att_get_u128(value));
+	else
+		bt_uuid16_create(&srch_uuid, att_get_u16(value));
 
 	/* Searching first requested handle number */
 	for (l = database, matches = NULL, range = NULL; l; l = l->next) {
@@ -2427,9 +2517,23 @@ static int find_by_type(struct gatt_channel *channel, uint16_t start,
 			break;
 		}
 
-		/* Primary service? Attribute value matches? */
-		if ((bt_uuid_cmp(&a->uuid, uuid) == 0) && (a->len == vlen) &&
-					(memcmp(a->data, value, vlen) == 0)) {
+		/* Convert attribute value to UUID for generic UUID compares */
+		if (a->len == sizeof(struct server_def_val16) ||
+				a->len == sizeof(struct server_def_val128)) {
+			compare = TRUE;
+			if (a->len == sizeof(struct server_def_val128))
+				bt_uuid128_create(&tmp_uuid,
+						att_get_u128(a->data));
+			else
+				bt_uuid16_create(&tmp_uuid,
+						att_get_u16(a->data));
+		} else {
+			compare = FALSE;
+		}
+
+		/* Attribute value UUID matches? */
+		if (compare && bt_uuid_cmp(&a->uuid, uuid) == 0 &&
+				bt_uuid_cmp(&tmp_uuid, &srch_uuid) == 0) {
 
 			range = g_new0(struct att_range, 1);
 			range->start = a->handle;
@@ -2541,8 +2645,8 @@ static void read_reply(DBusPendingCall *call, void *user_data)
 	struct gatt_server *server = channel->op.server;
 	DBusMessage *message;
 	DBusError err;
-	uint16_t length = 0;
-	uint8_t dst[23];
+	uint16_t handle, length = 0;
+	uint8_t dst[ATT_DEFAULT_LE_MTU];
 	uint8_t att_err = 0;
 	const uint8_t *value;
 	const char *uuid_str;
@@ -2556,11 +2660,16 @@ static void read_reply(DBusPendingCall *call, void *user_data)
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
 
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
-		att_err = map_dbus_error(&err);
-		error("Server replied with an error: %s, %s",
-				err.name, err.message);
+		att_err = map_dbus_error(&err, &handle);
+		error("Server replied with an error: %s, %s (0x%x)",
+			err.name, err.message, att_err);
 		dbus_error_free(&err);
 		goto cleanup_dbus;
 	}
@@ -2653,6 +2762,17 @@ static void dbus_read(struct gatt_channel *channel, uint16_t handle)
 	if (!server)
 		goto failed;
 
+	/* Apply Carrier restriction if appropriate */
+	if (server->carrier == CARRIER_BR_ONLY && channel->le) {
+		att_err = ATT_ECODE_INVALID_TRANSPORT;
+		goto failed;
+	}
+
+	if (server->carrier == CARRIER_LE_ONLY && !channel->le) {
+		att_err = ATT_ECODE_INVALID_TRANSPORT;
+		goto failed;
+	}
+
 	if (handle >= server->base)
 		handle -= server->base;
 
@@ -2723,11 +2843,11 @@ static int read_value(struct gatt_channel *channel, uint16_t handle,
 
 	a = l->data;
 
-	status = att_check_reqs(channel, ATT_OP_READ_REQ, a->read_reqs);
-
 	client_attr = client_cfg_attribute(channel, a);
 	if (client_attr)
 		a = client_attr;
+
+	status = att_check_reqs(channel, ATT_OP_READ_REQ, a->read_reqs);
 
 	if (status == 0x00 && a->read_cb)
 		status = a->read_cb(a, a->cb_user_data);
@@ -2764,15 +2884,15 @@ static int read_blob(struct gatt_channel *channel, uint16_t handle,
 
 	a = l->data;
 
-	if (a->len <= offset)
-		return enc_error_resp(ATT_OP_READ_BLOB_REQ, handle,
-					ATT_ECODE_INVALID_OFFSET, pdu, len);
-
-	status = att_check_reqs(channel, ATT_OP_READ_BLOB_REQ, a->read_reqs);
-
 	client_attr = client_cfg_attribute(channel, a);
 	if (client_attr)
 		a = client_attr;
+
+	status = att_check_reqs(channel, ATT_OP_READ_BLOB_REQ, a->read_reqs);
+
+	if (!status && a->len <= offset)
+		return enc_error_resp(ATT_OP_READ_BLOB_REQ, handle,
+					ATT_ECODE_INVALID_OFFSET, pdu, len);
 
 	if (status == 0x00 && a->read_cb)
 		status = a->read_cb(a, a->cb_user_data);
@@ -2791,7 +2911,7 @@ static void write_reply(DBusPendingCall *call, void *user_data)
 	const char *uuid_str;
 	bt_uuid_t uuid;
 	DBusError err;
-	uint16_t length;
+	uint16_t handle, length;
 	uint8_t att_err = 0;
 
 	DBG("");
@@ -2800,11 +2920,16 @@ static void write_reply(DBusPendingCall *call, void *user_data)
 	 * is only called after a reply has been received */
 	message = dbus_pending_call_steal_reply(call);
 
+	if (!is_channel_valid(channel)) {
+		dbus_message_unref(message);
+		return;
+	}
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, message)) {
-		att_err = map_dbus_error(&err);
-		error("Server replied with an error: %s, %s",
-				err.name, err.message);
+		att_err = map_dbus_error(&err, &handle);
+		DBG("Server replied with an error: %s, %s (0x%x)",
+			err.name, err.message, att_err);
 		dbus_error_free(&err);
 		goto cleanup_dbus;
 	}
@@ -2846,6 +2971,7 @@ done:
 				channel->op.u.write.handle,
 				att_err, channel->opdu, channel->mtu);
 
+	g_free(channel->op.u.write.value);
 	channel->op.opcode = 0;
 	server_resp(channel->attrib, 0, channel->opdu[0],
 			channel->opdu, length, NULL, NULL, NULL);
@@ -2949,6 +3075,7 @@ static void dbus_writecmd(struct gatt_channel *channel, uint16_t handle,
 
 	dbus_connection_send(connection, channel->msg, NULL);
 	dbus_message_unref(channel->msg);
+	channel->msg = NULL;
 }
 
 static int write_value(struct gatt_channel *channel, gboolean resp,
@@ -2964,13 +3091,16 @@ static int write_value(struct gatt_channel *channel, gboolean resp,
 
 	if (gatt_server_list && gatt_server_list->base <= handle) {
 		if (resp) {
-			channel->op.u.write.value = g_malloc0(vlen);
-			if(!channel->op.u.write.value)
-				return -1;
+			if (value && vlen)
+				channel->op.u.write.value = g_malloc0(vlen);
+			else
+				channel->op.u.write.value = NULL;
+
+			if (channel->op.u.write.value)
+				memcpy(channel->op.u.write.value, value, vlen);
 
 			channel->op.opcode = ATT_OP_WRITE_REQ;
 			channel->op.u.write.handle = handle;
-			memcpy(channel->op.u.write.value, value, vlen);
 			channel->op.u.write.vlen = vlen;
 			dbus_write(channel, handle, value, vlen);
 		} else {
@@ -3064,7 +3194,9 @@ static void zero_cli_cfg(char *key, char *value, void *user_data)
 	dbus_message_unref(msg);
 }
 
-static void channel_disconnect(void *user_data)
+static void ind_return(guint8 status, const guint8 *pdu, guint16 len,
+								gpointer data);
+static void channel_destroy(void *user_data)
 {
 	struct gatt_channel *channel = user_data;
 	char filename[PATH_MAX + 1];
@@ -3075,13 +3207,41 @@ static void channel_disconnect(void *user_data)
 	make_cli_cfg_name(filename, channel);
 	textfile_foreach(filename, zero_cli_cfg, channel);
 
+	if (channel->ind_msg) {
+		DBG(" return_failure channel->ind_msg");
+		ind_return(ATT_ECODE_UNLIKELY, NULL, 0, channel);
+	}
+
 	clients = g_slist_remove(clients, channel);
+
+	if (channel->msg) {
+		DBG("channel_disconnect channel->msg");
+		dbus_message_unref(channel->msg);
+		channel->msg = NULL;
+	}
+
+	if (channel->call) {
+		DBG("channel_disconnect channel->call");
+		dbus_pending_call_unref(channel->call);
+		channel->call = NULL;
+	}
 
 	g_slist_free(channel->notify);
 	g_slist_free(channel->indicate);
 	g_attrib_set_disconnect_server_function(channel->attrib, NULL, NULL);
+	g_attrib_set_destroy_function(channel->attrib, NULL, NULL);
 
 	g_free(channel);
+}
+
+static void channel_disconnect(void *user_data)
+{
+	struct gatt_channel *channel = user_data;
+	GAttrib *attrib = channel->attrib;
+	DBG("");
+
+	channel_destroy(channel);
+	g_attrib_unref(attrib);
 }
 
 static void channel_handler(const uint8_t *ipdu, uint16_t len,
@@ -3380,8 +3540,9 @@ void attrib_server_attach(struct _GAttrib *attrib, bdaddr_t *src,
 	channel->id = g_attrib_register(attrib, GATTRIB_ALL_REQS,
 				channel_handler, channel, NULL);
 
+	g_attrib_set_destroy_function(attrib, channel_destroy, channel);
 	g_attrib_set_disconnect_server_function(attrib, channel_disconnect,
-								channel);
+			channel);
 
 	clients = g_slist_append(clients, channel);
 
@@ -3419,8 +3580,6 @@ static void connect_event(GIOChannel *io, GError *err, void *user_data)
 
 			attrib_server_attach(attrib, &src, &dst, omtu);
 	}
-
-	g_io_channel_unref(io);
 }
 
 static void confirm_event(GIOChannel *io, void *user_data)
@@ -3737,12 +3896,12 @@ static void create_server_entry(char *key, char *value, void *user_data)
 		return;
 	}
 
-	if (strlen(value) <= 5)
+	if (strlen(value) <= 8)
 		return;
 
 	path = key;
 	plen = strlen(path);
-	name = &value[5];
+	name = &value[8];
 
 	for (nlen = 0; name[nlen]; nlen++) {
 		if (name[nlen] == ' ') {
@@ -3757,6 +3916,7 @@ static void create_server_entry(char *key, char *value, void *user_data)
 		return;
 
 	new_server->count = (uint16_t) strtol(value, NULL, 16);
+	new_server->carrier = (uint8_t) strtol(&value[5], NULL, 16);
 	new_server->prev = gatt_server_last;
 	new_server->path = &new_server->name[nlen + 1];
 	memcpy(new_server->name, name, nlen);
@@ -3818,8 +3978,9 @@ static DBusMessage *register_server(DBusConnection *conn, DBusMessage *msg,
 {
 	char filename[PATH_MAX + 1];
 	char vstr[32];
-	const char *path, *owner;
+	const char *path, *owner, *car;
 	uint16_t cnt;
+	uint8_t carrier = CARRIER_NO_RESTRICTION;
 	uint32_t available = 0x10000, serial_num = 0;
 	char *str;
 
@@ -3836,7 +3997,9 @@ static DBusMessage *register_server(DBusConnection *conn, DBusMessage *msg,
 	if (!dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_STRING, &owner,
 				DBUS_TYPE_OBJECT_PATH, &path,
-				DBUS_TYPE_UINT16, &cnt, DBUS_TYPE_INVALID) ||
+				DBUS_TYPE_UINT16, &cnt,
+				DBUS_TYPE_STRING, &car,
+				DBUS_TYPE_INVALID) ||
 				!cnt || !path || !path[0] ||
 				!owner || !owner[0])
 		return btd_error_invalid_args(msg);
@@ -3871,8 +4034,18 @@ static DBusMessage *register_server(DBusConnection *conn, DBusMessage *msg,
 		textfile_put(filename, serial_num_str, vstr);
 	}
 
+	if (car) {
+		if (!strcmp(car, "LE"))
+			carrier = CARRIER_LE_ONLY;
+		else if (!strcmp(car, "BR"))
+			carrier = CARRIER_BR_ONLY;
+		else
+			carrier = CARRIER_NO_RESTRICTION;
+	}
+
 	/* Register new Server, using fixed size str to prevent db reordering */
-	snprintf(vstr, sizeof(vstr), "%4.4X %s %99s", cnt, owner, " ");
+	snprintf(vstr, sizeof(vstr), "%4.4X %2.2X %s %99s",
+						cnt, carrier, owner, " ");
 	vstr[sizeof(vstr) - 1] = 0;
 	textfile_put(filename, path, vstr);
 
@@ -4069,7 +4242,7 @@ static DBusMessage *server_notify(DBusConnection *conn, DBusMessage *msg,
 {
 	struct gatt_channel *channel;
 	struct gatt_server *server;
-	uint8_t pdu[23];
+	uint8_t pdu[ATT_DEFAULT_LE_MTU];
 	GSList *l;
 	uint32_t session;
 	const char *path;
@@ -4147,7 +4320,7 @@ static DBusMessage *server_indicate(DBusConnection *conn, DBusMessage *msg,
 {
 	struct gatt_channel *channel = NULL;
 	struct gatt_server *server;
-	uint8_t pdu[23];
+	uint8_t pdu[ATT_DEFAULT_LE_MTU];
 	GSList *l;
 	uint32_t session;
 	const char *path;
@@ -4198,6 +4371,36 @@ static DBusMessage *server_indicate(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static DBusMessage *get_reg_servers(DBusConnection *conn, DBusMessage *msg,
+								void *data)
+{
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter array_iter;
+
+	if (!dbus_message_has_signature(msg, DBUS_TYPE_INVALID_AS_STRING))
+		return btd_error_invalid_args(msg);
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply)
+		return NULL;
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+				DBUS_TYPE_OBJECT_PATH_AS_STRING, &array_iter);
+	if (gatt_server_list) {
+		struct gatt_server *l;
+
+		for (l = gatt_server_list; l; l = l->next) {
+
+		dbus_message_iter_append_basic(&array_iter,
+				DBUS_TYPE_OBJECT_PATH, &l->path);
+		}
+	}
+	dbus_message_iter_close_container(&iter, &array_iter);
+	return reply;
+}
+
 static DBusMessage *get_server_prop(DBusConnection *conn, DBusMessage *msg,
 								void *data)
 {
@@ -4214,13 +4417,14 @@ static DBusMessage *get_server_prop(DBusConnection *conn, DBusMessage *msg,
 }
 
 static GDBusMethodTable gatt_server_methods[] = {
-	{ "RegisterServer",      "soq",    "",      register_server,   0, 0 },
+	{ "RegisterServer",      "soqs",   "",      register_server,   0, 0 },
 	{ "AddPrimarySdp",       "ossqqb", "",      add_primary_sdp,   0, 0 },
 	{ "AddPrimaryAdvertise", "os",     "",      add_primary_adv,   0, 0 },
 	{ "DeregisterServer",    "o",      "",      deregister_server, 0, 0 },
 	{ "Notify",              "ouqay",  "",      server_notify,     0, 0 },
 	{ "Indicate",            "ouqay",  "",      server_indicate,   
 						G_DBUS_METHOD_FLAG_ASYNC, 0 },
+	{ "GetRegisteredServers", "",      "a{o}",  get_reg_servers,   0, 0 },
 	{ "GetProperty",         "os",     "v",     get_server_prop,   0, 0 },
 	{ NULL, NULL, NULL, NULL, 0, 0 }
 };

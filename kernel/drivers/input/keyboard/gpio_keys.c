@@ -317,13 +317,58 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+/*[Arima Edison]  move force crash key sequence from gpio_matrix to here++*/
+
+#define FORCE_CRASH_TIMEOUT (HZ*2)
+#define VOL_U KEY_VOLUMEUP
+#define VOL_D KEY_VOLUMEDOWN
+static unsigned char check_crash_step[] = {VOL_U, VOL_D, KEY_CAMERA, VOL_U, VOL_U};
+static unsigned char force_crash_step = 0;
+static unsigned long force_crash_basetime = 0;
+
+void check_crash_seq(int keycode)
+{
+	if (keycode == check_crash_step[force_crash_step++]) {
+		unsigned long curtime = 0;
+
+		curtime = jiffies;
+#if 1
+		pr_emerg("key(%x), dur(%ld)", keycode, curtime - force_crash_basetime);
+#endif
+		if ((force_crash_basetime) && time_before((force_crash_basetime + FORCE_CRASH_TIMEOUT), curtime)) {
+			force_crash_step = 0;
+			force_crash_basetime = 0;							
+		}
+		force_crash_basetime = curtime;
+
+	} else {
+		force_crash_step = 0;
+		force_crash_basetime = 0;
+	}
+	
+	if (force_crash_step == sizeof(check_crash_step)/sizeof(check_crash_step[0])) {
+		printk(KERN_EMERG "*************FORCE CRASH***************\n");
+		{
+			*(int* const)(0x0) = 0;
+		}
+	}	
+}
+
+/*[Arima Edison]  force crash key sequence from gpio_matrix to here++*/
+
 static void gpio_keys_report_event(struct gpio_button_data *bdata)
 {
 	struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
-
+	
+	/*[Arima Edison]add force crash key sequence++*/
+	printk(KERN_EMERG "%s key : (%d) state = (%d)\n",__func__,button->code,state);	
+	if(state)
+		check_crash_seq(button->code);
+	/*[Arima Edison]add force crash key sequence--*/
+	
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -376,6 +421,12 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	setup_timer(&bdata->timer, gpio_keys_timer, (unsigned long)bdata);
 	INIT_WORK(&bdata->work, gpio_keys_work_func);
 
+       /*Mel - Config GPIO*/
+	error=gpio_tlmm_config(GPIO_CFG(button->gpio, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);  
+	if (error < 0)
+			printk(KERN_INFO "[GPIO Key] - GPIO %d enable fail \n",button->gpio);
+       /*Mel - Config GPIO*/
+	
 	error = gpio_request(button->gpio, desc);
 	if (error < 0) {
 		dev_err(dev, "failed to request GPIO %d, error %d\n",

@@ -198,12 +198,12 @@ static void WebHistoryInflate(JNIEnv* env, jobject obj, jint frame, jbyteArray d
 // 6 empty strings + no document state + children count + 2 scales = 10 unsigned values
 // 1 char for isTargetItem.
 #define HISTORY_MIN_SIZE ((int)(sizeof(unsigned) * 10 + sizeof(char)))
-
-// MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+//TPSW1_SoMC_SS_3rd_Patches_Begin
+// Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
 // define max string size of history item components 
 #define HISTORY_COMPONENT_MAX_SIZE 65535
-// MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
-
+// Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+//TPSW1_SoMC_SS_3rd_Patches_End
 jbyteArray WebHistory::Flatten(JNIEnv* env, WTF::Vector<char>& v, WebCore::HistoryItem* item)
 {
     if (!item)
@@ -419,7 +419,7 @@ static void write_item(WTF::Vector<char>& v, WebCore::HistoryItem* item)
             // save the identifier as it is not included in the flatten data
             int64_t id = formData->identifier();
             v.append((char*)&id, sizeof(int64_t));
-        }
+		}
     } else
         write_string(v, WTF::String()); // Empty constructor does not allocate a buffer.
 
@@ -505,13 +505,15 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
     // Read the expected length of the string.
     unsigned l;
     memcpy(&l, data, sizeofUnsigned);
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+    //TPSW1_SoMC_SS_3rd_Patches_Begin
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
     // check history component size.
     if( l > HISTORY_COMPONENT_MAX_SIZE ) {
         LOGE("History component have invalid size: %d\n. exit", l);
         return false;
     }
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    //TPSW1_SoMC_SS_3rd_Patches_End
     // Increment data pointer by the size of an unsigned int.
     data += sizeofUnsigned;
     if (l) {
@@ -531,13 +533,15 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
 
     // Read the url
     memcpy(&l, data, sizeofUnsigned);
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+    //TPSW1_SoMC_SS_3rd_Patches_Begin
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
     // check history component size.
     if( l > HISTORY_COMPONENT_MAX_SIZE ) {
         LOGE("History component have invalid size: %d\n. exit", l);
         return false;
     }
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    //TPSW1_SoMC_SS_3rd_Patches_End
     data += sizeofUnsigned;
     if (l) {
         LOGV("Url             %d %.*s", l, l, data);
@@ -552,13 +556,15 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
 
     // Read the title
     memcpy(&l, data, sizeofUnsigned);
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+    //TPSW1_SoMC_SS_3rd_Patches_Begin
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
     // check history component size.
     if( l > HISTORY_COMPONENT_MAX_SIZE ) {
         LOGE("History component have invalid size: %d\n. exit", l);
         return false;
     }
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    //TPSW1_SoMC_SS_3rd_Patches_End
     data += sizeofUnsigned;
     if (l) {
         LOGV("Title           %d %.*s", l, l, data);
@@ -577,13 +583,15 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
 
     // Read the form content type
     memcpy(&l, data, sizeofUnsigned);
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+    //TPSW1_SoMC_SS_3rd_Patches_Begin
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
     // check history component size.
     if( l > HISTORY_COMPONENT_MAX_SIZE ) {
         LOGE("History component have invalid size: %d\n. exit", l);
         return false;
     }
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+   //TPSW1_SoMC_SS_3rd_Patches_End 
     data += sizeofUnsigned;
     if (l) {
         LOGV("Content type    %d %.*s", l, l, data);
@@ -598,13 +606,16 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
 
     // Read the form data
     memcpy(&l, data, sizeofUnsigned);
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+    //TPSW1_SoMC_SS_3rd_Patches_Begin
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
     // check history component size.
     if( l > HISTORY_COMPONENT_MAX_SIZE ) {
         LOGE("History component have invalid size: %d\n. exit", l);
         return false;
     }
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    //TPSW1_SoMC_SS_3rd_Patches_End
+
     data += sizeofUnsigned;
     if (l) {
         LOGV("Form data       %d %.*s", l, l, data);
@@ -637,13 +648,15 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
 
     // Read the target
     memcpy(&l, data, sizeofUnsigned);
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+    //TPSW1_SoMC_SS_3rd_Patches_Begin
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
     // check history component size. Must not large than 65535
     if( l > HISTORY_COMPONENT_MAX_SIZE ) {
         LOGE("History component have invalid size: %d\n. exit", l);
         return false;
     }
-    // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+    //TPSW1_SoMC_SS_3rd_Patches_End
     data += sizeofUnsigned;
     if (l) {
         LOGV("Target          %d %.*s", l, l, data);
@@ -703,13 +716,15 @@ static bool read_item_recursive(WebCore::HistoryItem* newItem,
                 return false;
             int strLen;
             memcpy(&strLen, data, sizeofUnsigned);
-            // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
+           //TPSW1_SoMC_SS_3rd_Patches_Begin 
+            // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 +
             // check history component size.
             if( strLen > HISTORY_COMPONENT_MAX_SIZE ) {
                 LOGE("History component have invalid size: %d\n. exit", strLen);
                 return false;
             }
-            // MTD-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+            // Tamsui3-ASD-SYS-KS-Fix-Tapioca_ICS-04580 -
+            //TPSW1_SoMC_SS_3rd_Patches_End
             data += sizeofUnsigned;
             if (data + strLen < end)
                 docState.append(e.decode(data, strLen));

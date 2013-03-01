@@ -5,7 +5,7 @@
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2010, Code Aurora Forum. All rights reserved.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
+ *
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -89,12 +89,15 @@
 #define AVDTP_MSG_TYPE_ACCEPT			0x02
 #define AVDTP_MSG_TYPE_REJECT			0x03
 
-//MTD_CONN_DL_Tapioca_ICS-00518-[
+ //TPSW1_SoMC_2nd_Patches_Begin
+//Tamsui3_CONN_DL_Tapioca_ICS-00518-[
 //#define REQ_TIMEOUT 6
-//MTD_CONN_DL_Tapioca_ICS-00518-]
-//MTD_CONN_DL_Tapioca_ICS-00518+[
+//Tamsui3_CONN_DL_Tapioca_ICS-00518-]
+//Tamsui3_CONN_DL_Tapioca_ICS-00518+[
 #define REQ_TIMEOUT 10
-//MTD_CONN_DL_Tapioca_ICS-00518+]
+//Tamsui3_CONN_DL_Tapioca_ICS-00518+]
+ //TPSW1_SoMC_2nd_Patches_End
+
 #define ABORT_TIMEOUT 2
 #define DISCONNECT_TIMEOUT 3
 #define STREAM_SETUP_TIMEOUT 3 // 2 seconds for SDP to start
@@ -439,6 +442,7 @@ struct avdtp {
 	gboolean stream_setup;
 
 	DBusPendingCall *pending_auth;
+	gboolean protection_required;
 };
 
 static GSList *servers = NULL;
@@ -477,10 +481,6 @@ void avdtp_reset_link_policy(struct avdtp *session)
 	/*Check whether this is needed for the remote device
 	  by comparing against the known IOP devices
 	*/
-	match = 0;
-	ret = read_special_map_devaddr("force_master", &session->dst, &match);
-	if (ret < 0 || !match)
-		return;
 
 	adapter = manager_find_adapter(&session->server->src);
 	if (!adapter)
@@ -1270,9 +1270,13 @@ void avdtp_unref(struct avdtp *session)
 
 		if (session->io)
 			set_disconnect_timer(session, DISCONNECT_TIMEOUT);
-		else if (!session->free_lock) /* Drop the local ref if we
+		else {
+			if (!session->free_lock) /* Drop the local ref if we
 						 aren't connected */
 			session->ref--;
+			avdtp_set_state(session,
+					AVDTP_SESSION_STATE_DISCONNECTED);
+		}
 	}
 
 	if (session->ref > 0)
@@ -3418,6 +3422,14 @@ struct avdtp_service_capability *avdtp_get_remote_sep_protection(struct avdtp_re
 	return NULL;
 }
 
+void avdtp_set_protection_req(struct avdtp *session, gboolean value)
+{
+	session->protection_required = value;
+}
+gboolean avdtp_get_protection_req(struct avdtp *session)
+{
+	return session->protection_required;
+}
 struct avdtp_stream *avdtp_get_stream(struct avdtp_remote_sep *sep)
 {
 	return sep->stream;
@@ -4070,4 +4082,12 @@ gboolean avdtp_remove_state_cb(unsigned int id)
 	}
 
 	return FALSE;
+}
+void avdtp_disconnect_session(struct avdtp *session)
+{
+	if (session->io) {
+		g_io_channel_shutdown(session->io, FALSE, NULL);
+		g_io_channel_unref(session->io);
+		session->io = NULL;
+	}
 }

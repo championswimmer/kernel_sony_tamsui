@@ -14,7 +14,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define VERSION "2.51.2"
+#define VERSION "2.51"
 
 #define FTABSIZ 150 /* max number of outstanding requests (default) */
 #define MAX_PROCS 20 /* max no children for TCP requests */
@@ -61,7 +61,9 @@
 #   endif
 #endif
 
-#define DEFLEASE 3600 /* default lease time, 1 hour */
+//felexching 20120624 Set DHCP lease time to 24hr
+#define DEFLEASE 3600 * 24 /* default lease time, 1 hour */
+//felexching 20120624 Set DHCP lease time to 24hr
 #define CHUSER "nobody"
 #define CHGRP "dip"
 #define DHCP_SERVER_PORT 67

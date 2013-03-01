@@ -2,7 +2,6 @@
  * BCMSDH Function Driver for the native SDIO/MMC driver in the Linux Kernel
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -28,7 +27,7 @@
 #ifndef __BCMSDH_SDMMC_H__
 #define __BCMSDH_SDMMC_H__
 
-#define sd_err(x) printf x
+#define sd_err(x)
 #define sd_trace(x)
 #define sd_info(x)
 #define sd_debug(x)

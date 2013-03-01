@@ -17,7 +17,7 @@
 #include <linux/err.h>
 #include <linux/qcomwlan7x27a_pwrif.h>
 
-#define WLAN_GPIO_EXT_POR_N     134
+#define WLAN_GPIO_EXT_POR_N     13//Arima modification
 
 static const char *id = "WLAN";
 
@@ -41,7 +41,7 @@ struct wlan_vreg_info {
 
 
 static struct wlan_vreg_info vreg_info[] = {
-	{"bt",        3050000, 3050000, 21, 1, NULL},
+	{"bt",        3000000, 3000000, 21, 1, NULL},
 	{"msme1",     1800000, 1800000, 2,  0, NULL},
 	{"wlan_tcx0", 1800000, 1800000, 53, 0, NULL},
 	{"wlan4",     1200000, 1200000, 23, 0, NULL},

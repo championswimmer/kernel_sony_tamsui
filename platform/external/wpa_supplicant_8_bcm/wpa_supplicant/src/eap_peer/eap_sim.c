@@ -635,8 +635,6 @@ static struct wpabuf * eap_sim_process_challenge(struct eap_sm *sm,
 		identity = eap_get_config_identity(sm, &identity_len);
 	wpa_hexdump_ascii(MSG_DEBUG, "EAP-SIM: Selected identity for MK "
 			  "derivation", identity, identity_len);
-	wpa_printf(MSG_WARNING, "EAP-SIM: Challenge message "
-			   "identity = %s", identity);
 	eap_sim_derive_mk(identity, identity_len, data->nonce_mt,
 			  data->selected_version, data->ver_list,
 			  data->ver_list_len, data->num_chal,

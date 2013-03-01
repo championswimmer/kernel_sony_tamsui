@@ -1,7 +1,5 @@
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -241,11 +239,7 @@ void mipi_dsi_phy_init(int panel_ndx, struct msm_panel_info const *panel_info,
 	int i, off;
 
 	MIPI_OUTP(MIPI_DSI_BASE + 0x128, 0x0001);/* start phy sw reset */
-#ifdef CONFIG_FIH_HR_MSLEEP
-	hr_msleep(50);  /* FIH-SW3-MM-NC-DEC_TIME-00 */
-#else
 	msleep(100);
-#endif
 	MIPI_OUTP(MIPI_DSI_BASE + 0x128, 0x0000);/* end phy w reset */
 	MIPI_OUTP(MIPI_DSI_BASE + 0x2cc, 0x0003);/* regulator_ctrl_0 */
 	MIPI_OUTP(MIPI_DSI_BASE + 0x2d0, 0x0001);/* regulator_ctrl_1 */
@@ -369,10 +363,15 @@ void mipi_dsi_clk_disable(void)
 	clk_disable(mdp_dsi_pclk);
 	/* DSIPHY_PLL_CTRL_0, disable dsi pll */
 	MIPI_OUTP(MIPI_DSI_BASE + 0x0200, 0x40);
+// <<FerryWu, 2012/03/28, prevent EBI1 clock being disabled when entering sleep mode
+// 20120523-Jordan , Need to remove these codes due to it will cause phone crash when sleep mode and plugin USB 
+#if 1
 	if (clk_set_rate(ebi1_dsi_clk, 0))
 		pr_err("%s: ebi1_dsi_clk set rate failed\n", __func__);
 	clk_disable(ebi1_dsi_clk);
-	mipi_dsi_clk_on = 0;
+#endif
+// >>FerryWu, 2012/03/28, prevent EBI1 clock being disabled when entering sleep mode
+	mipi_dsi_clk_on=0; //20120524-Jordan
 }
 
 void mipi_dsi_phy_ctrl(int on)
@@ -416,19 +415,7 @@ void update_lane_config(struct msm_panel_info *pinfo)
 	struct mipi_dsi_phy_ctrl *pd;
 
 	pd = (pinfo->mipi).dsi_phy_db;
-	pinfo->mipi.data_lane1 = FALSE;
+	
 	pd->pll[10] |= 0x08;
-
-/* FIH-SW3-MM-NC-LCM-00-[+ */
-/*
-	pinfo->yres = 320;
-	pinfo->lcdc.h_back_porch = 15;
-	pinfo->lcdc.h_front_porch = 21;
-	pinfo->lcdc.h_pulse_width = 5;
-	pinfo->lcdc.v_back_porch = 50;
-	pinfo->lcdc.v_front_porch = 101;
-	pinfo->lcdc.v_pulse_width = 50;
-*/
-/* FIH-SW3-MM-NC-LCM-00-]- */
 }
 #endif

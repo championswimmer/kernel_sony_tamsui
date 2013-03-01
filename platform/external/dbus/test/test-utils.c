@@ -304,8 +304,12 @@ test_server_setup (DBusLoop      *loop,
                                         sd,
                                         serverdata_free))
     {
-      return FALSE;
+      goto nomem;
     }
+
+  sd = serverdata_new (loop, server);
+  if (sd == NULL)
+    goto nomem;
 
   if (!dbus_server_set_timeout_functions (server,
                                           add_server_timeout,
@@ -313,7 +317,7 @@ test_server_setup (DBusLoop      *loop,
                                           NULL,
                                           sd, serverdata_free))
     {
-      return FALSE;
+      goto nomem;
     }   
   return TRUE;
 
@@ -330,6 +334,8 @@ void
 test_server_shutdown (DBusLoop         *loop,
                       DBusServer       *server)
 {
+  dbus_server_disconnect (server);
+
   if (!dbus_server_set_watch_functions (server,
                                         NULL, NULL, NULL,
                                         NULL,

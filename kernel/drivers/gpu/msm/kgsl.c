@@ -1,5 +1,4 @@
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,7 +25,6 @@
 #include <linux/ashmem.h>
 #include <linux/major.h>
 #include <linux/ion.h>
-#include <mach/socinfo.h>
 
 #include "kgsl.h"
 #include "kgsl_debugfs.h"
@@ -107,16 +105,6 @@ static int kgsl_add_event(struct kgsl_device *device, u32 ts,
 	queue_work(device->work_queue, &device->ts_expired_ws);
 	return 0;
 }
-
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-extern struct workqueue_struct *display_late_resume_wq;
-static struct work_struct  kgsl_late_resume_work;
-struct kgsl_device *kgsl_device_data = NULL;
-
-static void kgsl_late_resume_work_func(struct work_struct *work);
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
 
 /**
  * kgsl_cancel_events - Cancel all events for a process
@@ -436,6 +424,10 @@ static int kgsl_suspend_device(struct kgsl_device *device, pm_message_t state)
 			INIT_COMPLETION(device->hwaccess_gate);
 			device->ftbl->suspend_context(device);
 			device->ftbl->stop(device);
+			if (device->idle_wakelock.name)
+				wake_unlock(&device->idle_wakelock);
+			pm_qos_update_request(&device->pm_qos_req_dma,
+						PM_QOS_DEFAULT_VALUE);
 			kgsl_pwrctrl_set_state(device, KGSL_STATE_SUSPEND);
 			break;
 		case KGSL_STATE_SLUMBER:
@@ -539,27 +531,8 @@ int kgsl_resume_driver(struct platform_device *pdev)
 }
 EXPORT_SYMBOL(kgsl_resume_driver);
 
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-static void kgsl_late_resume_work_func(struct work_struct *work)
-{
-	if (kgsl_device_data) {
-		struct kgsl_device *device = kgsl_device_data;
-		mutex_lock(&device->mutex);
-		kgsl_pwrctrl_pwrlevel_change(kgsl_device_data, KGSL_PWRLEVEL_TURBO);
-		mutex_unlock(&device->mutex);
-	}
-}
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
-
 void kgsl_late_resume_driver(struct early_suspend *h)
 {
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-	kgsl_device_data = container_of(h, struct kgsl_device, display_off);
-	queue_work(display_late_resume_wq, &kgsl_late_resume_work);
-#else
 	struct kgsl_device *device = container_of(h,
 					struct kgsl_device, display_off);
 	KGSL_PWR_WARN(device, "late resume start\n");
@@ -570,8 +543,6 @@ void kgsl_late_resume_driver(struct early_suspend *h)
 	mutex_unlock(&device->mutex);
 	kgsl_check_idle(device);
 	KGSL_PWR_WARN(device, "late resume end\n");
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
 }
 EXPORT_SYMBOL(kgsl_late_resume_driver);
 
@@ -682,19 +653,16 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 
 		next = next + 1;
 	}
-	/*
-	 * Clean up any to-be-freed entries that belong to this
-	 * process and this device. This is done after the context
-	 * are destroyed to avoid possibly freeing memory while
-	 * it is still in use by the GPU.
-	 */
-	kgsl_cancel_events(device, dev_priv);
 
 	device->open_count--;
 	if (device->open_count == 0) {
 		result = device->ftbl->stop(device);
 		kgsl_pwrctrl_set_state(device, KGSL_STATE_INIT);
 	}
+	/* clean up any to-be-freed entries that belong to this
+	 * process and this device
+	 */
+	kgsl_cancel_events(device, dev_priv);
 
 	mutex_unlock(&device->mutex);
 	kfree(dev_priv);
@@ -913,40 +881,6 @@ static long kgsl_ioctl_device_waittimestamp(struct kgsl_device_private
 
 	return result;
 }
-static bool check_ibdesc(struct kgsl_device_private *dev_priv,
-			 struct kgsl_ibdesc *ibdesc, unsigned int numibs,
-			 bool parse)
-{
-	bool result = true;
-	unsigned int i;
-	for (i = 0; i < numibs; i++) {
-		struct kgsl_mem_entry *entry;
-		spin_lock(&dev_priv->process_priv->mem_lock);
-		entry = kgsl_sharedmem_find_region(dev_priv->process_priv,
-			ibdesc[i].gpuaddr, ibdesc[i].sizedwords * sizeof(uint));
-		spin_unlock(&dev_priv->process_priv->mem_lock);
-		if (entry == NULL) {
-			KGSL_DRV_ERR(dev_priv->device,
-				"invalid cmd buffer gpuaddr %08x " \
-				"sizedwords %d\n", ibdesc[i].gpuaddr,
-				ibdesc[i].sizedwords);
-			result = false;
-			break;
-		}
-
-		if (parse && !kgsl_cffdump_parse_ibs(dev_priv, &entry->memdesc,
-			ibdesc[i].gpuaddr, ibdesc[i].sizedwords, true)) {
-			KGSL_DRV_ERR(dev_priv->device,
-				"invalid cmd buffer gpuaddr %08x " \
-				"sizedwords %d numibs %d/%d\n",
-				ibdesc[i].gpuaddr,
-				ibdesc[i].sizedwords, i+1, numibs);
-			result = false;
-			break;
-		}
-	}
-	return result;
-}
 
 static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 				      unsigned int cmd, void *data)
@@ -1016,12 +950,6 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 		param->numibs = 1;
 	}
 
-	if (!check_ibdesc(dev_priv, ibdesc, param->numibs, true)) {
-		KGSL_DRV_ERR(dev_priv->device, "bad ibdesc");
-		result = -EINVAL;
-		goto free_ibdesc;
-	}
-
 	result = dev_priv->device->ftbl->issueibcmds(dev_priv,
 					     context,
 					     ibdesc,
@@ -1030,18 +958,6 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 					     param->flags);
 
 	trace_kgsl_issueibcmds(dev_priv->device, param, result);
-
-	if (result != 0)
-		goto free_ibdesc;
-
-	/* this is a check to try to detect if a command buffer was freed
-	 * during issueibcmds().
-	 */
-	if (!check_ibdesc(dev_priv, ibdesc, param->numibs, false)) {
-		KGSL_DRV_ERR(dev_priv->device, "bad ibdesc AFTER issue");
-		result = -EINVAL;
-		goto free_ibdesc;
-	}
 
 free_ibdesc:
 	kfree(ibdesc);
@@ -1251,7 +1167,7 @@ kgsl_ioctl_sharedmem_from_vmalloc(struct kgsl_device_private *dev_priv,
 		goto error;
 	}
 
-	result = kgsl_sharedmem_vmalloc_user(&entry->memdesc,
+	result = kgsl_sharedmem_page_alloc_user(&entry->memdesc,
 					     private->pagetable, len,
 					     param->flags);
 	if (result != 0)
@@ -1262,7 +1178,7 @@ kgsl_ioctl_sharedmem_from_vmalloc(struct kgsl_device_private *dev_priv,
 	result = kgsl_sharedmem_map_vma(vma, &entry->memdesc);
 	if (result) {
 		KGSL_CORE_ERR("kgsl_sharedmem_map_vma failed: %d\n", result);
-		goto error_free_vmalloc;
+		goto error_free_alloc;
 	}
 
 	param->gpuaddr = entry->memdesc.gpuaddr;
@@ -1277,7 +1193,7 @@ kgsl_ioctl_sharedmem_from_vmalloc(struct kgsl_device_private *dev_priv,
 	kgsl_check_idle(dev_priv->device);
 	return 0;
 
-error_free_vmalloc:
+error_free_alloc:
 	kgsl_sharedmem_free(&entry->memdesc);
 
 error_free_entry:
@@ -1399,9 +1315,9 @@ static int memdesc_sg_virt(struct kgsl_memdesc *memdesc,
 	int i;
 	int sglen = PAGE_ALIGN(size) / PAGE_SIZE;
 	unsigned long paddr = (unsigned long) addr;
-	/* FIH-SW2-MM-KW-Google_patch-00+{ */
-	memdesc->sg = kgsl_sg_alloc(sglen * sizeof(struct scatterlist));
-	/* FIH-SW2-MM-KW-Google_patch-00-} */
+
+	memdesc->sg = kgsl_sg_alloc(sglen);
+
 	if (memdesc->sg == NULL)
 		return -ENOMEM;
 
@@ -1441,9 +1357,7 @@ static int memdesc_sg_virt(struct kgsl_memdesc *memdesc,
 
 err:
 	spin_unlock(&current->mm->page_table_lock);
-	/* FIH-SW2-MM-KW-Google_patch-00+{ */
-	kgsl_sg_free(memdesc->sg, sglen * sizeof(struct scatterlist));
-	/* FIH-SW2-MM-KW-Google_patch-00-} */
+	kgsl_sg_free(memdesc->sg,  sglen);
 	memdesc->sg = NULL;
 
 	return -EINVAL;
@@ -1578,11 +1492,8 @@ static int kgsl_setup_ion(struct kgsl_mem_entry *entry,
 	struct scatterlist *s;
 	unsigned long flags;
 
-	if (kgsl_ion_client == NULL) {
-		kgsl_ion_client = msm_ion_client_create(UINT_MAX, KGSL_NAME);
-		if (kgsl_ion_client == NULL)
-			return -ENODEV;
-	}
+	if (IS_ERR_OR_NULL(kgsl_ion_client))
+		return -ENODEV;
 
 	handle = ion_import_fd(kgsl_ion_client, fd);
 	if (IS_ERR_OR_NULL(handle))
@@ -1712,10 +1623,20 @@ static long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 	kgsl_check_idle(dev_priv->device);
 	return result;
 
- error_put_file_ptr:
-	if (entry->priv_data)
-		fput(entry->priv_data);
-
+error_put_file_ptr:
+	switch (entry->memtype) {
+	case KGSL_MEM_ENTRY_PMEM:
+	case KGSL_MEM_ENTRY_ASHMEM:
+		if (entry->priv_data)
+			fput(entry->priv_data);
+		break;
+	case KGSL_MEM_ENTRY_ION:
+		ion_unmap_dma(kgsl_ion_client, entry->priv_data);
+		ion_free(kgsl_ion_client, entry->priv_data);
+		break;
+	default:
+		break;
+	}
 error:
 	kfree(entry);
 	kgsl_check_idle(dev_priv->device);
@@ -1972,9 +1893,7 @@ static const struct {
 static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 {
 	struct kgsl_device_private *dev_priv = filep->private_data;
-	/* FIH-SW2-MM-KW-Google_patch-00+{ */
-	unsigned int nr = 0;
-	/* FIH-SW2-MM-KW-Google_patch-00-} */
+	unsigned int nr = _IOC_NR(cmd);
 	kgsl_ioctl_func_t func;
 	int lock, ret;
 	char ustack[64];
@@ -1990,9 +1909,6 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	else if (cmd == IOCTL_KGSL_CMDSTREAM_READTIMESTAMP_OLD)
 		cmd = IOCTL_KGSL_CMDSTREAM_READTIMESTAMP;
 
-	/* FIH-SW2-MM-KW-Google_patch-00+{ */
-	nr = _IOC_NR(cmd);
-	/* FIH-SW2-MM-KW-Google_patch-00-} */
 	if (cmd & (IOC_IN | IOC_OUT)) {
 		if (_IOC_SIZE(cmd) < sizeof(ustack))
 			uptr = ustack;
@@ -2017,19 +1933,7 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	}
 
 	if (nr < ARRAY_SIZE(kgsl_ioctl_funcs) &&
-		kgsl_ioctl_funcs[nr].func != NULL) {
-		/* FIH-SW2-MM-KW-Google_patch-00+{ */
-		/*
-		 * Make sure that nobody tried to send us a malformed ioctl code
-		 * with a valid NR but bogus flags
-		*/
-		if (unlikely(kgsl_ioctl_funcs[nr].cmd != cmd)) {
-			KGSL_DRV_ERR(dev_priv->device,
-				"Malformed ioctl code %08x\n", cmd);
-			ret = -ENOIOCTLCMD;
-			goto done;
-		}
-		/* FIH-SW2-MM-KW-Google_patch-00-} */
+	    kgsl_ioctl_funcs[nr].func != NULL) {
 		func = kgsl_ioctl_funcs[nr].func;
 		lock = kgsl_ioctl_funcs[nr].lock;
 	} else {
@@ -2045,8 +1949,6 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 
 	if (lock) {
 		mutex_lock(&dev_priv->device->mutex);
-		if (dev_priv->device->state == KGSL_STATE_SLEEP)
-			kgsl_pwrctrl_wake(dev_priv->device);
 		kgsl_check_suspended(dev_priv->device);
 	}
 
@@ -2209,8 +2111,8 @@ void kgsl_unregister_device(struct kgsl_device *device)
 	kgsl_cffdump_close(device->id);
 	kgsl_pwrctrl_uninit_sysfs(device);
 
-	if (cpu_is_msm8x60())
-		wake_lock_destroy(&device->idle_wakelock);
+	wake_lock_destroy(&device->idle_wakelock);
+	pm_qos_remove_request(&device->pm_qos_req_dma);
 
 	idr_destroy(&device->context_idr);
 
@@ -2301,9 +2203,9 @@ kgsl_register_device(struct kgsl_device *device)
 	if (ret != 0)
 		goto err_close_mmu;
 
-	if (cpu_is_msm8x60())
-		wake_lock_init(&device->idle_wakelock,
-					   WAKE_LOCK_IDLE, device->name);
+	wake_lock_init(&device->idle_wakelock, WAKE_LOCK_IDLE, device->name);
+	pm_qos_add_request(&device->pm_qos_req_dma, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
 
 	idr_init(&device->context_idr);
 
@@ -2349,6 +2251,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device,
 	if (status)
 		goto error;
 
+	kgsl_ion_client = msm_ion_client_create(UINT_MAX, KGSL_NAME);
+
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 					   device->iomemname);
 	if (res == NULL) {
@@ -2361,12 +2265,6 @@ int kgsl_device_platform_probe(struct kgsl_device *device,
 		status = -EINVAL;
 		goto error_pwrctrl_close;
 	}
-
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-	INIT_WORK(&kgsl_late_resume_work, kgsl_late_resume_work_func);
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
 
 	regspace = &device->regspace;
 	regspace->mmio_phys_base = res->start;

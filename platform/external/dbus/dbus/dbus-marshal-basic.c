@@ -29,6 +29,42 @@
 
 #include <string.h>
 
+#if defined(__GNUC__) && (__GNUC__ >= 4)
+# define _DBUS_ASSERT_ALIGNMENT(type, op, val) \
+  _DBUS_STATIC_ASSERT (__extension__ __alignof__ (type) op val)
+#else
+  /* not gcc, so probably no alignof operator: just use a no-op statement
+   * that's valid in the same contexts */
+# define _DBUS_ASSERT_ALIGNMENT(type, op, val) \
+  _DBUS_STATIC_ASSERT (TRUE)
+#endif
+
+/* True by definition, but just for completeness... */
+_DBUS_STATIC_ASSERT (sizeof (char) == 1);
+_DBUS_ASSERT_ALIGNMENT (char, ==, 1);
+
+_DBUS_STATIC_ASSERT (sizeof (dbus_int16_t) == 2);
+_DBUS_ASSERT_ALIGNMENT (dbus_int16_t, <=, 2);
+_DBUS_STATIC_ASSERT (sizeof (dbus_uint16_t) == 2);
+_DBUS_ASSERT_ALIGNMENT (dbus_uint16_t, <=, 2);
+
+_DBUS_STATIC_ASSERT (sizeof (dbus_int32_t) == 4);
+_DBUS_ASSERT_ALIGNMENT (dbus_int32_t, <=, 4);
+_DBUS_STATIC_ASSERT (sizeof (dbus_uint32_t) == 4);
+_DBUS_ASSERT_ALIGNMENT (dbus_uint32_t, <=, 4);
+_DBUS_STATIC_ASSERT (sizeof (dbus_bool_t) == 4);
+_DBUS_ASSERT_ALIGNMENT (dbus_bool_t, <=, 4);
+
+_DBUS_STATIC_ASSERT (sizeof (double) == 8);
+_DBUS_ASSERT_ALIGNMENT (double, <=, 8);
+
+#ifdef DBUS_HAVE_INT64
+_DBUS_STATIC_ASSERT (sizeof (dbus_int64_t) == 8);
+_DBUS_ASSERT_ALIGNMENT (dbus_int64_t, <=, 8);
+_DBUS_STATIC_ASSERT (sizeof (dbus_uint64_t) == 8);
+_DBUS_ASSERT_ALIGNMENT (dbus_uint64_t, <=, 8);
+#endif
+
 /**
  * @defgroup DBusMarshal marshaling and unmarshaling
  * @ingroup  DBusInternals
@@ -1065,8 +1101,6 @@ _dbus_marshal_write_fixed_multi (DBusString *str,
     case DBUS_TYPE_INT16:
     case DBUS_TYPE_UINT16:
       return marshal_fixed_multi (str, insert_at, vp, n_elements, byte_order, 2, pos_after);
-      /* FIXME: we canonicalize to 0 or 1 for the single boolean case
-       * should we here too ? */
     case DBUS_TYPE_BOOLEAN:
     case DBUS_TYPE_INT32:
     case DBUS_TYPE_UINT32:

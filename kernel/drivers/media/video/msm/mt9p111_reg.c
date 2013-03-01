@@ -1,0 +1,1852 @@
+/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
+#include "mt9p111.h"
+struct reg_struct_type mt9p111_init_settings_array[] = {
+#if 0
+//[AF-trigger]
+{ 0x098E, 0xB006, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AF_PROGRESS]
+{ 0xB006, 0x01, 16, 0}, 	// AF_PROGRESS
+
+
+
+//[Preview 480x320]
+
+{ 0x098E, 0x483A, 16, 0},// LOGICAL_ADDRESS_ACCESS [CAM_CORE_A_Y_ADDR_START]
+{ 0xC83A, 0x005C, 16, 0},// CAM_CORE_A_Y_ADDR_START
+{ 0xC83E, 0x0789, 16, 0},// CAM_CORE_A_Y_ADDR_END
+{ 0xC86E, 0x035C, 16, 0}, // CAM_CORE_A_OUTPUT_SIZE_HEIGHT
+{ 0xC8AA, 0x01E0, 16, 0}, // CAM_OUTPUT_0_IMAGE_WIDTH 
+{ 0xC8AC, 0x0140, 16, 0},// CAM_OUTPUT_0_IMAGE_HEIGHT   
+{ 0xDC0A, 0x0E    , 16, 0},// SYS_SCALE_MODE 	
+{ 0x8404, 0x06  , 16, 0},// SEQ_CMD
+#endif
+//[*Let_us_go_out*]
+
+//XMCLK=24000000
+//[Step1-Reset]
+// Reset the sensor..hardware specific for demo2 board...toggles the reset pin
+//STATE=Sensor Reset, 1
+//STATE=Sensor Reset, 0
+//for devware
+//STATE = Num Capture Frames, 2
+//[Step2-PLL_Timing]
+//for 24MHz input, VCO=MAX PCLK=76.8MHz
+{ 0x0010, 0x0340, 16, 0},
+{ 0x0012, 0x0090, 16, 0},
+{ 0x0014, 0x2025, 16, 0},
+{ 0x001E, 0x0565, 16, 0}, 	// PAD_SLEW_PAD_CONFIG
+{ 0x0022, 0x0030, 16, 0},   //0x01E0 	// VDD_DIS_COUNTER
+{ 0x002A, 0x7F7E, 16, 0},   //0x7F7F 	// PLL_P4_P5_P6_DIVIDERS By Hwang 20101104
+{ 0x002C, 0x0000, 16, 0}, 	// PLL_P7_DIVIDER
+{ 0x002E, 0x0000, 16, 0}, 	// SENSOR_CLOCK_DIVIDER
+{ 0x0018, 0x4008, 16, 100}, 	// STANDBY_CONTROL_AND_STATUS
+//DELAY=100
+//timing_settings
+{ 0x098E, 0x483A, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [CAM_CORE_A_Y_ADDR_START]
+{ 0xC83A, 0x005C, 16, 0}, 	// CAM_CORE_A_Y_ADDR_START
+{ 0xC83C, 0x0018, 16, 0}, 	// CAM_CORE_A_X_ADDR_START
+{ 0xC83E, 0x0789, 16, 0}, 	// CAM_CORE_A_Y_ADDR_END
+{ 0xC840, 0x0A45, 16, 0}, 	// CAM_CORE_A_X_ADDR_END
+{ 0xC842, 0x0001, 16, 0}, 	// CAM_CORE_A_ROW_SPEED
+{ 0xC844, 0x0103, 16, 0}, 	// CAM_CORE_A_SKIP_X_CORE
+{ 0xC846, 0x0103, 16, 0}, 	// CAM_CORE_A_SKIP_Y_CORE
+{ 0xC848, 0x0103, 16, 0}, 	// CAM_CORE_A_SKIP_X_PIPE
+{ 0xC84A, 0x0103, 16, 0}, 	// CAM_CORE_A_SKIP_Y_PIPE
+{ 0xC84C, 0x0096, 16, 0}, 	// CAM_CORE_A_POWER_MODE [101124 Au￠F!Ae] 0x00F6-> 0x0096
+{ 0xC84E, 0x0001, 16, 0}, 	// CAM_CORE_A_BIN_MODE
+{ 0xC850, 0x00  , 8, 0},// CAM_CORE_A_ORIENTATION
+{ 0xC851, 0x00  , 8, 0},// CAM_CORE_A_PIXEL_ORDER
+{ 0xC852, 0x019C, 16, 0}, 	// CAM_CORE_A_FINE_CORRECTION
+{ 0xC854, 0x0732, 16, 0}, 	// CAM_CORE_A_FINE_ITMIN
+{ 0xC858, 0x0000, 16, 0}, 	// CAM_CORE_A_COARSE_ITMIN
+{ 0xC85A, 0x0001, 16, 0}, 	// CAM_CORE_A_COARSE_ITMAX_MARGIN
+{ 0xC85C, 0x0423, 16, 0}, 	// CAM_CORE_A_MIN_FRAME_LENGTH_LINES
+{ 0xC85E, 0xFFFF, 16, 0}, 	// CAM_CORE_A_MAX_FRAME_LENGTH_LINES
+{ 0xC860, 0x0423, 16, 0}, 	// CAM_CORE_A_BASE_FRAME_LENGTH_LINES
+{ 0xC862, 0x1194, 16, 0}, 	// CAM_CORE_A_MIN_LINE_LENGTH_PCLK
+{ 0xC864, 0xFFFE, 16, 0}, 	// CAM_CORE_A_MAX_LINE_LENGTH_PCLK
+{ 0xC866, 0x7F7F, 16, 0}, 	// CAM_CORE_A_P4_5_6_DIVIDER
+{ 0xC868, 0x0423, 16, 0}, 	// CAM_CORE_A_FRAME_LENGTH_LINES
+{ 0xC86A, 0x1194, 16, 0}, 	// CAM_CORE_A_LINE_LENGTH_PCK
+{ 0xC86C, 0x0518, 16, 0}, 	// CAM_CORE_A_OUTPUT_SIZE_WIDTH
+{ 0xC86E, 0x035C, 16, 0}, 	// CAM_CORE_A_OUTPUT_SIZE_HEIGHT
+{ 0xC870, 0x0014, 16, 0}, 	// CAM_CORE_A_RX_FIFO_TRIGGER_MARK
+{ 0xC858, 0x0003, 16, 0}, 	// CAM_CORE_A_COARSE_ITMIN
+{ 0xC8B8, 0x0004, 16, 0}, 	// CAM_OUTPUT_0_JPEG_CONTROL
+{ 0xC8AE, 0x0001, 16, 0}, 	// CAM_OUTPUT_0_OUTPUT_FORMAT
+{ 0xC8AA, 0x01E0, 16, 0},   //320	//500 	// CAM_OUTPUT_0_IMAGE_WIDTH
+{ 0xC8AC, 0x0140, 16, 0},   //258	//3C0 	// CAM_OUTPUT_0_IMAGE_HEIGHT
+{ 0xDC0A, 0x0E  , 8, 0},// SYS_SCALE_MODE
+//[Full_Res_Settings_JPEG_Fullspeed]
+//;Max Framerate in Full Res
+{ 0x098E, 0x4872, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS
+{ 0xC872, 0x0010, 16, 0}, 	// CAM_CORE_B_Y_ADDR_START
+{ 0xC874, 0x001C, 16, 0}, 	// CAM_CORE_B_X_ADDR_START
+{ 0xC876, 0x07AF, 16, 0}, 	// CAM_CORE_B_Y_ADDR_END
+{ 0xC878, 0x0A43, 16, 0}, 	// CAM_CORE_B_X_ADDR_END
+{ 0xC87A, 0x0001, 16, 0}, 	// CAM_CORE_B_ROW_SPEED
+{ 0xC87C, 0x0101, 16, 0}, 	// CAM_CORE_B_SKIP_X_CORE
+{ 0xC87E, 0x0101, 16, 0}, 	// CAM_CORE_B_SKIP_Y_CORE
+{ 0xC880, 0x0101, 16, 0}, 	// CAM_CORE_B_SKIP_X_PIPE
+{ 0xC882, 0x0101, 16, 0}, 	// CAM_CORE_B_SKIP_Y_PIPE
+{ 0xC884, 0x005C, 16, 0}, 	// CAM_CORE_B_POWER_MODE [101124 Au￠F!Ae] 0x00F2-> 0x005C
+{ 0xC886, 0x0000, 16, 0}, 	// CAM_CORE_B_BIN_MODE
+{ 0xC888, 0x00  , 8, 0},// CAM_CORE_B_ORIENTATION
+{ 0xC889, 0x00  , 8, 0},// CAM_CORE_B_PIXEL_ORDER
+{ 0xC88A, 0x009C, 16, 0}, 	// CAM_CORE_B_FINE_CORRECTION
+{ 0xC88C, 0x034A, 16, 0}, 	// CAM_CORE_B_FINE_ITMIN
+{ 0xC890, 0x0000, 16, 0}, 	// CAM_CORE_B_COARSE_ITMIN
+{ 0xC892, 0x0001, 16, 0}, 	// CAM_CORE_B_COARSE_ITMAX_MARGIN
+{ 0xC894, 0x07EF, 16, 0}, 	// CAM_CORE_B_MIN_FRAME_LENGTH_LINES
+{ 0xC896, 0xFFFF, 16, 0}, 	// CAM_CORE_B_MAX_FRAME_LENGTH_LINES
+{ 0xC898, 0x082F, 16, 0}, 	// CAM_CORE_B_BASE_FRAME_LENGTH_LINES
+{ 0xC89A, 0x1964, 16, 0}, 	// CAM_CORE_B_MIN_LINE_LENGTH_PCLK
+{ 0xC89C, 0xFFFE, 16, 0}, 	// CAM_CORE_B_MAX_LINE_LENGTH_PCLK
+{ 0xC89E, 0x7F7F, 16, 0}, 	// CAM_CORE_B_P4_5_6_DIVIDER
+{ 0xC8A0, 0x07EF, 16, 0}, 	// CAM_CORE_B_FRAME_LENGTH_LINES
+{ 0xC8A2, 0x1964, 16, 0}, 	// CAM_CORE_B_LINE_LENGTH_PCK
+{ 0xC8A4, 0x0A28, 16, 0}, 	// CAM_CORE_B_OUTPUT_SIZE_WIDTH
+{ 0xC8A6, 0x07A0, 16, 0}, 	// CAM_CORE_B_OUTPUT_SIZE_HEIGHT
+{ 0xC8A8, 0x0124, 16, 0}, 	// CAM_CORE_B_RX_FIFO_TRIGGER_MARK
+{ 0xC890, 0x0003, 16, 0}, 	// CAM_CORE_B_COARSE_ITMIN
+{ 0xC8C0, 0x0A20, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x0798, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0xC89A, 0x1964, 16, 0}, 	// CAM_CORE_B_MIN_LINE_LENGTH_PCLK
+{ 0xC8A2, 0x1964, 16, 0}, 	// CAM_CORE_B_LINE_LENGTH_PCK
+{ 0xC8C4, 0x0001, 16, 0}, 	// CAM_OUTPUT_1_OUTPUT_FORMAT
+{ 0xC8C6, 0x0000, 16, 0}, 	// CAM_OUTPUT_1_OUTPUT_FORMAT_ORDER
+{ 0xC8CE, 0x0014, 16, 0}, 	// CAM_OUTPUT_1_JPEG_CONTROL
+{ 0xD822, 0x4610, 16, 0}, 	// JPEG_JPSS_CTRL_VAR
+{ 0x3330, 0x0000, 16, 0}, 	// OUTPUT_FORMAT_TEST
+//REG= 0x098E, 0xA00E 	// LOGICAL_ADDRESS_ACCESS
+//REG= 0xA00E, 0x32 	// FD_MAX_NUM_AUTOCOR_FUNC_VALUES_TO_CHECK
+{ 0xA010, 0x00CC, 16, 0}, 	// FD_MIN_EXPECTED50HZ_FLICKER_PERIOD
+{ 0xA012, 0x00E0, 16, 0}, 	// FD_MAX_EXPECTED50HZ_FLICKER_PERIOD
+{ 0xA014, 0x00A8, 16, 0}, 	// FD_MIN_EXPECTED60HZ_FLICKER_PERIOD
+{ 0xA016, 0x00BC, 16, 0}, 	// FD_MAX_EXPECTED60HZ_FLICKER_PERIOD
+{ 0xA018, 0x00D6, 16, 0}, 	// FD_EXPECTED50HZ_FLICKER_PERIOD_IN_CONTEXT_A
+{ 0xA01A, 0x0095, 16, 0}, 	// FD_EXPECTED50HZ_FLICKER_PERIOD_IN_CONTEXT_B
+{ 0xA01C, 0x00B2, 16, 0}, 	// FD_EXPECTED60HZ_FLICKER_PERIOD_IN_CONTEXT_A
+{ 0xA01E, 0x007C, 16, 0}, 	// FD_EXPECTED60HZ_FLICKER_PERIOD_IN_CONTEXT_B                                                     
+{ 0xA000, 0x10  , 8, 0},// FD_STATUS
+{ 0x8417, 0x02  , 8, 0},// SEQ_STATE_CFG_1_FD
+{ 0x8404, 0x06  , 8, 300},// SEQ_CMD
+//;DELAY=300
+
+//[Step3-Recommended]
+//; NEW Patch_AF
+//  k28a_rev03_patch14_CR31491_Pantech_CAF_OSD_REV2    //jolland_0105_2011
+{ 0x0982, 0x0000, 16, 0}, 	// ACCESS_CTL_STAT
+{ 0x098A, 0x0000, 16, 0}, 	// PHYSICAL_ADDRESS_ACCESS
+{ 0x886C, 0xC0F1, 16, 0},
+{ 0x886E, 0xC5E1, 16, 0},
+{ 0x8870, 0x246A, 16, 0},
+{ 0x8872, 0x1280, 16, 0},
+{ 0x8874, 0xC4E1, 16, 0},
+{ 0x8876, 0xD20F, 16, 0},
+{ 0x8878, 0x2069, 16, 0},
+{ 0x887A, 0x0000, 16, 0},
+{ 0x887C, 0x6A62, 16, 0},
+{ 0x887E, 0x1303, 16, 0},
+{ 0x8880, 0x0084, 16, 0},
+{ 0x8882, 0x1734, 16, 0},
+{ 0x8884, 0x7005, 16, 0},
+{ 0x8886, 0xD801, 16, 0},
+{ 0x8888, 0x8A41, 16, 0},
+{ 0x888A, 0xD900, 16, 0},
+{ 0x888C, 0x0D5A, 16, 0},
+{ 0x888E, 0x0664, 16, 0},
+{ 0x8890, 0x8B61, 16, 0},
+{ 0x8892, 0xE80B, 16, 0},
+{ 0x8894, 0x000D, 16, 0},
+{ 0x8896, 0x0020, 16, 0},
+{ 0x8898, 0xD508, 16, 0},
+{ 0x889A, 0x1504, 16, 0},
+{ 0x889C, 0x1400, 16, 0},
+{ 0x889E, 0x7840, 16, 0},
+{ 0x88A0, 0xD007, 16, 0},
+{ 0x88A2, 0x0DFB, 16, 0},
+{ 0x88A4, 0x9004, 16, 0},
+{ 0x88A6, 0xC4C1, 16, 0},
+{ 0x88A8, 0x2029, 16, 0},
+{ 0x88AA, 0x0300, 16, 0},
+{ 0x88AC, 0x0219, 16, 0},
+{ 0x88AE, 0x06C4, 16, 0},
+{ 0x88B0, 0xFF80, 16, 0},
+{ 0x88B2, 0x08CC, 16, 0},
+{ 0x88B4, 0xFF80, 16, 0},
+{ 0x88B6, 0x086C, 16, 0},
+{ 0x88B8, 0xFF80, 16, 0},
+{ 0x88BA, 0x08C0, 16, 0},
+{ 0x88BC, 0xFF80, 16, 0},
+{ 0x88BE, 0x08CC, 16, 0},
+{ 0x88C0, 0xFF80, 16, 0},
+{ 0x88C2, 0x0CA8, 16, 0},
+{ 0x88C4, 0xFF80, 16, 0},
+{ 0x88C6, 0x0D80, 16, 0},
+{ 0x88C8, 0xFF80, 16, 0},
+{ 0x88CA, 0x0DA0, 16, 0},
+{ 0x88CC, 0x000E, 16, 0},
+{ 0x88CE, 0x0002, 16, 0},
+{ 0x88D0, 0x0000, 16, 0},
+{ 0x88D2, 0x0000, 16, 0},
+{ 0x88D4, 0xD2FC, 16, 0},
+{ 0x88D6, 0xD0FD, 16, 0},
+{ 0x88D8, 0x122A, 16, 0},
+{ 0x88DA, 0x0901, 16, 0},
+{ 0x88DC, 0x900B, 16, 0},
+{ 0x88DE, 0x792F, 16, 0},
+{ 0x88E0, 0xB808, 16, 0},
+{ 0x88E2, 0x2004, 16, 0},
+{ 0x88E4, 0x0F80, 16, 0},
+{ 0x88E6, 0x0000, 16, 0},
+{ 0x88E8, 0xFF00, 16, 0},
+{ 0x88EA, 0x7825, 16, 0},
+{ 0x88EC, 0x1A2A, 16, 0},
+{ 0x88EE, 0x0024, 16, 0},
+{ 0x88F0, 0x0729, 16, 0},
+{ 0x88F2, 0x0504, 16, 0},
+{ 0x88F4, 0xC0F1, 16, 0},
+{ 0x88F6, 0x095E, 16, 0},
+{ 0x88F8, 0x06C4, 16, 0},
+{ 0x88FA, 0xD6F5, 16, 0},
+{ 0x88FC, 0x8E01, 16, 0},
+{ 0x88FE, 0xB8A4, 16, 0},
+{ 0x8900, 0xAE01, 16, 0},
+{ 0x8902, 0x8E09, 16, 0},
+{ 0x8904, 0xB8E0, 16, 0},
+{ 0x8906, 0xF29B, 16, 0},
+{ 0x8908, 0xD5F2, 16, 0},
+{ 0x890A, 0x153A, 16, 0},
+{ 0x890C, 0x1080, 16, 0},
+{ 0x890E, 0x153B, 16, 0},
+{ 0x8910, 0x1081, 16, 0},
+{ 0x8912, 0xB808, 16, 0},
+{ 0x8914, 0x7825, 16, 0},
+{ 0x8916, 0x16B8, 16, 0},
+{ 0x8918, 0x1101, 16, 0},
+{ 0x891A, 0x092D, 16, 0},
+{ 0x891C, 0x0003, 16, 0},
+{ 0x891E, 0x16B0, 16, 0},
+{ 0x8920, 0x1082, 16, 0},
+{ 0x8922, 0x1E3C, 16, 0},
+{ 0x8924, 0x1082, 16, 0},
+{ 0x8926, 0x16B1, 16, 0},
+{ 0x8928, 0x1082, 16, 0},
+{ 0x892A, 0x1E3D, 16, 0},
+{ 0x892C, 0x1082, 16, 0},
+{ 0x892E, 0x16B4, 16, 0},
+{ 0x8930, 0x1082, 16, 0},
+{ 0x8932, 0x1E3E, 16, 0},
+{ 0x8934, 0x1082, 16, 0},
+{ 0x8936, 0x16B5, 16, 0},
+{ 0x8938, 0x1082, 16, 0},
+{ 0x893A, 0x1E3F, 16, 0},
+{ 0x893C, 0x1082, 16, 0},
+{ 0x893E, 0x8E40, 16, 0},
+{ 0x8940, 0xBAA6, 16, 0},
+{ 0x8942, 0xAE40, 16, 0},
+{ 0x8944, 0x098F, 16, 0},
+{ 0x8946, 0x0022, 16, 0},
+{ 0x8948, 0x16BA, 16, 0},
+{ 0x894A, 0x1102, 16, 0},
+{ 0x894C, 0x0A87, 16, 0},
+{ 0x894E, 0x0003, 16, 0},
+{ 0x8950, 0x16B2, 16, 0},
+{ 0x8952, 0x1084, 16, 0},
+{ 0x8954, 0x0A92, 16, 0},
+{ 0x8956, 0x06A4, 16, 0},
+{ 0x8958, 0x16B0, 16, 0},
+{ 0x895A, 0x1083, 16, 0},
+{ 0x895C, 0x1E3C, 16, 0},
+{ 0x895E, 0x1002, 16, 0},
+{ 0x8960, 0x153A, 16, 0},
+{ 0x8962, 0x1080, 16, 0},
+{ 0x8964, 0x153B, 16, 0},
+{ 0x8966, 0x1081, 16, 0},
+{ 0x8968, 0x16B3, 16, 0},
+{ 0x896A, 0x1084, 16, 0},
+{ 0x896C, 0xB808, 16, 0},
+{ 0x896E, 0x7825, 16, 0},
+{ 0x8970, 0x16B8, 16, 0},
+{ 0x8972, 0x1101, 16, 0},
+{ 0x8974, 0x16BA, 16, 0},
+{ 0x8976, 0x1102, 16, 0},
+{ 0x8978, 0x0A6E, 16, 0},
+{ 0x897A, 0x06A4, 16, 0},
+{ 0x897C, 0x16B1, 16, 0},
+{ 0x897E, 0x1083, 16, 0},
+{ 0x8980, 0x1E3D, 16, 0},
+{ 0x8982, 0x1002, 16, 0},
+{ 0x8984, 0x153A, 16, 0},
+{ 0x8986, 0x1080, 16, 0},
+{ 0x8988, 0x153B, 16, 0},
+{ 0x898A, 0x1081, 16, 0},
+{ 0x898C, 0x16B6, 16, 0},
+{ 0x898E, 0x1084, 16, 0},
+{ 0x8990, 0xB808, 16, 0},
+{ 0x8992, 0x7825, 16, 0},
+{ 0x8994, 0x16B8, 16, 0},
+{ 0x8996, 0x1101, 16, 0},
+{ 0x8998, 0x16BA, 16, 0},
+{ 0x899A, 0x1102, 16, 0},
+{ 0x899C, 0x0A4A, 16, 0},
+{ 0x899E, 0x06A4, 16, 0},
+{ 0x89A0, 0x16B4, 16, 0},
+{ 0x89A2, 0x1083, 16, 0},
+{ 0x89A4, 0x1E3E, 16, 0},
+{ 0x89A6, 0x1002, 16, 0},
+{ 0x89A8, 0x153A, 16, 0},
+{ 0x89AA, 0x1080, 16, 0},
+{ 0x89AC, 0x153B, 16, 0},
+{ 0x89AE, 0x1081, 16, 0},
+{ 0x89B0, 0x16B7, 16, 0},
+{ 0x89B2, 0x1084, 16, 0},
+{ 0x89B4, 0xB808, 16, 0},
+{ 0x89B6, 0x7825, 16, 0},
+{ 0x89B8, 0x16B8, 16, 0},
+{ 0x89BA, 0x1101, 16, 0},
+{ 0x89BC, 0x16BA, 16, 0},
+{ 0x89BE, 0x1102, 16, 0},
+{ 0x89C0, 0x0A26, 16, 0},
+{ 0x89C2, 0x06A4, 16, 0},
+{ 0x89C4, 0x16B5, 16, 0},
+{ 0x89C6, 0x1083, 16, 0},
+{ 0x89C8, 0x1E3F, 16, 0},
+{ 0x89CA, 0x1002, 16, 0},
+{ 0x89CC, 0x8E00, 16, 0},
+{ 0x89CE, 0xB8A6, 16, 0},
+{ 0x89D0, 0xAE00, 16, 0},
+{ 0x89D2, 0x153A, 16, 0},
+{ 0x89D4, 0x1081, 16, 0},
+{ 0x89D6, 0x153B, 16, 0},
+{ 0x89D8, 0x1080, 16, 0},
+{ 0x89DA, 0xB908, 16, 0},
+{ 0x89DC, 0x7905, 16, 0},
+{ 0x89DE, 0x16BA, 16, 0},
+{ 0x89E0, 0x1100, 16, 0},
+{ 0x89E2, 0x085B, 16, 0},
+{ 0x89E4, 0x0042, 16, 0},
+{ 0x89E6, 0xD0BC, 16, 0},
+{ 0x89E8, 0x9E31, 16, 0},
+{ 0x89EA, 0x904D, 16, 0},
+{ 0x89EC, 0x0A2B, 16, 0},
+{ 0x89EE, 0x0063, 16, 0},
+{ 0x89F0, 0x8E00, 16, 0},
+{ 0x89F2, 0x16B0, 16, 0},
+{ 0x89F4, 0x1081, 16, 0},
+{ 0x89F6, 0x1E3C, 16, 0},
+{ 0x89F8, 0x1042, 16, 0},
+{ 0x89FA, 0x16B1, 16, 0},
+{ 0x89FC, 0x1081, 16, 0},
+{ 0x89FE, 0x1E3D, 16, 0},
+{ 0x8A00, 0x1042, 16, 0},
+{ 0x8A02, 0x16B4, 16, 0},
+{ 0x8A04, 0x1081, 16, 0},
+{ 0x8A06, 0x1E3E, 16, 0},
+{ 0x8A08, 0x1042, 16, 0},
+{ 0x8A0A, 0x16B5, 16, 0},
+{ 0x8A0C, 0x1081, 16, 0},
+{ 0x8A0E, 0x1E3F, 16, 0},
+{ 0x8A10, 0x1042, 16, 0},
+{ 0x8A12, 0xB886, 16, 0},
+{ 0x8A14, 0xF012, 16, 0},
+{ 0x8A16, 0x16B2, 16, 0},
+{ 0x8A18, 0x1081, 16, 0},
+{ 0x8A1A, 0xB8A6, 16, 0},
+{ 0x8A1C, 0x1E3C, 16, 0},
+{ 0x8A1E, 0x1042, 16, 0},
+{ 0x8A20, 0x16B3, 16, 0},
+{ 0x8A22, 0x1081, 16, 0},
+{ 0x8A24, 0x1E3D, 16, 0},
+{ 0x8A26, 0x1042, 16, 0},
+{ 0x8A28, 0x16B6, 16, 0},
+{ 0x8A2A, 0x1081, 16, 0},
+{ 0x8A2C, 0x1E3E, 16, 0},
+{ 0x8A2E, 0x1042, 16, 0},
+{ 0x8A30, 0x16B7, 16, 0},
+{ 0x8A32, 0x1081, 16, 0},
+{ 0x8A34, 0x1E3F, 16, 0},
+{ 0x8A36, 0x1042, 16, 0},
+{ 0x8A38, 0xAE00, 16, 0},
+{ 0x8A3A, 0x08F6, 16, 0},
+{ 0x8A3C, 0x01C4, 16, 0},
+{ 0x8A3E, 0x0081, 16, 0},
+{ 0x8A40, 0x06C4, 16, 0},
+{ 0x8A42, 0x78E0, 16, 0},
+{ 0x8A44, 0xC0F1, 16, 0},
+{ 0x8A46, 0x080E, 16, 0},
+{ 0x8A48, 0x06E4, 16, 0},
+{ 0x8A4A, 0xDB03, 16, 0},
+{ 0x8A4C, 0xD2A3, 16, 0},
+{ 0x8A4E, 0x8A2E, 16, 0},
+{ 0x8A50, 0x8ACF, 16, 0},
+{ 0x8A52, 0xB908, 16, 0},
+{ 0x8A54, 0x79C5, 16, 0},
+{ 0x8A56, 0xDD65, 16, 0},
+{ 0x8A58, 0x094F, 16, 0},
+{ 0x8A5A, 0x00D1, 16, 0},
+{ 0x8A5C, 0xD90A, 16, 0},
+{ 0x8A5E, 0x1A24, 16, 0},
+{ 0x8A60, 0x0042, 16, 0},
+{ 0x8A62, 0x8A24, 16, 0},
+{ 0x8A64, 0xE1E5, 16, 0},
+{ 0x8A66, 0xF6C9, 16, 0},
+{ 0x8A68, 0xD902, 16, 0},
+{ 0x8A6A, 0x2941, 16, 0},
+{ 0x8A6C, 0x0200, 16, 0},
+{ 0x8A6E, 0xAA0E, 16, 0},
+{ 0x8A70, 0xAA2F, 16, 0},
+{ 0x8A72, 0x70A9, 16, 0},
+{ 0x8A74, 0xF014, 16, 0},
+{ 0x8A76, 0xE1C8, 16, 0},
+{ 0x8A78, 0x0036, 16, 0},
+{ 0x8A7A, 0x000B, 16, 0},
+{ 0x8A7C, 0xE0C8, 16, 0},
+{ 0x8A7E, 0x003A, 16, 0},
+{ 0x8A80, 0x000A, 16, 0},
+{ 0x8A82, 0xD901, 16, 0},
+{ 0x8A84, 0x2941, 16, 0},
+{ 0x8A86, 0x0200, 16, 0},
+{ 0x8A88, 0xAA0E, 16, 0},
+{ 0x8A8A, 0xAA2F, 16, 0},
+{ 0x8A8C, 0xD848, 16, 0},
+{ 0x8A8E, 0xF008, 16, 0},
+{ 0x8A90, 0xD900, 16, 0},
+{ 0x8A92, 0x2941, 16, 0},
+{ 0x8A94, 0x0200, 16, 0},
+{ 0x8A96, 0xAA0E, 16, 0},
+{ 0x8A98, 0xAA2F, 16, 0},
+{ 0x8A9A, 0xD820, 16, 0},
+{ 0x8A9C, 0xD290, 16, 0},
+{ 0x8A9E, 0x8A26, 16, 0},
+{ 0x8AA0, 0xB961, 16, 0},
+{ 0x8AA2, 0xAA26, 16, 0},
+{ 0x8AA4, 0xF00D, 16, 0},
+{ 0x8AA6, 0x091F, 16, 0},
+{ 0x8AA8, 0x0091, 16, 0},
+{ 0x8AAA, 0x8A24, 16, 0},
+{ 0x8AAC, 0xF1E5, 16, 0},
+{ 0x8AAE, 0x0913, 16, 0},
+{ 0x8AB0, 0x0812, 16, 0},
+{ 0x8AB2, 0x08E1, 16, 0},
+{ 0x8AB4, 0x8812, 16, 0},
+{ 0x8AB6, 0x2B41, 16, 0},
+{ 0x8AB8, 0x0201, 16, 0},
+{ 0x8ABA, 0xAA2E, 16, 0},
+{ 0x8ABC, 0xAA6F, 16, 0},
+{ 0x8ABE, 0x0001, 16, 0},
+{ 0x8AC0, 0x06C4, 16, 0},
+{ 0x8AC2, 0x09F7, 16, 0},
+{ 0x8AC4, 0x8051, 16, 0},
+{ 0x8AC6, 0x8A24, 16, 0},
+{ 0x8AC8, 0xF1F3, 16, 0},
+{ 0x8ACA, 0x78E0, 16, 0},
+{ 0x8ACC, 0xC0F1, 16, 0},
+{ 0x8ACE, 0x0F7A, 16, 0},
+{ 0x8AD0, 0x0684, 16, 0},
+{ 0x8AD2, 0xD682, 16, 0},
+{ 0x8AD4, 0x7508, 16, 0},
+{ 0x8AD6, 0x8E01, 16, 0},
+{ 0x8AD8, 0xD181, 16, 0},
+{ 0x8ADA, 0x2046, 16, 0},
+{ 0x8ADC, 0x00C0, 16, 0},
+{ 0x8ADE, 0xAE01, 16, 0},
+{ 0x8AE0, 0x1145, 16, 0},
+{ 0x8AE2, 0x0080, 16, 0},
+{ 0x8AE4, 0x1146, 16, 0},
+{ 0x8AE6, 0x0082, 16, 0},
+{ 0x8AE8, 0xB808, 16, 0},
+{ 0x8AEA, 0x7845, 16, 0},
+{ 0x8AEC, 0x0817, 16, 0},
+{ 0x8AEE, 0x001E, 16, 0},
+{ 0x8AF0, 0x8900, 16, 0},
+{ 0x8AF2, 0x8941, 16, 0},
+{ 0x8AF4, 0xB808, 16, 0},
+{ 0x8AF6, 0x7845, 16, 0},
+{ 0x8AF8, 0x080B, 16, 0},
+{ 0x8AFA, 0x00DE, 16, 0},
+{ 0x8AFC, 0x70A9, 16, 0},
+{ 0x8AFE, 0xFFD2, 16, 0},
+{ 0x8B00, 0x7508, 16, 0},
+{ 0x8B02, 0x1604, 16, 0},
+{ 0x8B04, 0x1090, 16, 0},
+{ 0x8B06, 0x0D93, 16, 0},
+{ 0x8B08, 0x1400, 16, 0},
+{ 0x8B0A, 0x8EEA, 16, 0},
+{ 0x8B0C, 0x8E0B, 16, 0},
+{ 0x8B0E, 0x214A, 16, 0},
+{ 0x8B10, 0x2040, 16, 0},
+{ 0x8B12, 0x8E2D, 16, 0},
+{ 0x8B14, 0xBF08, 16, 0},
+{ 0x8B16, 0x7F05, 16, 0},
+{ 0x8B18, 0x8E0C, 16, 0},
+{ 0x8B1A, 0xB808, 16, 0},
+{ 0x8B1C, 0x7825, 16, 0},
+{ 0x8B1E, 0x7710, 16, 0},
+{ 0x8B20, 0x21C2, 16, 0},
+{ 0x8B22, 0x244C, 16, 0},
+{ 0x8B24, 0x081D, 16, 0},
+{ 0x8B26, 0x03E3, 16, 0},
+{ 0x8B28, 0xD9FF, 16, 0},
+{ 0x8B2A, 0x2702, 16, 0},
+{ 0x8B2C, 0x1002, 16, 0},
+{ 0x8B2E, 0x2A05, 16, 0},
+{ 0x8B30, 0x037E, 16, 0},
+{ 0x8B32, 0x0FF6, 16, 0},
+{ 0x8B34, 0x06A4, 16, 0},
+{ 0x8B36, 0x702F, 16, 0},
+{ 0x8B38, 0x7810, 16, 0},
+{ 0x8B3A, 0x7F02, 16, 0},
+{ 0x8B3C, 0x7FF0, 16, 0},
+{ 0x8B3E, 0xF00B, 16, 0},
+{ 0x8B40, 0x78E2, 16, 0},
+{ 0x8B42, 0x2805, 16, 0},
+{ 0x8B44, 0x037E, 16, 0},
+{ 0x8B46, 0x0FE2, 16, 0},
+{ 0x8B48, 0x06A4, 16, 0},
+{ 0x8B4A, 0x702F, 16, 0},
+{ 0x8B4C, 0x7810, 16, 0},
+{ 0x8B4E, 0x671F, 16, 0},
+{ 0x8B50, 0x7FF0, 16, 0},
+{ 0x8B52, 0x7FEF, 16, 0},
+{ 0x8B54, 0x8E08, 16, 0},
+{ 0x8B56, 0xBF06, 16, 0},
+{ 0x8B58, 0xD162, 16, 0},
+{ 0x8B5A, 0xB8C3, 16, 0},
+{ 0x8B5C, 0x78E5, 16, 0},
+{ 0x8B5E, 0xB88F, 16, 0},
+{ 0x8B60, 0x1908, 16, 0},
+{ 0x8B62, 0x0024, 16, 0},
+{ 0x8B64, 0x2841, 16, 0},
+{ 0x8B66, 0x0201, 16, 0},
+{ 0x8B68, 0x1E26, 16, 0},
+{ 0x8B6A, 0x1042, 16, 0},
+{ 0x8B6C, 0x0D15, 16, 0},
+{ 0x8B6E, 0x1423, 16, 0},
+{ 0x8B70, 0x1E27, 16, 0},
+{ 0x8B72, 0x1002, 16, 0},
+{ 0x8B74, 0x214C, 16, 0},
+{ 0x8B76, 0xA000, 16, 0},
+{ 0x8B78, 0x214A, 16, 0},
+{ 0x8B7A, 0x2040, 16, 0},
+{ 0x8B7C, 0x21C2, 16, 0},
+{ 0x8B7E, 0x2442, 16, 0},
+{ 0x8B80, 0x8E21, 16, 0},
+{ 0x8B82, 0x214F, 16, 0},
+{ 0x8B84, 0x0040, 16, 0},
+{ 0x8B86, 0x090F, 16, 0},
+{ 0x8B88, 0x2010, 16, 0},
+{ 0x8B8A, 0x2145, 16, 0},
+{ 0x8B8C, 0x0181, 16, 0},
+{ 0x8B8E, 0xAE21, 16, 0},
+{ 0x8B90, 0xF003, 16, 0},
+{ 0x8B92, 0xB8A2, 16, 0},
+{ 0x8B94, 0xAE01, 16, 0},
+{ 0x8B96, 0x0B7A, 16, 0},
+{ 0x8B98, 0xFFE3, 16, 0},
+{ 0x8B9A, 0x70A9, 16, 0},
+{ 0x8B9C, 0x0709, 16, 0},
+{ 0x8B9E, 0x0684, 16, 0},
+{ 0x8BA0, 0xC0F1, 16, 0},
+{ 0x8BA2, 0xC5E1, 16, 0},
+{ 0x8BA4, 0xD54E, 16, 0},
+{ 0x8BA6, 0x8D24, 16, 0},
+{ 0x8BA8, 0x8D45, 16, 0},
+{ 0x8BAA, 0xB908, 16, 0},
+{ 0x8BAC, 0x7945, 16, 0},
+{ 0x8BAE, 0x0941, 16, 0},
+{ 0x8BB0, 0x011E, 16, 0},
+{ 0x8BB2, 0x8D26, 16, 0},
+{ 0x8BB4, 0x0939, 16, 0},
+{ 0x8BB6, 0x0093, 16, 0},
+{ 0x8BB8, 0xD148, 16, 0},
+{ 0x8BBA, 0xA907, 16, 0},
+{ 0x8BBC, 0xD04A, 16, 0},
+{ 0x8BBE, 0x802E, 16, 0},
+{ 0x8BC0, 0x9117, 16, 0},
+{ 0x8BC2, 0x0F6E, 16, 0},
+{ 0x8BC4, 0x06A4, 16, 0},
+{ 0x8BC6, 0x912E, 16, 0},
+{ 0x8BC8, 0x790F, 16, 0},
+{ 0x8BCA, 0x0911, 16, 0},
+{ 0x8BCC, 0x00B2, 16, 0},
+{ 0x8BCE, 0x1541, 16, 0},
+{ 0x8BD0, 0x1080, 16, 0},
+{ 0x8BD2, 0x0F5E, 16, 0},
+{ 0x8BD4, 0x0684, 16, 0},
+{ 0x8BD6, 0x780F, 16, 0},
+{ 0x8BD8, 0x2840, 16, 0},
+{ 0x8BDA, 0x0201, 16, 0},
+{ 0x8BDC, 0x7825, 16, 0},
+{ 0x8BDE, 0x2841, 16, 0},
+{ 0x8BE0, 0x0201, 16, 0},
+{ 0x8BE2, 0x1D42, 16, 0},
+{ 0x8BE4, 0x1042, 16, 0},
+{ 0x8BE6, 0x1D43, 16, 0},
+{ 0x8BE8, 0x1002, 16, 0},
+{ 0x8BEA, 0xF003, 16, 0},
+{ 0x8BEC, 0xFFB8, 16, 0},
+{ 0x8BEE, 0x06D9, 16, 0},
+{ 0x8BF0, 0x0684, 16, 0},
+{ 0x8BF2, 0x78E0, 16, 0},
+{ 0x8BF4, 0xC0F1, 16, 0},
+{ 0x8BF6, 0x0E5E, 16, 0},
+{ 0x8BF8, 0x0684, 16, 0},
+{ 0x8BFA, 0xD538, 16, 0},
+{ 0x8BFC, 0x8D00, 16, 0},
+{ 0x8BFE, 0x0841, 16, 0},
+{ 0x8C00, 0x01DE, 16, 0},
+{ 0x8C02, 0xB8A7, 16, 0},
+{ 0x8C04, 0x790F, 16, 0},
+{ 0x8C06, 0xD639, 16, 0},
+{ 0x8C08, 0xAD00, 16, 0},
+{ 0x8C0A, 0x091F, 16, 0},
+{ 0x8C0C, 0x0050, 16, 0},
+{ 0x8C0E, 0x0921, 16, 0},
+{ 0x8C10, 0x0110, 16, 0},
+{ 0x8C12, 0x0911, 16, 0},
+{ 0x8C14, 0x0210, 16, 0},
+{ 0x8C16, 0xD036, 16, 0},
+{ 0x8C18, 0x0A5A, 16, 0},
+{ 0x8C1A, 0xFFE3, 16, 0},
+{ 0x8C1C, 0xA600, 16, 0},
+{ 0x8C1E, 0xF00A, 16, 0},
+{ 0x8C20, 0x000F, 16, 0},
+{ 0x8C22, 0x0020, 16, 0},
+{ 0x8C24, 0xD033, 16, 0},
+{ 0x8C26, 0x000B, 16, 0},
+{ 0x8C28, 0x0020, 16, 0},
+{ 0x8C2A, 0xD033, 16, 0},
+{ 0x8C2C, 0xD033, 16, 0},
+{ 0x8C2E, 0xA600, 16, 0},
+{ 0x8C30, 0x8600, 16, 0},
+{ 0x8C32, 0x8023, 16, 0},
+{ 0x8C34, 0x7960, 16, 0},
+{ 0x8C36, 0xD801, 16, 0},
+{ 0x8C38, 0xD800, 16, 0},
+{ 0x8C3A, 0xAD05, 16, 0},
+{ 0x8C3C, 0x1528, 16, 0},
+{ 0x8C3E, 0x1080, 16, 0},
+{ 0x8C40, 0x0817, 16, 0},
+{ 0x8C42, 0x01DE, 16, 0},
+{ 0x8C44, 0xB8A7, 16, 0},
+{ 0x8C46, 0x1D28, 16, 0},
+{ 0x8C48, 0x1002, 16, 0},
+{ 0x8C4A, 0xD028, 16, 0},
+{ 0x8C4C, 0x8000, 16, 0},
+{ 0x8C4E, 0x8023, 16, 0},
+{ 0x8C50, 0x7960, 16, 0},
+{ 0x8C52, 0x1528, 16, 0},
+{ 0x8C54, 0x1080, 16, 0},
+{ 0x8C56, 0x0669, 16, 0},
+{ 0x8C58, 0x0684, 16, 0},
+{ 0x8C5A, 0x78E0, 16, 0},
+{ 0x8C5C, 0xD21F, 16, 0},
+{ 0x8C5E, 0x8A21, 16, 0},
+{ 0x8C60, 0xB9A1, 16, 0},
+{ 0x8C62, 0x782F, 16, 0},
+{ 0x8C64, 0x7FE0, 16, 0},
+{ 0x8C66, 0xAA21, 16, 0},
+{ 0x8C68, 0xC0F1, 16, 0},
+{ 0x8C6A, 0xD125, 16, 0},
+{ 0x8C6C, 0x8906, 16, 0},
+{ 0x8C6E, 0x8947, 16, 0},
+{ 0x8C70, 0xB808, 16, 0},
+{ 0x8C72, 0x7845, 16, 0},
+{ 0x8C74, 0x262F, 16, 0},
+{ 0x8C76, 0xF007, 16, 0},
+{ 0x8C78, 0xF406, 16, 0},
+{ 0x8C7A, 0xD022, 16, 0},
+{ 0x8C7C, 0x8001, 16, 0},
+{ 0x8C7E, 0x7840, 16, 0},
+{ 0x8C80, 0xC0D1, 16, 0},
+{ 0x8C82, 0x7EE0, 16, 0},
+{ 0x8C84, 0xB861, 16, 0},
+{ 0x8C86, 0x7810, 16, 0},
+{ 0x8C88, 0x2841, 16, 0},
+{ 0x8C8A, 0x020C, 16, 0},
+{ 0x8C8C, 0xA986, 16, 0},
+{ 0x8C8E, 0xA907, 16, 0},
+{ 0x8C90, 0x780F, 16, 0},
+{ 0x8C92, 0x0815, 16, 0},
+{ 0x8C94, 0x0051, 16, 0},
+{ 0x8C96, 0xD015, 16, 0},
+{ 0x8C98, 0x8000, 16, 0},
+{ 0x8C9A, 0xD210, 16, 0},
+{ 0x8C9C, 0x8021, 16, 0},
+{ 0x8C9E, 0x7960, 16, 0},
+{ 0x8CA0, 0x8A07, 16, 0},
+{ 0x8CA2, 0xF1F0, 16, 0},
+{ 0x8CA4, 0xF1EE, 16, 0},
+{ 0x8CA6, 0x78E0, 16, 0},
+{ 0x8CA8, 0xC0F1, 16, 0},
+{ 0x8CAA, 0x0DAA, 16, 0},
+{ 0x8CAC, 0x06A4, 16, 0},
+{ 0x8CAE, 0xDA44, 16, 0},
+{ 0x8CB0, 0xD115, 16, 0},
+{ 0x8CB2, 0xD516, 16, 0},
+{ 0x8CB4, 0x76A9, 16, 0},
+{ 0x8CB6, 0x0B3E, 16, 0},
+{ 0x8CB8, 0x06A4, 16, 0},
+{ 0x8CBA, 0x70C9, 16, 0},
+{ 0x8CBC, 0xD014, 16, 0},
+{ 0x8CBE, 0xD900, 16, 0},
+{ 0x8CC0, 0xF028, 16, 0},
+{ 0x8CC2, 0x78E0, 16, 0},
+{ 0x8CC4, 0xFF00, 16, 0},
+{ 0x8CC6, 0x3354, 16, 0},
+{ 0x8CC8, 0xFF80, 16, 0},
+{ 0x8CCA, 0x0694, 16, 0},
+{ 0x8CCC, 0xFF80, 16, 0},
+{ 0x8CCE, 0x0314, 16, 0},
+{ 0x8CD0, 0xFF80, 16, 0},
+{ 0x8CD2, 0x0250, 16, 0},
+{ 0x8CD4, 0xFF80, 16, 0},
+{ 0x8CD6, 0x050C, 16, 0},
+{ 0x8CD8, 0xFF80, 16, 0},
+{ 0x8CDA, 0x0158, 16, 0},
+{ 0x8CDC, 0xFF80, 16, 0},
+{ 0x8CDE, 0x0290, 16, 0},
+{ 0x8CE0, 0xFF00, 16, 0},
+{ 0x8CE2, 0x0618, 16, 0},
+{ 0x8CE4, 0xFF80, 16, 0},
+{ 0x8CE6, 0x06C8, 16, 0},
+{ 0x8CE8, 0x8000, 16, 0},
+{ 0x8CEA, 0x0008, 16, 0},
+{ 0x8CEC, 0x0000, 16, 0},
+{ 0x8CEE, 0xF1A4, 16, 0},
+{ 0x8CF0, 0xFF80, 16, 0},
+{ 0x8CF2, 0x0EC0, 16, 0},
+{ 0x8CF4, 0x0000, 16, 0},
+{ 0x8CF6, 0xF1B4, 16, 0},
+{ 0x8CF8, 0x0000, 16, 0},
+{ 0x8CFA, 0xF1C4, 16, 0},
+{ 0x8CFC, 0xFF80, 16, 0},
+{ 0x8CFE, 0x02CC, 16, 0},
+{ 0x8D00, 0xFF80, 16, 0},
+{ 0x8D02, 0x0E48, 16, 0},
+{ 0x8D04, 0x0000, 16, 0},
+{ 0x8D06, 0xF9AC, 16, 0},
+{ 0x8D08, 0xFF80, 16, 0},
+{ 0x8D0A, 0x0E50, 16, 0},
+{ 0x8D0C, 0xFF80, 16, 0},
+{ 0x8D0E, 0x08D4, 16, 0},
+{ 0x8D10, 0xA502, 16, 0},
+{ 0x8D12, 0xD032, 16, 0},
+{ 0x8D14, 0xA0C0, 16, 0},
+{ 0x8D16, 0x17B4, 16, 0},
+{ 0x8D18, 0xF000, 16, 0},
+{ 0x8D1A, 0xB02B, 16, 0},
+{ 0x8D1C, 0x17B0, 16, 0},
+{ 0x8D1E, 0xF001, 16, 0},
+{ 0x8D20, 0x8900, 16, 0},
+{ 0x8D22, 0xDB08, 16, 0},
+{ 0x8D24, 0xDAF0, 16, 0},
+{ 0x8D26, 0x19B0, 16, 0},
+{ 0x8D28, 0x00C2, 16, 0},
+{ 0x8D2A, 0xB8A6, 16, 0},
+{ 0x8D2C, 0xA900, 16, 0},
+{ 0x8D2E, 0xD851, 16, 0},
+{ 0x8D30, 0x19B2, 16, 0},
+{ 0x8D32, 0x0002, 16, 0},
+{ 0x8D34, 0xD852, 16, 0},
+{ 0x8D36, 0x19B3, 16, 0},
+{ 0x8D38, 0x0002, 16, 0},
+{ 0x8D3A, 0xD855, 16, 0},
+{ 0x8D3C, 0x19B6, 16, 0},
+{ 0x8D3E, 0x0002, 16, 0},
+{ 0x8D40, 0xD856, 16, 0},
+{ 0x8D42, 0x19B7, 16, 0},
+{ 0x8D44, 0x0002, 16, 0},
+{ 0x8D46, 0xD896, 16, 0},
+{ 0x8D48, 0x19B8, 16, 0},
+{ 0x8D4A, 0x0004, 16, 0},
+{ 0x8D4C, 0xD814, 16, 0},
+{ 0x8D4E, 0x19BA, 16, 0},
+{ 0x8D50, 0x0004, 16, 0},
+{ 0x8D52, 0xD805, 16, 0},
+{ 0x8D54, 0xB111, 16, 0},
+{ 0x8D56, 0x19B1, 16, 0},
+{ 0x8D58, 0x0082, 16, 0},
+{ 0x8D5A, 0x19B4, 16, 0},
+{ 0x8D5C, 0x00C2, 16, 0},
+{ 0x8D5E, 0x19B5, 16, 0},
+{ 0x8D60, 0x0082, 16, 0},
+{ 0x8D62, 0xD11F, 16, 0},
+{ 0x8D64, 0x2555, 16, 0},
+{ 0x8D66, 0x1440, 16, 0},
+{ 0x8D68, 0x0A8A, 16, 0},
+{ 0x8D6A, 0x06A4, 16, 0},
+{ 0x8D6C, 0xDA2C, 16, 0},
+{ 0x8D6E, 0xD01D, 16, 0},
+{ 0x8D70, 0x2555, 16, 0},
+{ 0x8D72, 0x1441, 16, 0},
+{ 0x8D74, 0xA514, 16, 0},
+{ 0x8D76, 0xD01C, 16, 0},
+{ 0x8D78, 0x0545, 16, 0},
+{ 0x8D7A, 0x06A4, 16, 0},
+{ 0x8D7C, 0xA020, 16, 0},
+{ 0x8D7E, 0x78E0, 16, 0},
+{ 0x8D80, 0xD01A, 16, 0},
+{ 0x8D82, 0x1788, 16, 0},
+{ 0x8D84, 0xF001, 16, 0},
+{ 0x8D86, 0xA11C, 16, 0},
+{ 0x8D88, 0xD019, 16, 0},
+{ 0x8D8A, 0xA11D, 16, 0},
+{ 0x8D8C, 0xD019, 16, 0},
+{ 0x8D8E, 0xA11E, 16, 0},
+{ 0x8D90, 0xD019, 16, 0},
+{ 0x8D92, 0xA11F, 16, 0},
+{ 0x8D94, 0x1754, 16, 0},
+{ 0x8D96, 0xF000, 16, 0},
+{ 0x8D98, 0xE170, 16, 0},
+{ 0x8D9A, 0x7FE0, 16, 0},
+{ 0x8D9C, 0xA020, 16, 0},
+{ 0x8D9E, 0x78E0, 16, 0},
+{ 0x8DA0, 0xC0F1, 16, 0},
+{ 0x8DA2, 0xC5E1, 16, 0},
+{ 0x8DA4, 0x1764, 16, 0},
+{ 0x8DA6, 0xF00D, 16, 0},
+{ 0x8DA8, 0xD114, 16, 0},
+{ 0x8DAA, 0x2556, 16, 0},
+{ 0x8DAC, 0x1400, 16, 0},
+{ 0x8DAE, 0x0A46, 16, 0},
+{ 0x8DB0, 0x06A4, 16, 0},
+{ 0x8DB2, 0xDA38, 16, 0},
+{ 0x8DB4, 0x174C, 16, 0},
+{ 0x8DB6, 0xF000, 16, 0},
+{ 0x8DB8, 0xD111, 16, 0},
+{ 0x8DBA, 0xA021, 16, 0},
+{ 0x8DBC, 0xD011, 16, 0},
+{ 0x8DBE, 0x2556, 16, 0},
+{ 0x8DC0, 0x1401, 16, 0},
+{ 0x8DC2, 0x1D94, 16, 0},
+{ 0x8DC4, 0x1000, 16, 0},
+{ 0x8DC6, 0xD010, 16, 0},
+{ 0x8DC8, 0xA020, 16, 0},
+{ 0x8DCA, 0x171C, 16, 0},
+{ 0x8DCC, 0xF000, 16, 0},
+{ 0x8DCE, 0x802E, 16, 0},
+{ 0x8DD0, 0x9117, 16, 0},
+{ 0x8DD2, 0x04F5, 16, 0},
+{ 0x8DD4, 0x06A4, 16, 0},
+{ 0x8DD6, 0xB10E, 16, 0},
+{ 0x8DD8, 0x8000, 16, 0},
+{ 0x8DDA, 0x016C, 16, 0},
+{ 0x8DDC, 0x0000, 16, 0},
+{ 0x8DDE, 0xF444, 16, 0},
+{ 0x8DE0, 0xFF80, 16, 0},
+{ 0x8DE2, 0x08F4, 16, 0},
+{ 0x8DE4, 0x8000, 16, 0},
+{ 0x8DE6, 0x009C, 16, 0},
+{ 0x8DE8, 0xFF80, 16, 0},
+{ 0x8DEA, 0x0BF4, 16, 0},
+{ 0x8DEC, 0xFF80, 16, 0},
+{ 0x8DEE, 0x0BA0, 16, 0},
+{ 0x8DF0, 0xFF80, 16, 0},
+{ 0x8DF2, 0x0C5C, 16, 0},
+{ 0x8DF4, 0x0000, 16, 0},
+{ 0x8DF6, 0x0998, 16, 0},
+{ 0x8DF8, 0x0000, 16, 0},
+{ 0x8DFA, 0xF3BC, 16, 0},
+{ 0x8DFC, 0x0000, 16, 0},
+{ 0x8DFE, 0x2F2C, 16, 0},
+{ 0x8E00, 0xFF80, 16, 0},
+{ 0x8E02, 0x0C68, 16, 0},
+{ 0x8E04, 0x8000, 16, 0},
+{ 0x8E06, 0x008C, 16, 0},
+{ 0x8E08, 0xE280, 16, 0},
+{ 0x8E0A, 0x24CA, 16, 0},
+{ 0x8E0C, 0x7082, 16, 0},
+{ 0x8E0E, 0x78E0, 16, 0},
+{ 0x8E10, 0x20E8, 16, 0},
+{ 0x8E12, 0x01A2, 16, 0},
+{ 0x8E14, 0x1002, 16, 0},
+{ 0x8E16, 0x0D02, 16, 0},
+{ 0x8E18, 0x1902, 16, 0},
+{ 0x8E1A, 0x0094, 16, 0},
+{ 0x8E1C, 0x7FE0, 16, 0},
+{ 0x8E1E, 0x7028, 16, 0},
+{ 0x8E20, 0x7308, 16, 0},
+{ 0x8E22, 0x1000, 16, 0},
+{ 0x8E24, 0x0900, 16, 0},
+{ 0x8E26, 0x7904, 16, 0},
+{ 0x8E28, 0x7947, 16, 0},
+{ 0x8E2A, 0x1B00, 16, 0},
+{ 0x8E2C, 0x0064, 16, 0},
+{ 0x8E2E, 0x7EE0, 16, 0},
+{ 0x8E30, 0xE280, 16, 0},
+{ 0x8E32, 0x24CA, 16, 0},
+{ 0x8E34, 0x7082, 16, 0},
+{ 0x8E36, 0x78E0, 16, 0},
+{ 0x8E38, 0x20E8, 16, 0},
+{ 0x8E3A, 0x01A2, 16, 0},
+{ 0x8E3C, 0x1102, 16, 0},
+{ 0x8E3E, 0x0502, 16, 0},
+{ 0x8E40, 0x1802, 16, 0},
+{ 0x8E42, 0x00B4, 16, 0},
+{ 0x8E44, 0x7FE0, 16, 0},
+{ 0x8E46, 0x7028, 16, 0},
+{ 0x8E48, 0x0000, 16, 0},
+{ 0x8E4A, 0x0000, 16, 0},
+{ 0x8E4C, 0x0000, 16, 0},
+{ 0x8E4E, 0x0000, 16, 0},
+{ 0x098E, 0x0016, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [MON_ADDRESS_LO]
+{ 0x8016, 0x086C, 16, 0}, 	// MON_ADDRESS_LO
+{ 0x8002, 0x0001, 16, 300}, 	// MON_CMD
+//POLL_REG=0x800A,0x00,!=0x07,DELAY=10,TIMEOUT=100	//Wait for the core ready
+
+//DELAY=300
+//char_settings
+{ 0x30D4, 0x9080, 16, 0}, 	// COLUMN_CORRECTION
+{ 0x316E, 0xC400, 16, 0}, 	// DAC_ECL
+{ 0x305E, 0x10A0, 16, 0}, 	// GLOBAL_GAIN
+{ 0x3E00, 0x0010, 16, 0}, 	// SAMP_CONTROL
+{ 0x3E02, 0xED02, 16, 0}, 	// SAMP_ADDR_EN
+{ 0x3E04, 0xC88C, 16, 0}, 	// SAMP_RD1_SIG
+{ 0x3E06, 0xC88C, 16, 0}, 	// SAMP_RD1_SIG_BOOST
+{ 0x3E08, 0x700A, 16, 0}, 	// SAMP_RD1_RST
+{ 0x3E0A, 0x701E, 16, 0}, 	// SAMP_RD1_RST_BOOST
+{ 0x3E0C, 0x00FF, 16, 0}, 	// SAMP_RST1_EN
+{ 0x3E0E, 0x00FF, 16, 0}, 	// SAMP_RST1_BOOST
+{ 0x3E10, 0x00FF, 16, 0}, 	// SAMP_RST1_CLOOP_SH
+{ 0x3E12, 0x0000, 16, 0}, 	// SAMP_RST_BOOST_SEQ
+{ 0x3E14, 0xC78C, 16, 0}, 	// SAMP_SAMP1_SIG
+{ 0x3E16, 0x6E06, 16, 0}, 	// SAMP_SAMP1_RST
+{ 0x3E18, 0xA58C, 16, 0}, 	// SAMP_TX_EN
+{ 0x3E1A, 0xA58E, 16, 0}, 	// SAMP_TX_BOOST
+{ 0x3E1C, 0xA58E, 16, 0}, 	// SAMP_TX_CLOOP_SH
+{ 0x3E1E, 0xC0D0, 16, 0}, 	// SAMP_TX_BOOST_SEQ
+{ 0x3E20, 0xEB00, 16, 0}, 	// SAMP_VLN_EN
+{ 0x3E22, 0x00FF, 16, 0}, 	// SAMP_VLN_HOLD
+{ 0x3E24, 0xEB02, 16, 0}, 	// SAMP_VCL_EN
+{ 0x3E26, 0xEA02, 16, 0}, 	// SAMP_COLCLAMP
+{ 0x3E28, 0xEB0A, 16, 0}, 	// SAMP_SH_VCL
+{ 0x3E2A, 0xEC01, 16, 0}, 	// SAMP_SH_VREF
+{ 0x3E2C, 0xEB01, 16, 0}, 	// SAMP_SH_VBST
+{ 0x3E2E, 0x00FF, 16, 0}, 	// SAMP_SPARE
+{ 0x3E30, 0x00F3, 16, 0}, 	// SAMP_READOUT
+{ 0x3E32, 0x3DFA, 16, 0}, 	// SAMP_RESET_DONE
+{ 0x3E34, 0x00FF, 16, 0}, 	// SAMP_VLN_CLAMP
+{ 0x3E36, 0x00F3, 16, 0}, 	// SAMP_ASC_INT
+{ 0x3E38, 0x0000, 16, 0}, 	// SAMP_RS_CLOOP_SH_R
+{ 0x3E3A, 0xF802, 16, 0}, 	// SAMP_RS_CLOOP_SH
+{ 0x3E3C, 0x0FFF, 16, 0}, 	// SAMP_RS_BOOST_SEQ
+{ 0x3E3E, 0xEA10, 16, 0}, 	// SAMP_TXLO_GND
+{ 0x3E40, 0xEB05, 16, 0}, 	// SAMP_VLN_PER_COL
+{ 0x3E42, 0xE5C8, 16, 0}, 	// SAMP_RD2_SIG
+{ 0x3E44, 0xE5C8, 16, 0}, 	// SAMP_RD2_SIG_BOOST
+{ 0x3E46, 0x8C70, 16, 0}, 	// SAMP_RD2_RST
+{ 0x3E48, 0x8C71, 16, 0}, 	// SAMP_RD2_RST_BOOST
+{ 0x3E4A, 0x00FF, 16, 0}, 	// SAMP_RST2_EN
+{ 0x3E4C, 0x00FF, 16, 0}, 	// SAMP_RST2_BOOST
+{ 0x3E4E, 0x00FF, 16, 0}, 	// SAMP_RST2_CLOOP_SH
+{ 0x3E50, 0xE38D, 16, 0}, 	// SAMP_SAMP2_SIG
+{ 0x3E52, 0x8B0A, 16, 0}, 	// SAMP_SAMP2_RST
+{ 0x3E58, 0xEB0A, 16, 0}, 	// SAMP_PIX_CLAMP_EN
+{ 0x3E5C, 0x0A00, 16, 0}, 	// SAMP_PIX_PULLUP_EN
+{ 0x3E5E, 0x00FF, 16, 0}, 	// SAMP_PIX_PULLDOWN_EN_R
+{ 0x3E60, 0x00FF, 16, 0}, 	// SAMP_PIX_PULLDOWN_EN_S
+{ 0x3E90, 0x3C01, 16, 0}, 	// RST_ADDR_EN
+{ 0x3E92, 0x00FF, 16, 0}, 	// RST_RST_EN
+{ 0x3E94, 0x00FF, 16, 0}, 	// RST_RST_BOOST
+{ 0x3E96, 0x3C00, 16, 0}, 	// RST_TX_EN
+{ 0x3E98, 0x3C00, 16, 0}, 	// RST_TX_BOOST
+{ 0x3E9A, 0x3C00, 16, 0}, 	// RST_TX_CLOOP_SH
+{ 0x3E9C, 0xC0E0, 16, 0}, 	// RST_TX_BOOST_SEQ
+{ 0x3E9E, 0x00FF, 16, 0}, 	// RST_RST_CLOOP_SH
+{ 0x3EA0, 0x0000, 16, 0}, 	// RST_RST_BOOST_SEQ
+{ 0x3EA6, 0x3C00, 16, 0}, 	// RST_PIX_PULLUP_EN
+{ 0x3ED8, 0x3057, 16, 0}, 	// DAC_LD_12_13
+{ 0x316C, 0xB44F, 16, 0}, 	// DAC_TXLO
+{ 0x316E, 0xC6FF, 16, 0}, 	// DAC_ECL
+{ 0x3ED2, 0xEA0A, 16, 0}, 	// DAC_LD_6_7
+{ 0x3ED4, 0x00A3, 16, 0}, 	// DAC_LD_8_9
+{ 0x3EDC, 0x6020, 16, 0}, 	// DAC_LD_16_17
+{ 0x3EE6, 0xA541, 16, 0}, 	// DAC_LD_26_27
+{ 0x31E0, 0x0000, 16, 0},	// PIX_DEF_ID
+{ 0x3ED0, 0x2409, 16, 0}, 	// DAC_LD_4_5
+{ 0x3EDE, 0x0A49, 16, 0}, 	// DAC_LD_18_19
+{ 0x3EE0, 0x4909, 16, 0}, 	// DAC_LD_20_21
+{ 0x3EE2, 0x09CF, 16, 0}, 	// DAC_LD_22_23
+{ 0x30B6, 0x0008, 16, 0}, 	// AUTOLR_CONTROL
+{ 0x337C, 0x0006, 16, 0}, 	// YUV_YCBCR_CONTROL
+{ 0x3E1A, 0xA582, 16, 0}, 	// SAMP_TX_BOOST
+{ 0x3E2E, 0xEC05, 16, 0}, 	// SAMP_SPARE
+{ 0x3EE6, 0xA5C0, 16, 0}, 	// DAC_LD_26_27
+{ 0x316C, 0xF43F, 16, 0},   //0xB43F 	// DAC_TXLO
+{ 0x316E, 0xC6FF, 16, 0}, 	// DAC_ECL
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+//OTP Loaded (Before got the samples for 8001, please mark this section)
+{ 0x381C, 0x0000, 16, 0},
+{ 0xE02A, 0x0001, 16, 200}, 	// IO_NV_MEM_COMMAND                
+  //  POLL  IO_NV_MEM_STATUS::IO_NVMEM_STAT_OTPM_AVAIL =>  0x00 
+//DELAY =200 
+{ 0x3812, 0x2124, 16, 100},
+//POLL_FIELD= IO_NV_MEM_STATUS, IO_NV_MEM_STATUS!=0xC1,DELAY=100,TIMEOUT=50 //5 sec                                              
+//DELAY = 100
+{ 0xD004, 0x04  , 8, 0},// PGA_SOLUTION                                       
+{ 0xD006, 0x0008, 16, 0},  // PGA_ZONE_ADDR_0         
+{ 0xD005, 0x00  , 8, 0},// PGA_CURRENT_ZONE                   
+{ 0xD002, 0x8002, 16, 0}, 	// PGA_ALGO                         
+{ 0x3210, 0x49B8, 16, 0}, 	// COLOR_PIPELINE_CONTROL           
+////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+//[Step5-AWB_CCM]
+//awb_setup
+{ 0xAC02, 0x00FF, 16, 0}, 	// AWB_ALGO
+{ 0xAC01, 0x7F  , 8, 0},// AWB_MODE
+//preawb_params
+{ 0xAC3C, 0x39 , 8, 0},//42  // AWB_MIN_ACCEPTED_PRE_AWB_R2G_RATIO
+{ 0xAC3D, 0x6E , 8, 0},//50  // AWB_MAX_ACCEPTED_PRE_AWB_R2G_RATIO
+{ 0xAC3E, 0x28 , 8, 0},//13  // AWB_MIN_ACCEPTED_PRE_AWB_B2G_RATIO
+{ 0xAC3F, 0x6B , 8, 0},//5B  // AWB_MAX_ACCEPTED_PRE_AWB_B2G_RATIO
+{ 0xAC40, 0x64 , 8, 0},//52  // AWB_MIN_ACCEPTED_POST_AWB_R2G_RATIO
+{ 0xAC41, 0x66 , 8, 0},//56  // AWB_MAX_ACCEPTED_POST_AWB_R2G_RATIO
+{ 0xAC42, 0x64 , 8, 0}, // AWB_MIN_ACCEPTED_POST_AWB_B2G_RATIO
+{ 0xAC43, 0x66 , 8, 0}, // AWB_MAX_ACCEPTED_POST_AWB_B2G_RATIO
+//awb_patch
+{ 0xACB0, 0x31 , 8, 0}, // AWB_RG_MIN
+{ 0xACB1, 0x63 , 8, 0},//50  // AWB_RG_MAX
+{ 0xACB4, 0x2A , 8, 0},//13  // AWB_BG_MIN
+{ 0xACB5, 0x5B , 8, 0}, // AWB_BG_MAX
+{ 0xACB2, 0x40 , 8, 0},  //0x42   // AWB_RG_MIN_BRIGHT
+{ 0xACB3, 0x4D   , 8, 0},// 0x4B   // AWB_RG_MAX_BRIGHT
+{ 0xACB6, 0x36   , 8, 0},// AWB_BG_MIN_BRIGHT
+{ 0xACB7, 0x4A   , 8, 0},//0x42   // AWB_BG_MAX_BRIGHT
+{ 0xACB8, 0x00D0 , 16, 0}, // 0x0100  // AWB_START_NUM_INT_LINES
+{ 0xACBA, 0x0090, 16, 0},		// B0 	// AWB_END_NUM_INT_LINES
+//bright_DNP_patch
+{ 0x098E, 0xAC09, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS
+{ 0xAC09, 0x01  , 8, 0},// AWB_MODE_EX
+{ 0xAC22, 0x0000, 16, 0}, 	// AWB_SHARPNESS_TH
+//soc5140_ccm_settings
+{ 0x098E, 0x2C46, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AWB_LEFT_CCM_0]
+{ 0xAC46, 0x0108, 16, 0}, 	// AWB_LEFT_CCM_0
+{ 0xAC48, 0xFFF8, 16, 0}, 	// AWB_LEFT_CCM_1
+{ 0xAC4A, 0x0000, 16, 0}, 	// AWB_LEFT_CCM_2
+{ 0xAC4C, 0xFF5D, 16, 0}, 	// AWB_LEFT_CCM_3
+{ 0xAC4E, 0x0198, 16, 0}, 	// AWB_LEFT_CCM_4
+{ 0xAC50, 0x000C, 16, 0}, 	// AWB_LEFT_CCM_5
+{ 0xAC52, 0xFFBA, 16, 0}, 	// AWB_LEFT_CCM_6
+{ 0xAC54, 0xFE48, 16, 0}, 	// AWB_LEFT_CCM_7
+{ 0xAC56, 0x02FE, 16, 0}, 	// AWB_LEFT_CCM_8
+{ 0xAC58, 0x00A8, 16, 0}, 	// AWB_LEFT_CCM_R2BRATIO
+{ 0xAC5C, 0x02B2, 16, 0},   //0x02A5   //0x021C  // AWB_RIGHT_CCM_0
+{ 0xAC5E, 0xFECD, 16, 0},   //0xFF17   //0xFF35  // AWB_RIGHT_CCM_1
+{ 0xAC60, 0xFF81, 16, 0},   //0xFF44   //0xFFAF  // AWB_RIGHT_CCM_2
+{ 0xAC62, 0xFFB4, 16, 0},   //0xFFCB   //0xFFCD  // AWB_RIGHT_CCM_3
+{ 0xAC64, 0x0172, 16, 0},   //0x015D   //0x0176  // AWB_RIGHT_CCM_4
+{ 0xAC66, 0xFFDA, 16, 0},   //0xFFD8   //0xFFBD  // AWB_RIGHT_CCM_5
+{ 0xAC68, 0xFFE3, 16, 0},   //0xFFD3   //0xFFEE  // AWB_RIGHT_CCM_6
+{ 0xAC6A, 0xFF29, 16, 0},   //0xFF07   //0xFF5C  // AWB_RIGHT_CCM_7
+{ 0xAC6C, 0x01F5, 16, 0},   //0x0226   //0x01B6  // AWB_RIGHT_CCM_8
+{ 0xAC6E, 0x005A, 16, 0},  // AWB_RIGHT_CCM_R2BRATIO
+{ 0xAC72, 0x004D, 16, 0},  // AWB_LL_CCM_0
+{ 0xAC74, 0x0096, 16, 0},  // AWB_LL_CCM_1
+{ 0xAC76, 0x001D, 16, 0},  // AWB_LL_CCM_2
+{ 0xAC78, 0x004D, 16, 0},  // AWB_LL_CCM_3
+{ 0xAC7A, 0x0096, 16, 0},  // AWB_LL_CCM_4
+{ 0xAC7C, 0x001D, 16, 0},  // AWB_LL_CCM_5
+{ 0xAC7E, 0x004D, 16, 0}, 	// AWB_LL_CCM_6
+{ 0xAC80, 0x0096, 16, 0}, 	// AWB_LL_CCM_7
+{ 0xAC82, 0x001D, 16, 0}, 	// AWB_LL_CCM_8
+{ 0xAC96, 0x10  , 8, 0},// AWB_CCM_TINTING_TH
+{ 0xAC97, 0x70  , 8, 0},// AWB_LEFT_TINT_COEF_FOR_CCM_ROW_0 
+{ 0xAC98, 0x80  , 8, 0},// AWB_LEFT_TINT_COEF_FOR_CCM_ROW_1 
+{ 0xAC99, 0xAF  , 8, 0}, //0x90   //0x64  // AWB_LEFT_TINT_COEF_FOR_CCM_ROW_2 
+{ 0xAC9A, 0x7A  , 8, 0}, //0x7F   //0x76  // AWB_RIGHT_TINT_COEF_FOR_CCM_ROW_0
+{ 0xAC9B, 0x80  , 8, 0},// AWB_RIGHT_TINT_COEF_FOR_CCM_ROW_1
+{ 0xAC9C, 0x7A  , 8, 0}, //0x7D   //0x78  // AWB_RIGHT_TINT_COEF_FOR_CCM_ROW_2
+
+{ 0xB83E, 0x10  , 8, 0},// STAT_AWB_WINDOW_POS_X
+{ 0xB83F, 0x10  , 8, 0},// STAT_AWB_WINDOW_POS_Y
+{ 0xB840, 0xDF  , 8, 0},// STAT_AWB_WINDOW_SIZE_X
+{ 0xB841, 0xCF  , 8, 0},// STAT_AWB_WINDOW_SIZE_Y
+
+//soc5140_weighted2D_awb_settings
+{ 0xB842, 0x003B, 16, 0},   //0x0032 	// STAT_AWB_GRAY_CHECKER_OFFSET_X
+{ 0xB844, 0x0043, 16, 0},   //0x0038 	// STAT_AWB_GRAY_CHECKER_OFFSET_Y
+{ 0x3240, 0x0024, 16, 0}, 	// AWB_XY_SCALE
+{ 0x3242, 0x0000, 16, 0}, 	// AWB_WEIGHT_R0
+{ 0x3244, 0x0000, 16, 0}, 	// AWB_WEIGHT_R1
+{ 0x3246, 0x0000, 16, 0}, 	// AWB_WEIGHT_R2
+{ 0x3248, 0x7070, 16, 0}, 	// AWB_WEIGHT_R3
+{ 0x324A, 0x38E0, 16, 0}, 	// AWB_WEIGHT_R4
+{ 0x324C, 0x70E0, 16, 0}, 	// AWB_WEIGHT_R5
+{ 0x324E, 0x01B8, 16, 0}, 	// AWB_WEIGHT_R6
+{ 0x3250, 0x00AB, 16, 0}, 	// AWB_WEIGHT_R7
+{ 0xD80F, 0x04  , 8, 0},// JPEG_QSCALE_0
+{ 0xD810, 0x08  , 8, 0},// JPEG_QSCALE_1
+{ 0xC8D2, 0x04  , 8, 0},// CAM_OUTPUT_1_JPEG_QSCALE_0
+{ 0xC8D3, 0x08  , 8, 0},// CAM_OUTPUT_1_JPEG_QSCALE_1
+{ 0xC8BC, 0x04  , 8, 0},// CAM_OUTPUT_0_JPEG_QSCALE_0
+{ 0xC8BD, 0x08  , 8, 0},// CAM_OUTPUT_0_JPEG_QSCALE_1
+//sys_settings
+{ 0x301A, 0x10F4, 16, 0}, 	// RESET_REGISTER
+{ 0x301E, 0x0083, 16, 0}, 	// DATA_PEDESTAL
+{ 0x301A, 0x10FC, 16, 0}, 	// RESET_REGISTER
+{ 0xDC33, 0x20  , 8, 0},// SYS_FIRST_BLACK_LEVEL
+{ 0xDC35, 0x04  , 8, 0},// SYS_UV_COLOR_BOOST
+{ 0x326E, 0x0006, 16, 0},  // LOW_PASS_YUV_FILTER
+{ 0xDC37, 0x62  , 8, 0},// SYS_BRIGHT_COLORKILL
+{ 0x35A4, 0x0596, 16, 0},  // BRIGHT_COLOR_KILL_CONTROLS
+{ 0x35A2, 0x009C, 16, 0},  // DARK_COLOR_KILL_CONTROLS
+{ 0x098E, 0x5C02, 16, 0},  // MCU_ADDR
+{ 0xDC02, 0x003E, 16, 0},  // SYS_ALGO
+{ 0xDC36, 0x24  , 8, 0},// SYS_DARK_COLOR_KILL
+ // Refresh Mode - skip
+{ 0xBC18, 0x00  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_0
+{ 0xBC19, 0x11  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_1
+{ 0xBC1A, 0x23  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_2
+{ 0xBC1B, 0x3F  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_3
+{ 0xBC1C, 0x67  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_4
+{ 0xBC1D, 0x85  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_5
+{ 0xBC1E, 0x9B  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_6
+{ 0xBC1F, 0xAD  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_7
+{ 0xBC20, 0xBB  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_8
+{ 0xBC21, 0xC7  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_9
+{ 0xBC22, 0xD1  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_10
+{ 0xBC23, 0xDA  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_11
+{ 0xBC24, 0xE1  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_12
+{ 0xBC25, 0xE8  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_13
+{ 0xBC26, 0xEE  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_14
+{ 0xBC27, 0xF3  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_15
+{ 0xBC28, 0xF7  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_16
+{ 0xBC29, 0xFB  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_17
+{ 0xBC2A, 0xFF  , 8, 0},// LL_GAMMA_CONTRAST_CURVE_18
+{ 0xBC2B, 0x00  , 8, 0}, // LL_GAMMA_NEUTRAL_CURVE_0
+{ 0xBC2C, 0x0D  , 8, 0}, // LL_GAMMA_NEUTRAL_CURVE_1
+{ 0xBC2D, 0x21  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_2
+{ 0xBC2E, 0x38  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_3
+{ 0xBC2F, 0x58  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_4
+{ 0xBC30, 0x71  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_5
+{ 0xBC31, 0x87  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_6
+{ 0xBC32, 0x9A  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_7
+{ 0xBC33, 0xA9  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_8
+{ 0xBC34, 0xB6  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_9
+{ 0xBC35, 0xC2  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_10
+{ 0xBC36, 0xCC  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_11
+{ 0xBC37, 0xD5  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_12
+{ 0xBC38, 0xDE  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_13
+{ 0xBC39, 0xE5  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_14
+{ 0xBC3A, 0xEC  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_15
+{ 0xBC3B, 0xF3  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_16
+{ 0xBC3C, 0xF9  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_17
+{ 0xBC3D, 0xFF  , 8, 0},// LL_GAMMA_NEUTRAL_CURVE_18
+{ 0xBC3E, 0x00  , 8, 0},// LL_GAMMA_NR_CURVE_0
+{ 0xBC3F, 0x18  , 8, 0},// LL_GAMMA_NR_CURVE_1
+{ 0xBC40, 0x25  , 8, 0},// LL_GAMMA_NR_CURVE_2
+{ 0xBC41, 0x3A  , 8, 0},// LL_GAMMA_NR_CURVE_3
+{ 0xBC42, 0x59  , 8, 0},// LL_GAMMA_NR_CURVE_4
+{ 0xBC43, 0x70  , 8, 0},// LL_GAMMA_NR_CURVE_5
+{ 0xBC44, 0x81  , 8, 0},// LL_GAMMA_NR_CURVE_6
+{ 0xBC45, 0x90  , 8, 0},// LL_GAMMA_NR_CURVE_7
+{ 0xBC46, 0x9E  , 8, 0},// LL_GAMMA_NR_CURVE_8
+{ 0xBC47, 0xAB  , 8, 0},// LL_GAMMA_NR_CURVE_9
+{ 0xBC48, 0xB6  , 8, 0},// LL_GAMMA_NR_CURVE_10
+{ 0xBC49, 0xC1  , 8, 0},// LL_GAMMA_NR_CURVE_11
+{ 0xBC4A, 0xCB  , 8, 0},// LL_GAMMA_NR_CURVE_12
+{ 0xBC4B, 0xD5  , 8, 0},// LL_GAMMA_NR_CURVE_13
+{ 0xBC4C, 0xDE  , 8, 0},// LL_GAMMA_NR_CURVE_14
+{ 0xBC4D, 0xE7  , 8, 0},// LL_GAMMA_NR_CURVE_15
+{ 0xBC4E, 0xEF  , 8, 0},// LL_GAMMA_NR_CURVE_16
+{ 0xBC4F, 0xF7  , 8, 0},// LL_GAMMA_NR_CURVE_17
+{ 0xBC50, 0xFF  , 8, 0},// LL_GAMMA_NR_CURVE_18
+{ 0xBC51, 0x04  , 8, 0},// LL_GAMMA_CURVE_SELECTOR
+//BM_dampening  
+{ 0xB801, 0xE0  , 8, 0},// STAT_MODE
+{ 0xB862, 0x04  , 8, 0},// STAT_BMTRACKING_SPEED
+//AE
+{ 0xB829, 0x02  , 8, 0},// STAT_LL_BRIGHTNESS_METRIC_DIVISOR
+{ 0xB863, 0x02  , 8, 0},// STAT_BM_MUL
+{ 0xB827, 0x0F  , 8, 0},// STAT_AE_EV_SHIFT
+{ 0xA409, 0x41  , 8, 0}, //0x4A  // AE_RULE_BASE_TARGET
+{ 0xA805, 0x06  , 8, 0},// AE_TRACK_GATE
+{ 0xA80D, 0x08  , 8, 0},
+{ 0xA816, 0x0002, 16, 0},  // AE_TRACK_MIN_INT_TIME_ROWS
+{ 0xA401, 0x00  , 8, 0},// AE_RULE_MODE
+{ 0xA80E, 0x06  , 8, 0},// AE_TRACK_MAX_BLACK_LEVEL
+//BM_GM_start_stop
+{ 0xC8E6, 0x014C, 16, 0}, 	// RESERVED_CAM_E6
+{ 0xC8E8, 0x0040, 16, 0}, 	// RESERVED_CAM_E8
+{ 0xBC52, 0x00C8, 16, 0}, 	// LL_START_BRIGHTNESS_METRIC
+{ 0xBC54, 0x0A28, 16, 0}, 	// LL_END_BRIGHTNESS_METRIC
+{ 0xBC58, 0x0100, 16, 0}, 	// LL_START_GAIN_METRIC
+{ 0xBC5A, 0x0480, 16, 0}, 	// LL_END_GAIN_METRIC
+{ 0xBC5E, 0x0227, 16, 0}, 	// LL_START_APERTURE_GAIN_BM
+{ 0xBC60, 0x0540, 16, 0}, 	// LL_END_APERTURE_GAIN_BM
+{ 0xBC66, 0x0154, 16, 0}, 	// LL_START_APERTURE_GM
+{ 0xBC68, 0x07D0, 16, 0}, 	// LL_END_APERTURE_GM
+{ 0xBC86, 0x00C8, 16, 0}, 	// LL_START_FFNR_GM
+{ 0xBC88, 0x0420, 16, 0}, 	// LL_END_FFNR_GM
+{ 0xBCBC, 0x0040, 16, 0}, 	// LL_SFFB_START_GAIN
+{ 0xBCBE, 0x01FC, 16, 0}, 	// LL_SFFB_END_GAIN
+{ 0xBCCC, 0x00C8, 16, 0}, 	// LL_SFFB_START_MAX_GM
+{ 0xBCCE, 0x0640, 16, 0}, 	// LL_SFFB_END_MAX_GM
+{ 0xBC90, 0x00C8, 16, 0}, 	// LL_START_GRB_GM
+{ 0xBC92, 0x0640, 16, 0}, 	// LL_END_GRB_GM
+{ 0xBC0E, 0x0032, 16, 0}, 	// LL_GAMMA_CURVE_ADJ_START_POS
+{ 0xBC10, 0x0064, 16, 0}, 	// LL_GAMMA_CURVE_ADJ_MID_POS
+{ 0xBC12, 0x0FA0, 16, 0}, 	// LL_GAMMA_CURVE_ADJ_END_POS
+{ 0xBCAA, 0x03E8, 16, 0}, 	// LL_CDC_THR_ADJ_START_POS
+{ 0xBCAC, 0x012C, 16, 0}, 	// LL_CDC_THR_ADJ_MID_POS
+{ 0xBCAE, 0x0009, 16, 0}, 	// LL_CDC_THR_ADJ_END_POS
+{ 0xBCD8, 0x00C8, 16, 0}, 	// LL_PCR_START_BM
+{ 0xBCDA, 0x0A28, 16, 0}, 	// LL_PCR_END_BM
+
+//[Kernel]
+{ 0x3380, 0x0504, 16, 0}, 	// KERNEL_CONFIG
+{ 0x3380, 0x0505, 16, 0}, 	// KERNEL_CONFIG
+{ 0x3380, 0x0584, 16, 0}, 	// KERNEL_CONFIG
+{ 0x3380, 0x0586, 16, 0}, 	// KERNEL_CONFIG
+{ 0x3380, 0x0587, 16, 0}, 	// KERNEL_CONFIG
+
+//GRB
+{ 0xBC94, 0x06  , 8, 0},// LL_GB_START_THRESHOLD_0
+{ 0xBC95, 0x05  , 8, 0},// LL_GB_START_THRESHOLD_1
+{ 0xBC9C, 0x09  , 8, 0},// RESERVED_LL_9C
+{ 0xBC9D, 0x05  , 8, 0},// RESERVED_LL_9D
+
+//demosaic
+{ 0x33B0, 0x2A16, 16, 0},  // FFNR_ALPHA_BETA
+{ 0xBC8A, 0x0E  , 8, 0},// LL_START_FF_MIX_THRESH_Y
+{ 0xBC8B, 0x4C  , 8, 0},// LL_END_FF_MIX_THRESH_Y
+{ 0xBC8C, 0x00  , 8, 0},// LL_START_FF_MIX_THRESH_YGAIN
+{ 0xBC8D, 0x24  , 8, 0},// LL_END_FF_MIX_THRESH_YGAIN
+{ 0xBC8E, 0xFF  , 8, 0},// LL_START_FF_MIX_THRESH_GAIN
+{ 0xBC8F, 0x00  , 8, 0},// LL_END_FF_MIX_THRESH_GAIN
+{ 0xBCB2, 0x20  , 8, 0},// LL_CDC_DARK_CLUS_SLOPE
+{ 0xBCB3, 0x3A  , 8, 0},// LL_CDC_DARK_CLUS_SATUR
+{ 0xBCB4, 0x39  , 8, 0},// RESERVED_LL_B4
+{ 0xBCB7, 0x39  , 8, 0},// RESERVED_LL_B7
+{ 0xBCB5, 0x20  , 8, 0},// RESERVED_LL_B5
+{ 0xBCB8, 0x3A  , 8, 0},// RESERVED_LL_B8
+{ 0xBCB6, 0x80  , 8, 0},// RESERVED_LL_B6
+{ 0xBCB9, 0x24  , 8, 0},// RESERVED_LL_B9
+                
+//SFFB_rev3_noisemodel
+{ 0xBCC0, 0x1F  , 8, 0},// LL_SFFB_RAMP_START
+{ 0xBCC1, 0x03  , 8, 0},// LL_SFFB_RAMP_STOP
+{ 0xBCC2, 0x3C  , 8, 0},// LL_SFFB_SLOPE_START
+{ 0xBCC3, 0x10  , 8, 0},// LL_SFFB_SLOPE_STOP
+{ 0xBCC4, 0x07  , 8, 0},// LL_SFFB_THSTART
+{ 0xBCC5, 0x0B  , 8, 0},// LL_SFFB_THSTOP
+{ 0xBCBA, 0x0009, 16, 0},  // LL_SFFB_CONFIG
+
+//[Step7-CPIPE_Preference]
+//ftb_off
+{ 0xBC14, 0xFFFE, 16, 0},  // LL_GAMMA_FADE_TO_BLACK_START_POS
+{ 0xBC16, 0xFFFD, 16, 0},  // LL_GAMMA_FADE_TO_BLACK_END_POS 20110808 modify
+
+//aperture_preference
+{ 0xBC6A, 0x09  , 8, 0},// LL_START_APERTURE_INTEGER_GAIN
+{ 0xBC6B, 0x00  , 8, 0},// LL_END_APERTURE_INTEGER_GAIN
+{ 0xBC6C, 0x01  , 8, 0},// LL_START_APERTURE_EXP_GAIN
+{ 0xBC6D, 0x00  , 8, 0},// LL_END_APERTURE_EXP_GAIN
+{ 0xBCE2, 0x0A  , 8 ,0},// LL_START_POS_KNEE
+{ 0xBCE3, 0x2B  , 8, 0},// LL_END_POS_KNEE
+{ 0xBCE4, 0x0A  , 8, 0},// LL_START_NEG_KNEE
+{ 0xBCE5, 0x2B  , 8, 0},// LL_END_NEG_KNEE
+{ 0x33BA, 0x0084, 16, 0}, 	// APEDGE_CONTROL
+{ 0x33BE, 0x0000, 16, 0}, 	// UA_KNEE_L
+{ 0x33C2, 0x5600, 16, 0}, 	// UA_WEIGHTS
+{ 0xBC62, 0x10  , 8, 0},// LL_START_APERTURE_KPGAIN
+{ 0xBC63, 0x1F  , 8, 0},// LL_END_APERTURE_KPGAIN
+{ 0xBC64, 0x10  , 8, 0},// LL_START_APERTURE_KNGAIN
+{ 0xBC65, 0x1F  , 8, 0},// LL_END_APERTURE_KNGAIN
+{ 0xA81C, 0x0043, 16, 0},  // AE_TRACK_MIN_AGAIN
+{ 0xA81E, 0x0102, 16, 0}, 	// AE_TRACK_TARGET_AGAIN
+{ 0xA820, 0x0180, 16, 0},   //0x0102  // AE_TRACK_MAX_AGAIN
+{ 0xA822, 0x0080, 16, 0},  // AE_TRACK_MIN_DGAIN
+{ 0xA824, 0x00D0, 16, 0},   //0x00A6  // AE_TRACK_MAX_DGAIN
+
+//min_fps
+{ 0xA818, 0x07D0, 16, 0},  // AE_TRACK_TARGET_INT_TIME_ROWS
+{ 0xA81A, 0x0BF0, 16, 0},   //0x0A00 //0x0810(10.9Fps)   //0x0FF4(5Fps)  // AE_TRACK_MAX_INT_TIME_ROWS
+
+//ccm_saturation
+{ 0xBC56, 0x80  , 8, 0},//0xA8  // LL_START_CCM_SATURATION
+{ 0xBC57, 0x00  , 8, 0},// LL_END_CCM_SATURATION
+
+//DCCM
+{ 0xBCDE, 0x03  , 8, 0},// LL_START_SYS_THRESHOLD
+{ 0xBCDF, 0x50  , 8, 0},// LL_STOP_SYS_THRESHOLD
+{ 0xBCE0, 0x08  , 8, 0},// LL_START_SYS_GAIN
+{ 0xBCE1, 0x03  , 8, 0},// LL_STOP_SYS_GAIN
+
+//sobel
+{ 0xBCD0, 0x000A, 16, 0}, 	// LL_SFFB_SOBEL_FLAT_START
+{ 0xBCD2, 0x00FE, 16, 0}, 	// LL_SFFB_SOBEL_FLAT_STOP
+{ 0xBCD4, 0x001E, 16, 0}, 	// LL_SFFB_SOBEL_SHARP_START
+{ 0xBCD6, 0x00FF, 16, 0}, 	// LL_SFFB_SOBEL_SHARP_STOP
+{ 0xBCC6, 0x00  , 8, 0},// LL_SFFB_SHARPENING_START
+{ 0xBCC7, 0x00  , 8, 0},// LL_SFFB_SHARPENING_STOP
+{ 0xBCC8, 0x20  , 8, 0},// LL_SFFB_FLATNESS_START
+{ 0xBCC9, 0x40  , 8, 0},// LL_SFFB_FLATNESS_STOP
+{ 0xBCCA, 0x04  , 8, 0},// LL_SFFB_TRANSITION_START
+{ 0xBCCB, 0x00  , 8, 0},// LL_SFFB_TRANSITION_STOP
+
+//SFFB_slope_zero_enable
+{ 0xBCE6, 0x03  , 8, 0},// LL_SFFB_ZERO_ENABLE
+
+//manual_FD(auto)
+{ 0x8417, 0x02  , 8, 0},// SEQ_STATE_CFG_1_FD
+//tx_setting
+{ 0xC8ED, 0x00  , 8, 0}, //0x02  // CAM_TX_ENABLE_MODE Context A,B time
+//cdc_off
+
+{ 0x8404, 0x06  , 8, 300},// SEQ_CMD
+//DELAY=300
+
+//[Step8-Features]
+//AF_VCM_enable
+{ 0x8419, 0x05, 8, 0},          //5          //4          //, BYTE_LEN, 0},  // SEQ_STATE_CFG_1_AF
+{ 0xC400, 0x88, 8, 0},          //08       //, BYTE_LEN, 0},  // AFM_ALGO
+//AF_settings
+{ 0xB002, 0x0006, 16, 0},     //301     //, WORD_LEN, 0},  // AF_MODE
+{ 0xB004, 0x0010, 16, 0},     //02       //, WORD_LEN, 0},  // AF_ALGO
+{ 0xB045, 0x0015, 16, 0},     //
+{ 0xB02C, 0x20  , 8, 0},        // AF_HC_STEP
+{ 0xB02D, 0x40  , 8, 0},       // AF_HC_LONG_STEP
+{ 0xB02E, 0x50  , 8, 0},        // AF_HC_LONG_STEP_USE_THR
+{ 0xB048, 0x01  , 8, 0},        // AF_C_HC_PROGRESS_TH
+{ 0xB041, 0x02  , 8, 0},        //20       // AF_DEBUG2
+{ 0xC856, 0x0423, 16, 0},     // CAM_CORE_A_UNUSED1
+                
+//set_posMin/Max
+{ 0xC40A, 0x0010, 16, 0}, 	// AFM_POS_MIN
+{ 0xC40C, 0x00E8, 16, 0}, 	// AFM_POS_MAX
+{ 0xC402, 0x00  , 8, 0},        // AFM_MODE
+
+//AF_postition_settings
+{ 0xB018, 0x00  , 8, 0},// AF_FS_POS_0
+{ 0xB019, 0x18  , 8, 0},// AF_FS_POS_1
+{ 0xB01A, 0x30  , 8, 0},// AF_FS_POS_2
+{ 0xB01B, 0x48  , 8, 0},// AF_FS_POS_3
+{ 0xB01C, 0x60  , 8, 0},// AF_FS_POS_4
+{ 0xB01D, 0x80  , 8, 0},// AF_FS_POS_5
+{ 0xB01E, 0xA0  , 8, 0},// AF_FS_POS_6
+{ 0xB01F, 0xC0  , 8, 0},// AF_FS_POS_7
+{ 0xB020, 0xE0  , 8, 0},// AF_FS_POS_8
+{ 0xB012, 0x09  , 8, 0},// AF_FS_NUM_STEPS
+//2nd_scan_option
+{ 0xB013, 0x33  , 8, 0},// AF_FS_NUM_STEPS2
+{ 0xB014, 0x06  , 8, 0},// AF_FS_STEP_SIZE
+
+{ 0xB854, 0x52  , 8, 0},        // STAT_SM_WINDOW_POS_X
+{ 0xB855, 0x58  , 8, 0},        // STAT_SM_WINDOW_POS_Y
+{ 0xB856, 0x5D  , 8, 0},       // STAT_SM_WINDOW_SIZE_X
+{ 0xB857, 0x5A  , 8, 0},       // STAT_SM_WINDOW_SIZE_Y
+{ 0x8404, 0x05  , 8, 300},// SEQ_CMD
+//DELAY=300
+//REG= 0x3EDA, 0x6060 	// DAC_LD_14_15
+{ 0x0018, 0x2008, 16, 100}, 	// STANDBY_CONTROL_AND_STATUS
+//DELAY=100       
+{ 0x3EDA, 0x6060, 16, 100},  // DAC_LD_14_15
+#if 1
+//////////Below setting is for demo kit using //////////
+//Delay=100
+//SERIAL_REG = 0xCA, 0x00, 0x8000, 8:16   // FPGA disabled   
+//Delay=10  
+//SERIAL_REG = 0xCA, 0x00, 0x0006, 8:16   // FPGA into MIPI single lane mode
+//////////////////////////////////////////////
+                
+ //MIPI_1-lane  
+{ 0x301A, 0x107C, 16, 0}, 	// RESET_REGISTER
+{ 0x3400, 0x7A26, 16, 0}, 	// MIPI_CONTROL
+{ 0x001A, 0x0018, 16, 0}, 	// RESET_AND_MISC_CONTROL
+{ 0x001A, 0x001C, 16, 0}, 	// RESET_AND_MISC_CONTROL
+{ 0x3CA0, 0x0001, 16, 0}, 	// TXSS_PARAMETERS
+{ 0xC8D4, 0x0000, 16, 0}, 	// CAM_OUTPUT_1_MIPICHANNEL
+{ 0x3402, 0x0011, 16, 0}, 	// MIPI_STATUS
+{ 0x3400, 0x7A24, 16, 0}, 	// MIPI_CONTROL
+
+{ 0x8404, 0x06    , 8, 300},// SEQ_CMD
+//DELAY = 300
+
+
+//POLL_FIELD= SEQ_CMD, !=0, DELAY= 10, TIMEOUT= 100 
+
+#endif
+#if 0
+{ 0x3EDA, 0x6060, 16, 0},     // DAC_LD_14_15
+{ 0x098E, 0x843C, 16, 0},     // LOGICAL_ADDRESS_ACCESS [SEQ_STATE_CFG_5_MAX_FRAME_CNT]
+{ 0x843C, 0x01  , 16, 0},     // SEQ_STATE_CFG_5_MAX_FRAME_CNT
+{ 0x8404, 0x01  , 16, 0},     // SEQ_CMD
+//POLL_REG=0x8404,0x00,!=0x00,DELAY=10,TIMEOUT=100
+{ 0x3170, 0x2096, 16, 0},     // ANALOG_CONTROL
+#endif
+
+};
+
+//==========================================================================================
+// Capture Configuration Update setting
+//==========================================================================================
+struct reg_struct_type mt9p111_capture[] =
+{
+//[1. 2592x1944 -- full resolution]
+{ 0x098E, 0x48C0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0A20, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x0798, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06 	, 8, 250},  // SEQ_CMD
+//DELAY = 250
+//[Capture_power] // command for Capture
+{ 0x3EDA, 0x6060, 16, 0},     // DAC_LD_14_15
+{ 0x098E, 0x843C, 16, 0},     // LOGICAL_ADDRESS_ACCESS [SEQ_STATE_CFG_5_MAX_FRAME_CNT]
+{ 0x843C, 0xFF  , 8, 0},     // SEQ_STATE_CFG_5_MAX_FRAME_CNT
+{ 0x8404, 0x02  , 8, 100},     // SEQ_CMD
+//POLL_REG=0x8404,0x00,!=0x00,DELAY=10,TIMEOUT=100
+{ 0x3170, 0x205C, 16, 0},     // ANALOG_CONTROL
+ { 0, 0, 0, 0}
+};
+//[========Capture Size=========]
+struct reg_struct_type mt9p111_capture_full[] =
+{
+//[1. 2592x1944 -- full resolution]
+{ 0x098E, 0x48C0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0A20, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x0798, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06 	, 8, 250},  // SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+};
+struct reg_struct_type mt9p111_capture_3M[] =
+{
+//[2. 2048x1536 -- 3M]
+{ 0x098E, 0x48C0, 16, 0},  	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0800, 16, 0},  	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x0600, 16, 0},  	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06  , 8, 250},// SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+
+};
+struct reg_struct_type mt9p111_capture_2M[] =
+{
+//[3. 1600x1200 -- 2M]
+{ 0x098E, 0x48C0, 16, 0},  	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0640, 16, 0},  	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x04B0, 16, 0},  	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06  , 8, 250},// SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+
+};
+struct reg_struct_type mt9p111_capture_1M[] =
+{
+//[4. 1280x960 -- 1M]
+{ 0x098E, 0x48C0, 16, 0},  	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0500, 16, 0},  	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x03C0, 16, 0},  	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06  , 8, 250},// SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+
+};
+struct reg_struct_type mt9p111_capture_1024[] =
+{
+//[5. 1024x768]
+{ 0x098E, 0x48C0, 16, 0},  	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0400, 16, 0},  	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x0300, 16, 0},  	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06  , 8, 250},// SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+
+};
+struct reg_struct_type mt9p111_capture_800[] =
+{
+//[6. 800x600]
+{ 0x098E, 0x48C0, 16, 0},  	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0320, 16, 0},  	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x0258, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06  , 8, 250},// SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+
+};
+struct reg_struct_type mt9p111_capture_VGA[] =
+{
+//[7. 640x480 -- VGA]
+{ 0x098E, 0x48C0, 16, 0},  	// LOGICAL_ADDRESS_ACCESS [CAM_OUTPUT_1_IMAGE_WIDTH]
+{ 0xC8C0, 0x0280, 16, 0}, 	// CAM_OUTPUT_1_IMAGE_WIDTH
+{ 0xC8C2, 0x01E0, 16, 0},  	// CAM_OUTPUT_1_IMAGE_HEIGHT
+{ 0x8404, 0x06  , 8, 250},// SEQ_CMD
+//DELAY = 250
+ { 0, 0, 0, 0}
+};
+/*
+1: 
+2: 
+3: 
+4: 
+5: 
+6: 
+*/
+struct reg_struct_type *mt9p111_capture_size[7] =
+{
+ mt9p111_capture_full,
+ mt9p111_capture_3M,
+ mt9p111_capture_2M,
+ mt9p111_capture_1M,
+ mt9p111_capture_1024,
+ mt9p111_capture_800,
+ mt9p111_capture_VGA,
+};
+
+//==========================================================================================
+// Preview Configuration Update setting
+//==========================================================================================
+struct reg_struct_type mt9p111_preview[] =
+{
+//[Preview_power] // back to preview
+{ 0x3EDA, 0x6060, 16, 0},     // DAC_LD_14_15
+{ 0x098E, 0x843C, 16, 0},     // LOGICAL_ADDRESS_ACCESS [SEQ_STATE_CFG_5_MAX_FRAME_CNT]
+{ 0x843C, 0x01  , 8, 0},     // SEQ_STATE_CFG_5_MAX_FRAME_CNT
+{ 0x8404, 0x01  , 8, 0},     // SEQ_CMD
+//POLL_REG=0x8404,0x00,!=0x00,DELAY=10,TIMEOUT=100
+{ 0x3170, 0x2096, 16, 0},     // ANALOG_CONTROL
+ { 0, 0, 0, 0}
+};
+//==========================================================================================
+// White Balance Configuration Update setting
+//==========================================================================================
+struct reg_struct_type mt9p111_WB_Auto[] =
+{
+{ 0x098E, 0xACB0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AWB_MIN_ACCEPTED_PRE_AWB_R2G_RATIO]
+{ 0xACB0, 0x31 	, 8, 0},// AWB_RG_MIN
+{ 0xACB1, 0x63 	, 8, 0},// AWB_RG_MAX
+{ 0xACB4, 0x2A 	, 8, 0},// AWB_BG_MIN
+{ 0xACB5, 0x5B 	, 8, 0},// AWB_BG_MAX
+{ 0xACB2, 0x40  , 8, 0}, //0x42 	// AWB_RG_MIN_BRIGHT
+{ 0xACB3, 0x4D  , 8, 0}, //0x4B 	// AWB_RG_MAX_BRIGHT
+{ 0xACB6, 0x36 	, 8, 0},// AWB_BG_MIN_BRIGHT
+{ 0xACB7, 0x4A  , 8, 0}, //0x42 	// AWB_BG_MAX_BRIGHT
+{ 0xAC44, 0x00 	, 8, 0},// AWB_LEFT_CCM_POS_RANGE_LIMIT                                 
+{ 0xAC45, 0x7F 	, 8, 0},// AWB_RIGHT_CCM_POS_RANGE_LIMIT                                
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_WB_Incandescent[] =
+{
+{ 0x098E, 0xACB0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AWB_MIN_ACCEPTED_PRE_AWB_R2G_RATIO]
+{ 0xACB0, 0x57 	, 8, 0},// AWB_RG_MIN
+{ 0xACB1, 0x5F 	, 8, 0},// AWB_RG_MAX
+{ 0xACB4, 0x26 	, 8, 0},// AWB_BG_MIN
+{ 0xACB5, 0x2E 	, 8, 0},// AWB_BG_MAX
+{ 0xACB2, 0x57 	, 8, 0},// AWB_RG_MIN_BRIGHT
+{ 0xACB3, 0x5F 	, 8, 0},// AWB_RG_MAX_BRIGHT
+{ 0xACB6, 0x26 	, 8, 0},// AWB_BG_MIN_BRIGHT
+{ 0xACB7, 0x2E 	, 8, 0},// AWB_BG_MAX_BRIGHT
+{ 0xAC44, 0x00 	, 8, 0},// AWB_LEFT_CCM_POS_RANGE_LIMIT                                 
+{ 0xAC45, 0x08 	, 8, 0},// AWB_RIGHT_CCM_POS_RANGE_LIMIT                                
+{ 0xAC04, 0x5B 	, 8, 0},// AWB_PRE_AWB_R2G_RATIO
+{ 0xAC05, 0x2A 	, 8, 0},// AWB_PRE_AWB_B2G_RATIO
+{ 0xAC08, 0x00 	, 8, 0},// AWB_CUR_CCM_POS
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_WB_Fluorescent[] =
+{
+{ 0x098E, 0xACB0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AWB_MIN_ACCEPTED_PRE_AWB_R2G_RATIO]
+{ 0xACB0, 0x44 	, 8, 0},// AWB_RG_MIN
+{ 0xACB1, 0x4B 	, 8, 0},// AWB_RG_MAX
+{ 0xACB4, 0x2C 	, 8, 0},// AWB_BG_MIN
+{ 0xACB5, 0x34 	, 8, 0},// AWB_BG_MAX
+{ 0xACB2, 0x44 	, 8, 0},// AWB_RG_MIN_BRIGHT
+{ 0xACB3, 0x4B 	, 8, 0},// AWB_RG_MAX_BRIGHT
+{ 0xACB6, 0x2C 	, 8, 0},// AWB_BG_MIN_BRIGHT
+{ 0xACB7, 0x34 	, 8, 0},// AWB_BG_MAX_BRIGHT
+{ 0xAC44, 0x40 	, 8, 0},// AWB_LEFT_CCM_POS_RANGE_LIMIT                                 
+{ 0xAC45, 0x4A 	, 8, 0},// AWB_RIGHT_CCM_POS_RANGE_LIMIT                                
+{ 0xAC04, 0x47 	, 8, 0},// AWB_PRE_AWB_R2G_RATIO
+{ 0xAC05, 0x30 	, 8, 0},// AWB_PRE_AWB_B2G_RATIO
+{ 0xAC08, 0x45 	, 8, 0},// AWB_CUR_CCM_POS
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_WB_Cloudy[] =
+{
+{ 0x098E, 0xACB0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AWB_MIN_ACCEPTED_PRE_AWB_R2G_RATIO]
+{ 0xACB0, 0x38 	, 8, 0},// AWB_RG_MIN
+{ 0xACB1, 0x42 	, 8, 0},// AWB_RG_MAX
+{ 0xACB4, 0x44 	, 8, 0},// AWB_BG_MIN
+{ 0xACB5, 0x4C 	, 8, 0},// AWB_BG_MAX
+{ 0xACB2, 0x38 	, 8, 0},// AWB_RG_MIN_BRIGHT
+{ 0xACB3, 0x42 	, 8, 0},// AWB_RG_MAX_BRIGHT
+{ 0xACB6, 0x44 	, 8, 0},// AWB_BG_MIN_BRIGHT
+{ 0xACB7, 0x4C 	, 8, 0},// AWB_BG_MAX_BRIGHT
+{ 0xAC44, 0x7C 	, 8, 0},// AWB_LEFT_CCM_POS_RANGE_LIMIT                                 
+{ 0xAC45, 0x7F 	, 8, 0},// AWB_RIGHT_CCM_POS_RANGE_LIMIT                                
+{ 0xAC04, 0x3E 	, 8, 0},// AWB_PRE_AWB_R2G_RATIO
+{ 0xAC05, 0x48 	, 8, 0},// AWB_PRE_AWB_B2G_RATIO
+{ 0xAC08, 0x7F 	, 8, 0},// AWB_CUR_CCM_POS
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_WB_Daylight[] =
+{
+{ 0x098E, 0xACB0, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AWB_MIN_ACCEPTED_PRE_AWB_R2G_RATIO]
+{ 0xACB0, 0x3A 	, 8, 0},// AWB_RG_MIN
+{ 0xACB1, 0x44 	, 8, 0},// AWB_RG_MAX
+{ 0xACB4, 0x40 	, 8, 0},// AWB_BG_MIN
+{ 0xACB5, 0x4A 	, 8, 0},// AWB_BG_MAX
+{ 0xACB2, 0x3A 	, 8, 0},// AWB_RG_MIN_BRIGHT
+{ 0xACB3, 0x44 	, 8, 0},// AWB_RG_MAX_BRIGHT
+{ 0xACB6, 0x40 	, 8, 0},// AWB_BG_MIN_BRIGHT
+{ 0xACB7, 0x4A 	, 8, 0},// AWB_BG_MAX_BRIGHT
+{ 0xAC44, 0x7C 	, 8, 0},// AWB_LEFT_CCM_POS_RANGE_LIMIT                                 
+{ 0xAC45, 0x7F 	, 8, 0},// AWB_RIGHT_CCM_POS_RANGE_LIMIT                                
+{ 0xAC04, 0x40 	, 8, 0},// AWB_PRE_AWB_R2G_RATIO
+{ 0xAC05, 0x48 	, 8, 0},// AWB_PRE_AWB_B2G_RATIO
+{ 0xAC08, 0x7F 	, 8, 0},// AWB_CUR_CCM_POS
+ { 0, 0, 0, 0}
+};
+/*
+1: auto
+2: ?
+3: incandescent
+4: fluorescent
+5: daylight
+6: cloudy
+*/
+struct reg_struct_type *mt9p111_WB[MT9P111_WB_MAX] =
+{
+ mt9p111_WB_Auto,
+ mt9p111_WB_Auto,
+ mt9p111_WB_Incandescent,
+ mt9p111_WB_Fluorescent,
+ mt9p111_WB_Daylight,
+ mt9p111_WB_Cloudy,
+};
+
+//==========================================================================================
+// Brightness Configuration Update setting
+//==========================================================================================
+struct reg_struct_type mt9p111_brightness_0[] =
+{
+//[EV -2]
+{ 0x098E, 0xA409, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AE_RULE_BASE_TARGET]
+{ 0xA409, 0x21 	, 8, 0},	// AE_RULE_BASE_TARGET
+//;REG= 0xA805, 0x06 		// AE_TRACK_GATE
+{ 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_brightness_1[] =
+{
+//[EV -1]
+  
+{ 0x098E, 0xA409, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AE_RULE_BASE_TARGET]
+{ 0xA409, 0x31 	, 8, 0},	// AE_RULE_BASE_TARGET
+//;REG= 0xA805, 0x06 		// AE_TRACK_GATE
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_brightness_2[] =
+{
+//[EV 0 (default)]
+  
+{ 0x098E, 0xA409, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AE_RULE_BASE_TARGET]
+{ 0xA409, 0x41 	, 8, 0},	// AE_RULE_BASE_TARGET
+//;REG= 0xA805, 0x06 		// AE_TRACK_GATE
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_brightness_3[] =
+{
+//[EV +1]
+  
+{ 0x098E, 0xA409, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AE_RULE_BASE_TARGET]
+{ 0xA409, 0x51 	, 8, 0},	// AE_RULE_BASE_TARGET
+//REG= 0xA805, 0x08 		// AE_TRACK_GATE
+ { 0, 0, 0, 0}
+};
+
+struct reg_struct_type mt9p111_brightness_4[] =
+{
+//[EV +2]
+  
+{ 0x098E, 0xA409, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [AE_RULE_BASE_TARGET]
+{ 0xA409, 0x61 	, 8, 0},	// AE_RULE_BASE_TARGET
+//REG= 0xA805, 0x0A 		// AE_TRACK_GATE
+ { 0, 0, 0, 0}
+};
+struct reg_struct_type *mt9p111_brightness[MT9P111_BRIGHTNESS_MAX] =
+{
+ mt9p111_brightness_0,
+ mt9p111_brightness_1,
+ mt9p111_brightness_2,
+ mt9p111_brightness_3,
+ mt9p111_brightness_4,
+};
+
+
+//==========================================================================================
+// Effect Configuration Update setting
+//==========================================================================================
+struct reg_struct_type MT9P111_effect_NONE[]=
+{
+//[Effect_Off]
+{ 0x098E, 0xDC38, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [SYS_SELECT_FX]
+{ 0xDC38, 0x00 	, 8, 0},// SYS_SELECT_FX
+{ 0xDC02, 0x003E, 16, 0}, 	// SYS_ALGO
+{ 0x8404, 0x05 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+ 
+struct reg_struct_type MT9P111_effect_MONO[]=
+{
+//[Effect_Mono]
+{ 0x098E, 0xDC38, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [SYS_SELECT_FX]
+{ 0xDC38, 0x01 	, 8, 0},// SYS_SELECT_FX
+{ 0xDC02, 0x007E, 16, 0}, 	// SYS_ALGO
+{ 0x8404, 0x05 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+ 
+struct reg_struct_type MT9P111_effect_NEGATIVE[]=
+{
+//[Effect_Negative]
+{ 0x098E, 0xDC38, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [SYS_SELECT_FX]
+{ 0xDC38, 0x03 	, 8, 0},// SYS_SELECT_FX
+{ 0xDC02, 0x007E, 16, 0}, 	// SYS_ALGO
+{ 0x8404, 0x05 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+struct reg_struct_type MT9P111_effect_SEPIA[]=
+{
+//[Effect_Sepia]
+{ 0x098E, 0xDC38, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [SYS_SELECT_FX]
+{ 0xDC38, 0x02 	, 8, 0},// SYS_SELECT_FX
+{ 0xDC3A, 0x10 	, 8, 0},// SYS_SEPIA_CR
+{ 0xDC3B, 0xE0 	, 8, 0},// SYS_SEPIA_CB
+{ 0xDC02, 0x007E, 16, 0}, 	// SYS_ALGO
+{ 0x8404, 0x05 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+struct reg_struct_type MT9P111_effect_SOLARIZE[]=
+{
+//[Effect_Solarize]
+{ 0x098E, 0xDC38, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [SYS_SELECT_FX]
+{ 0xDC38, 0x04 	, 8, 0},// SYS_SELECT_FX
+{ 0xDC02, 0x007E, 16, 0}, 	// SYS_ALGO
+{ 0x8404, 0x05 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+ 
+struct reg_struct_type MT9P111_effect_AQUA[]=
+{
+ { 0, 0, 0, 0}
+};
+ 
+struct reg_struct_type MT9P111_effect_SKETCH[]=
+{
+ { 0, 0, 0, 0}
+};
+/*
+0: CAMERA_EFFECT_OFF
+1: CAMERA_EFFECT_MONO
+2: CAMERA_EFFECT_NEGATIVE
+3: CAMERA_EFFECT_SOLARIZE
+4: CAMERA_EFFECT_SEPIA
+5: CAMERA_EFFECT_POSTERIZE
+6: CAMERA_EFFECT_WHITEBOARD
+7: CAMERA_EFFECT_BLACKBOARD
+8: CAMERA_EFFECT_AQUA
+9: CAMERA_EFFECT_MAX
+*/
+struct reg_struct_type *mt9p111_effect[MT9P111_EFFECT_MAX] =
+{
+ MT9P111_effect_NONE,
+ MT9P111_effect_MONO,
+ MT9P111_effect_NEGATIVE,
+ MT9P111_effect_NONE,
+ MT9P111_effect_SEPIA,
+ MT9P111_effect_NONE,
+ MT9P111_effect_NONE,
+ MT9P111_effect_NONE,
+ MT9P111_effect_AQUA,
+ MT9P111_effect_NONE,
+};
+
+
+//==========================================================================================
+// Exposure mode Configuration Update setting
+//==========================================================================================
+struct reg_struct_type mt9p111_exposure_default[]=
+{
+ //================================================================================================
+ // 1. Spot mode : Default weighted (center based)
+ //================================================================================================
+//Weighted
+{ 0x098E, 0xB820, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [STAT_AE_WINDOW_POS_X]
+{ 0xB820, 0x00 	, 8, 0},// STAT_AE_WINDOW_POS_X
+{ 0xB821, 0x00 	, 8, 0},// STAT_AE_WINDOW_POS_Y
+{ 0xB822, 0xFF 	, 8, 0},// STAT_AE_WINDOW_SIZE_X
+{ 0xB823, 0xEF 	, 8, 0},// STAT_AE_WINDOW_SIZE_Y
+{ 0x8404, 0x06 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+struct reg_struct_type mt9p111_exposure_average[]=
+{
+ //================================================================================================
+ // 2. Spot mode : Average weighted 
+ //================================================================================================
+//Average
+{ 0x098E, 0xB820, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [STAT_AE_WINDOW_POS_X]
+{ 0xB820, 0x26 	, 8, 0},// STAT_AE_WINDOW_POS_X
+{ 0xB821, 0x26 	, 8, 0},// STAT_AE_WINDOW_POS_Y
+{ 0xB822, 0xB5 	, 8, 0},// STAT_AE_WINDOW_SIZE_X
+{ 0xB823, 0xB5 	, 8, 0},// STAT_AE_WINDOW_SIZE_Y
+{ 0x8404, 0x06 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+struct reg_struct_type mt9p111_exposure_center[]=
+{
+ //================================================================================================
+ // 3. Spot mode : Center spot weighted 
+ //================================================================================================
+//Metering
+{ 0x098E, 0xB820, 16, 0}, 	// LOGICAL_ADDRESS_ACCESS [STAT_AE_WINDOW_POS_X]
+{ 0xB820, 0x66 	, 8, 0},// STAT_AE_WINDOW_POS_X
+{ 0xB821, 0x66 	, 8, 0},// STAT_AE_WINDOW_POS_Y
+{ 0xB822, 0x33 	, 8, 0},// STAT_AE_WINDOW_SIZE_X
+{ 0xB823, 0x33 	, 8, 0},// STAT_AE_WINDOW_SIZE_Y
+{ 0x8404, 0x06 	, 8, 0},// SEQ_CMD
+ { 0, 0, 0, 0}
+};
+
+/*
+1: frame-average
+2: center-weighted
+3: spot-metering
+*/
+struct reg_struct_type *mt9p111_exposure[MT9P111_EXPOSURE_MAX] =
+{
+ mt9p111_exposure_default,
+ mt9p111_exposure_average,
+ mt9p111_exposure_center,
+};
+
+int32_t mt9p111_array_length = sizeof(mt9p111_init_settings_array) /
+ sizeof(mt9p111_init_settings_array[0]);
+
+

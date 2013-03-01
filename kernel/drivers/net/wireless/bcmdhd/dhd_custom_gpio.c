@@ -1,7 +1,6 @@
 /*
 * Customer code to add GPIO control during WLAN start/stop
 * Copyright (C) 1999-2011, Broadcom Corporation
-* Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
 * 
 *         Unless you and Broadcom execute a separate written software license
 * agreement governing use of this software, this software is licensed to you
@@ -35,18 +34,9 @@
 #include <wlioctl.h>
 #include <wl_iw.h>
 
-#include <rpc_nv.h>   //FIH-ADD+
 #define WL_ERROR(x) printf x
 #define WL_TRACE(x)
 
-//FIH-ADD+[
-#ifdef FIH_HW
-extern int bcm4330_wifi_resume(void);
-extern int bcm4330_wifi_suspend(void);
-extern int wifi_power(int on);
-extern int sisi_get_host_wlan_irq(void);
-#endif
-//FIH-ADD+]
 #ifdef CUSTOMER_HW
 extern  void bcm_wlan_power_off(int);
 extern  void bcm_wlan_power_on(int);
@@ -96,21 +86,10 @@ int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr)
 {
 	int  host_oob_irq = 0;
 
-#if defined(CUSTOMER_HW2)
+#ifdef CUSTOMER_HW2
 	host_oob_irq = wifi_get_irq_number(irq_flags_ptr);
 
-#elif defined(FIH_HW)
-    dhd_oob_gpio_num = sisi_get_host_wlan_irq();  //FIH-ADD+
-    if (dhd_oob_gpio_num < 0) {
-		WL_ERROR(("%s: ERROR FIH specific Host GPIO is NOT defined \n",
-			__FUNCTION__));
-		return (dhd_oob_gpio_num);
-	}
-	WL_ERROR(("%s: FIH specific Host GPIO number is (%d)\n",
-	         __FUNCTION__, dhd_oob_gpio_num));
-    host_oob_irq = MSM_GPIO_TO_INT(dhd_oob_gpio_num);  //FIH-ADD+
 #else
-    
 #if defined(CUSTOM_OOB_GPIO_NUM)
 	if (dhd_oob_gpio_num < 0) {
 		dhd_oob_gpio_num = CUSTOM_OOB_GPIO_NUM;
@@ -126,7 +105,6 @@ int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr)
 	WL_ERROR(("%s: customer specific Host GPIO number is (%d)\n",
 	         __FUNCTION__, dhd_oob_gpio_num));
 
-	
 #if defined CUSTOMER_HW
 	host_oob_irq = MSM_GPIO_TO_INT(dhd_oob_gpio_num);
 #elif defined CUSTOMER_HW3
@@ -148,9 +126,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 		case WLAN_RESET_OFF:
 			WL_TRACE(("%s: call customer specific GPIO to insert WLAN RESET\n",
 				__FUNCTION__));
-#ifdef FIH_HW
-			bcm4330_wifi_suspend();  //FIH-ADD+
-#endif
 #ifdef CUSTOMER_HW
 			bcm_wlan_power_off(2);
 #endif /* CUSTOMER_HW */
@@ -163,9 +138,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 		case WLAN_RESET_ON:
 			WL_TRACE(("%s: callc customer specific GPIO to remove WLAN RESET\n",
 				__FUNCTION__));
-#ifdef FIH_HW
-			bcm4330_wifi_resume();  //FIH-ADD+
-#endif
 #ifdef CUSTOMER_HW
 			bcm_wlan_power_on(2);
 #endif /* CUSTOMER_HW */
@@ -178,9 +150,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 		case WLAN_POWER_OFF:
 			WL_TRACE(("%s: call customer specific GPIO to turn off WL_REG_ON\n",
 				__FUNCTION__));
-#ifdef FIH_HW
-			wifi_power(0);  //FIH-ADD+
-#endif
 #ifdef CUSTOMER_HW
 			bcm_wlan_power_off(1);
 #endif /* CUSTOMER_HW */
@@ -189,9 +158,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 		case WLAN_POWER_ON:
 			WL_TRACE(("%s: call customer specific GPIO to turn on WL_REG_ON\n",
 				__FUNCTION__));
-#ifdef FIH_HW
-			wifi_power(1);  //FIH-ADD+
-#endif
 #ifdef CUSTOMER_HW
 			bcm_wlan_power_on(1);
 			/* Lets customer power to get stable */
@@ -203,45 +169,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 
 #ifdef GET_CUSTOM_MAC_ENABLE
 /* Function to get custom MAC address */
-//FIH-ADD+[
-void fih_wifi_mac_swap(unsigned char *buf)
-{
-    swap(buf[5], buf[0]);
-    swap(buf[4], buf[1]);
-    swap(buf[3], buf[2]);
-}
-
-void fih_get_SE_random_mac(unsigned char *buf)
-{
-    buf[0] = 0x6C;
-    buf[1] = 0x0E;
-    buf[2] = 0x0D;
-    get_random_bytes(&buf[3], 3);
-}
-
-int fih_mac_is_se_mac(const unsigned char *const buf)
-{
-    if (buf[0] == 0x6C)
-        return 1;
-    else
-        return 0;
-}
-
-static unsigned char cached_mac[ETHER_ADDR_LEN];
-static int getwlanmac = 0;
-
-void fih_generate_mac(unsigned char *temp_buf, unsigned char *out_buf)
-{
-    int ret = 0;
-    fih_get_SE_random_mac(temp_buf);
-    bcopy(temp_buf, out_buf, ETHER_ADDR_LEN);
-    bcopy(temp_buf, cached_mac, ETHER_ADDR_LEN);
-    fih_wifi_mac_swap(temp_buf);
-    ret = rpc_nv_write_wlan_mac_addr(temp_buf);
-    if (ret != 0)
-        printk(KERN_INFO "%s: rpc_nv_write_wlan_mac_addr fails\n", __func__);
-}
-//FIH-ADD+]
 int
 dhd_custom_get_mac_address(unsigned char *buf)
 {
@@ -255,53 +182,7 @@ dhd_custom_get_mac_address(unsigned char *buf)
 #if defined(CUSTOMER_HW2) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
 	ret = wifi_get_mac_addr(buf);
 #endif
-//FIH-ADD+[
-    if (getwlanmac != 0) {
-        bcopy(cached_mac, buf, ETHER_ADDR_LEN);
-        printk(KERN_INFO "%s:[WIFI] cached MAC address: '%02x:%02x:%02x:%02x:%02x:%02x'\n", __func__,
-                cached_mac[0], cached_mac[1], cached_mac[2], cached_mac[3], cached_mac[4], cached_mac[5]);
-    } else {
-        unsigned char cMacaddr[ETHER_ADDR_LEN];
 
-	    memset(cMacaddr, 0, sizeof(cMacaddr));
-        ret = rpc_nv_read_wlan_mac_addr(cMacaddr);
-
-        if (ret == 0) {
-            fih_wifi_mac_swap(cMacaddr);
-            printk(KERN_INFO "%s:[WIFI] read MAC(nv 4678): '%02x:%02x:%02x:%02x:%02x:%02x\n'", __func__,
-                    cMacaddr[0], cMacaddr[1], cMacaddr[2], cMacaddr[3], cMacaddr[4], cMacaddr[5]);
-            if (cMacaddr[0] == 0x0 && cMacaddr[1] == 0x0 && cMacaddr[2] == 0x0
-                 && cMacaddr[3] == 0x0 && cMacaddr[4] == 0x0 && cMacaddr[5] == 0x0) {
-                printk("%s: zero Mac is not acceptable, return error\n", __func__);
-                return -EINVAL;
-            }
-            else {
-                bcopy(cMacaddr, buf, ETHER_ADDR_LEN);
-                bcopy(cMacaddr, cached_mac, ETHER_ADDR_LEN);
-            }
-#if 0	/* Do not check SoMC mac */
-            if ( fih_mac_is_se_mac(cMacaddr) ) {
-                bcopy(cMacaddr, buf, ETHER_ADDR_LEN);
-                bcopy(cMacaddr, cached_mac, ETHER_ADDR_LEN);
-            } else {
-                printk(KERN_INFO "%s:[WIFI]MAC from NV is not of SEMC\n", __func__);
-                fih_generate_mac(cMacaddr, buf);
-            }
-#endif
-        } else {
-            printk("%s: failed to get MAC address from NV \n", __func__);
-            /* fih_generate_mac(cMacaddr, buf);
-            *
-            * MAC is empty in NV, break from Wi-Fi init function
-            */
-            return -EINVAL;
-        }
-
-        getwlanmac = 1;
-        //Update the new mac address based on NV item 4678
-        printk("[Wlan] MAC address: '%02x:%02x:%02x:%02x:%02x:%02x'\n", cached_mac[0], cached_mac[1], cached_mac[2], cached_mac[3], cached_mac[4], cached_mac[5]);
-    }
-//FIH-ADD+]
 #ifdef EXAMPLE_GET_MAC
 	/* EXAMPLE code */
 	{

@@ -190,6 +190,10 @@ static const unsigned int rpc_vers[] = {
 
 static int pmic_rpc_req_reply(struct pmic_buf *tbuf,
 				struct pmic_buf *rbuf, int proc);
+//Edison add ++
+static int pmic_rpc_set_only_plus(uint data0, uint data1, uint data2, 
+	uint data3,uint data4, uint data5,  int num, int proc);
+//Edison add --        
 static int pmic_rpc_set_only(uint data0, uint data1, uint data2,
 				uint data3, int num, int proc);
 static int pmic_rpc_set_struct(int, uint, uint *data, uint size, int proc);
@@ -379,6 +383,67 @@ static int pmic_rpc_req_reply(struct pmic_buf *tbuf, struct pmic_buf *rbuf,
 
 	return rbuf->len;
 }
+
+//Edison add ++
+static int pmic_rpc_set_only_plus(uint data0, uint data1, uint data2, uint data3,uint data4, uint data5, 
+		int num, int proc)
+{
+	struct pmic_ctrl *pm = &pmic_ctrl;
+	struct pmic_buf	*tp;
+	struct pmic_buf	*rp;
+	int	stat;
+
+
+	if (mutex_lock_interruptible(&pmic_mtx))
+		return -ERESTARTSYS;
+
+	if (pm->inited <= 0) {
+		stat = pmic_buf_init();
+		if (stat < 0) {
+			mutex_unlock(&pmic_mtx);
+			return stat;
+		}
+	}
+
+	tp = &pm->tbuf;
+	rp = &pm->rbuf;
+
+	pmic_buf_reset(tp);
+	pmic_buf_reserve(tp, sizeof(struct rpc_request_hdr));
+	pmic_buf_reset(rp);
+
+	if (num > 0)
+		pmic_put_tx_data(tp, data0);
+
+	if (num > 1)
+		pmic_put_tx_data(tp, data1);
+
+	if (num > 2)
+		pmic_put_tx_data(tp, data2);
+
+	if (num > 3)
+		pmic_put_tx_data(tp, data3);
+	
+	if (num > 4)
+		pmic_put_tx_data(tp, data4);
+	
+	if (num > 5)
+		pmic_put_tx_data(tp, data5);
+	
+	stat = pmic_rpc_req_reply(tp, rp, proc);
+	if (stat < 0) {
+		mutex_unlock(&pmic_mtx);
+		return stat;
+	}
+
+	pmic_pull_rx_data(rp, &stat);	/* result from server */
+
+	mutex_unlock(&pmic_mtx);
+
+	return modem_to_linux_err(stat);
+}
+//Edison add --
+
 
 /**
  * pmic_rpc_set_only() - set arguments and no get
@@ -1264,6 +1329,17 @@ int pmic_gpio_get_value(unsigned gpio)
 	return value ? 1 : 0;
 }
 EXPORT_SYMBOL(pmic_gpio_get_value);
+
+//Edison add ++
+int pmic_gpio_config_digital_output(uint gpio, uint out_buffer_config, uint voltage_source, 
+uint source, uint out_buffer_strength, uint out_inversion)
+{
+	
+	return pmic_rpc_set_only_plus(gpio, out_buffer_config, 
+		voltage_source, source, out_buffer_strength, out_inversion,6,GPIO_CONFIG_DIGITAL_OUTPUT_PROC);
+
+}
+//Edison add --
 
 int pmic_gpio_get_direction(unsigned gpio)
 {

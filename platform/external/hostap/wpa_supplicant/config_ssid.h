@@ -2,14 +2,8 @@
  * WPA Supplicant / Network configuration structures
  * Copyright (c) 2003-2008, Jouni Malinen <j@w1.fi>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #ifndef CONFIG_SSID_H
@@ -30,6 +24,17 @@
 #define DEFAULT_GROUP (WPA_CIPHER_CCMP | WPA_CIPHER_TKIP | \
 		       WPA_CIPHER_WEP104 | WPA_CIPHER_WEP40)
 #define DEFAULT_FRAGMENT_SIZE 1398
+
+#define DEFAULT_DISABLE_HT 0
+#define DEFAULT_DISABLE_HT40 0
+#define DEFAULT_DISABLE_MAX_AMSDU -1 /* no change */
+#define DEFAULT_AMPDU_FACTOR -1 /* no change */
+#define DEFAULT_AMPDU_DENSITY -1 /* no change */
+
+#ifdef CONFIG_WAPI
+#define WAPI_KEY_TYPE_ASCII             0
+#define WAPI_KEY_TYPE_HEX               1
+#endif /* CONFIG_WAPI */
 
 /**
  * struct wpa_ssid - Network configuration data
@@ -123,7 +128,12 @@ struct wpa_ssid {
 	/**
 	 * psk - WPA pre-shared key (256 bits)
 	 */
+
+#ifdef CONFIG_WAPI
+	u8 psk[128];
+#else /* CONFIG_WAPI */
 	u8 psk[32];
+#endif /* CONFIG_WAPI */
 
 	/**
 	 * psk_set - Whether PSK field is configured
@@ -377,6 +387,20 @@ struct wpa_ssid {
 	char *bgscan;
 
 	/**
+	 * ignore_broadcast_ssid - Hide SSID in AP mode
+	 *
+	 * Send empty SSID in beacons and ignore probe request frames that do
+	 * not specify full SSID, i.e., require stations to know SSID.
+	 * default: disabled (0)
+	 * 1 = send empty (length=0) SSID in beacon and ignore probe request
+	 * for broadcast SSID
+	 * 2 = clear SSID (ASCII 0), but keep the original length (this may be
+	 * required with some clients that do not support empty SSID) and
+	 * ignore probe requests for broadcast SSID
+	 */
+	int ignore_broadcast_ssid;
+
+	/**
 	 * freq_list - Array of allowed frequencies or %NULL for all
 	 *
 	 * This is an optional zero-terminated array of frequencies in
@@ -385,6 +409,20 @@ struct wpa_ssid {
 	 * considered when selecting a BSS.
 	 */
 	int *freq_list;
+
+	/**
+	 * p2p_client_list - List of P2P Clients in a persistent group (GO)
+	 *
+	 * This is a list of P2P Clients (P2P Device Address) that have joined
+	 * the persistent group. This is maintained on the GO for persistent
+	 * group entries (disabled == 2).
+	 */
+	u8 *p2p_client_list;
+
+	/**
+	 * num_p2p_clients - Number of entries in p2p_client_list
+	 */
+	size_t num_p2p_clients;
 
 	/**
 	 * p2p_group - Network generated as a P2P group (used internally)
@@ -408,6 +446,54 @@ struct wpa_ssid {
 	 * WPS or similar so that they may be exported.
 	 */
 	int export_keys;
+
+#ifdef CONFIG_HT_OVERRIDES
+	/**
+	 * disable_ht - Disable HT (IEEE 802.11n) for this network
+	 *
+	 * By default, use it if it is available, but this can be configured
+	 * to 1 to have it disabled.
+	 */
+	int disable_ht;
+
+	/**
+	 * disable_ht40 - Disable HT40 for this network
+	 *
+	 * By default, use it if it is available, but this can be configured
+	 * to 1 to have it disabled.
+	 */
+	int disable_ht40;
+
+	/**
+	 * disable_max_amsdu - Disable MAX A-MSDU
+	 *
+	 * A-MDSU will be 3839 bytes when disabled, or 7935
+	 * when enabled (assuming it is otherwise supported)
+	 * -1 (default) means do not apply any settings to the kernel.
+	 */
+	int disable_max_amsdu;
+
+	/**
+	 * ampdu_factor - Maximum A-MPDU Length Exponent
+	 *
+	 * Value: 0-3, see 7.3.2.56.3 in IEEE Std 802.11n-2009.
+	 */
+	int ampdu_factor;
+
+	/**
+	 * ampdu_density - Minimum A-MPDU Start Spacing
+	 *
+	 * Value: 0-7, see 7.3.2.56.3 in IEEE Std 802.11n-2009.
+	 */
+	int ampdu_density;
+
+	/**
+	 * ht_mcs - Allowed HT-MCS rates, in ASCII hex: ffff0000...
+	 *
+	 * By default (empty string): Use whatever the OS has configured.
+	 */
+	char *ht_mcs;
+#endif /* CONFIG_HT_OVERRIDES */
 };
 
 #endif /* CONFIG_SSID_H */

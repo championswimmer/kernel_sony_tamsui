@@ -49,13 +49,6 @@ RenderHTMLCanvas::RenderHTMLCanvas(HTMLCanvasElement* element)
 
 bool RenderHTMLCanvas::requiresLayer() const
 {
-#if PLATFORM(ANDROID)
-    // All Canvas are drawn on their own composited layer
-    // This improves performances a lot (as this simplify
-    // the repaint/inval chain dealing with the PictureSet)
-    return true;
-#endif
-
     if (RenderReplaced::requiresLayer())
         return true;
     
@@ -76,6 +69,12 @@ void RenderHTMLCanvas::paintReplaced(PaintInfo& paintInfo, int tx, int ty)
         static_cast<HTMLCanvasElement*>(node())->enableGpuRendering();
         m_requiresLayer = true;
         m_acceleratedCanvas = true;
+    }else if(!canUseGPU && m_acceleratedCanvas)
+    {
+        static_cast<HTMLCanvasElement*>(node())->setNeedsStyleRecalc(SyntheticStyleChange);
+        static_cast<HTMLCanvasElement*>(node())->disableGpuRendering();
+        m_requiresLayer = false;
+        m_acceleratedCanvas = false;
     }
 }
 

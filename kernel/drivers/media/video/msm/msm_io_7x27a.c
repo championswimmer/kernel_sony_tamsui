@@ -1,5 +1,4 @@
 /* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -392,10 +391,6 @@ void msm_camio_disable(struct platform_device *pdev)
 	CDBG("%s MIPI_PHY_CL_CONTROL val=0x%x\n", __func__, val);
 	msm_io_w(val, csibase + MIPI_PHY_CL_CONTROL);
 	msleep(20);
-	
-	/*FIH-SW3-MM-URI-fix addional power consumption+*/
-	msm_io_w(0x0000, csibase + MIPI_CALIBRATION_CONTROL); 
-	 /*FIH-SW3-MM-URI-fix addional power consumption-*/
 
 	free_irq(camio_ext.csiirq, 0);
 	iounmap(csibase);
@@ -420,25 +415,18 @@ int msm_camio_sensor_clk_on(struct platform_device *pdev)
 	camio_ext = camdev->ioext;
 	camio_clk = camdev->ioclk;
 
-    /* FIH-SW3-MM-SL-CameraPorting-00*{ */
-	/*rc = camdev->camera_gpio_on();
+	rc = camdev->camera_gpio_on();
 	if (rc < 0)
 		return rc;
-	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);*/
-    return rc;
-    /* FIH-SW3-MM-SL-CameraPorting-00*} */
+	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
 }
 
 int msm_camio_sensor_clk_off(struct platform_device *pdev)
 {
-   /* FIH-SW3-MM-SL-CameraPorting-00*{ */
-	/*const struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
+	const struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
 	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
 	camdev->camera_gpio_off();
-	return msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);*/
-	msm_camio_set_perf_lvl(S_EXIT);
-    return 0;
-    /* FIH-SW3-MM-SL-CameraPorting-00*} */
+	return msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
 
 }
 
@@ -483,21 +471,17 @@ int msm_camio_probe_on(struct platform_device *pdev)
 	msm_camio_clk_enable(CAMIO_CSI0_PCLK);
 	msm_camio_clk_enable(CAMIO_CSI1_PCLK);
 
-	/* FIH-SW3-MM-SL-CameraPorting-00*{ */
-	/*rc = camdev->camera_gpio_on();
+	rc = camdev->camera_gpio_on();
 	if (rc < 0)
 		return rc;
-	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);*/
-	return rc;
-	/* FIH-SW3-MM-SL-CameraPorting-00*} */
+	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
 }
-/*MM-UW-reduce boot time+++*/
-/*MM-UW-reduce boot time+01*/
+
 int msm_camio_probe_off(struct platform_device *pdev)
 {
 	const struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
 	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
-	//camdev->camera_gpio_off();
+	camdev->camera_gpio_off();
 
 	csibase = ioremap(camdev->ioext.csiphy, camdev->ioext.csisz);
 	if (!csibase) {
@@ -509,11 +493,9 @@ int msm_camio_probe_off(struct platform_device *pdev)
 ioremap_fail:
 	msm_camio_clk_disable(CAMIO_CSI0_PCLK);
 	msm_camio_clk_disable(CAMIO_CSI1_PCLK);
-	//return msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
-	return 0;
+	return msm_camio_clk_disable(CAMIO_CAM_MCLK_CLK);
 }
-/*MM-UW-reduce boot time-01*/
-/*MM-UW-reduce boot time---*/
+
 int msm_camio_csi_config(struct msm_camera_csi_params *csi_params)
 {
 	int rc = 0;

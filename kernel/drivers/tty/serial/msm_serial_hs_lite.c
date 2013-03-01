@@ -1,7 +1,6 @@
 /*
  * drivers/serial/msm_serial.c - driver for msm7k serial device and console
  *
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
@@ -48,12 +47,6 @@
 #include <mach/msm_serial_hs_lite.h>
 #include <asm/mach-types.h>
 #include "msm_serial_hs_hwreg.h"
-
- /* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+[ */ 
-#ifdef CONFIG_FEATURE_FIH_SW3_REMOVE_SERIAL_DYNAMICALLY
-extern unsigned int fih_read_uart_switch_from_nv(void);
-#endif
- /* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+] */ 
 
 struct msm_hsl_port {
 	struct uart_port	uart;
@@ -130,7 +123,7 @@ static struct of_device_id msm_hsl_match_table[] = {
 	{}
 };
 static struct dentry *debug_base;
-static inline void wait_for_xmitr(struct uart_port *port, int bits);
+static inline void wait_for_xmitr(struct uart_port *port);
 static int get_console_state(struct uart_port *port);
 static inline void msm_hsl_write(struct uart_port *port,
 				 unsigned int val, unsigned int off)
@@ -395,15 +388,16 @@ static void handle_tx(struct uart_port *port)
 
 	/* Handle x_char */
 	if (port->x_char) {
-		wait_for_xmitr(port, UARTDM_ISR_TX_READY_BMSK);
-		msm_hsl_write(port, tx_count + 1,
-			regmap[vid][UARTDM_NCF_TX]);
+		wait_for_xmitr(port);
+		msm_hsl_write(port, tx_count + 1, regmap[vid][UARTDM_NCF_TX]);
+		msm_hsl_read(port, regmap[vid][UARTDM_NCF_TX]);
 		msm_hsl_write(port, port->x_char, regmap[vid][UARTDM_TF]);
 		port->icount.tx++;
 		port->x_char = 0;
 	} else if (tx_count) {
-		wait_for_xmitr(port, UARTDM_ISR_TX_READY_BMSK);
+		wait_for_xmitr(port);
 		msm_hsl_write(port, tx_count, regmap[vid][UARTDM_NCF_TX]);
+		msm_hsl_read(port, regmap[vid][UARTDM_NCF_TX]);
 	}
 	if (!tx_count) {
 		msm_hsl_stop_tx(port);
@@ -652,8 +646,8 @@ static void msm_hsl_set_baud_rate(struct uart_port *port, unsigned int baud)
 		break;
 	}
 
-	/* Set timeout to be ~100x the character transmit time */
-	msm_hsl_port->tx_timeout = 1000000000 / baud;
+	/* Set timeout to be ~600x the character transmit time */
+	msm_hsl_port->tx_timeout = (1000000000 / baud) * 6;
 
 	vid = msm_hsl_port->ver_id;
 	msm_hsl_write(port, baud_code, regmap[vid][UARTDM_CSR]);
@@ -1131,7 +1125,7 @@ static void dump_hsl_regs(struct uart_port *port)
 /*
  *  Wait for transmitter & holding register to empty
  *  Derived from wait_for_xmitr in 8250 serial driver by Russell King  */
-void wait_for_xmitr(struct uart_port *port, int bits)
+static void wait_for_xmitr(struct uart_port *port)
 {
 	struct msm_hsl_port *msm_hsl_port = UART_TO_MSM(port);
 	unsigned int vid = msm_hsl_port->ver_id;
@@ -1139,8 +1133,8 @@ void wait_for_xmitr(struct uart_port *port, int bits)
 
 	if (!(msm_hsl_read(port, regmap[vid][UARTDM_SR]) &
 			UARTDM_SR_TXEMT_BMSK)) {
-		while ((msm_hsl_read(port, regmap[vid][UARTDM_ISR]) &
-					bits) != bits) {
+		while (!(msm_hsl_read(port, regmap[vid][UARTDM_ISR]) &
+			UARTDM_ISR_TX_READY_BMSK)) {
 			udelay(1);
 			touch_nmi_watchdog();
 			cpu_relax();
@@ -1158,7 +1152,7 @@ static void msm_hsl_console_putchar(struct uart_port *port, int ch)
 {
 	unsigned int vid = UART_TO_MSM(port)->ver_id;
 
-	wait_for_xmitr(port, UARTDM_ISR_TX_READY_BMSK);
+	wait_for_xmitr(port);
 	msm_hsl_write(port, 1, regmap[vid][UARTDM_NCF_TX]);
 	/*
 	 * Dummy read to add 1 AHB clock delay to fix UART hardware bug.
@@ -1201,7 +1195,7 @@ static int msm_hsl_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port;
 	unsigned int vid;
-	int baud = 0, flow, bits, parity;
+	int baud = 0, flow, bits, parity, mr2;
 	int ret;
 
 	if (unlikely(co->index >= UART_NR || co->index < 0))
@@ -1236,10 +1230,19 @@ static int msm_hsl_console_setup(struct console *co, char *options)
 	msm_hsl_set_baud_rate(port, baud);
 
 	ret = uart_set_options(port, co, baud, parity, bits, flow);
+
+	mr2 = msm_hsl_read(port, regmap[vid][UARTDM_MR2]);
+	mr2 |= UARTDM_MR2_RX_ERROR_CHAR_OFF;
+	mr2 |= UARTDM_MR2_RX_BREAK_ZERO_CHAR_OFF;
+	msm_hsl_write(port, mr2, regmap[vid][UARTDM_MR2]);
+
 	msm_hsl_reset(port);
 	/* Enable transmitter */
 	msm_hsl_write(port, CR_PROTECTION_EN, regmap[vid][UARTDM_CR]);
 	msm_hsl_write(port, UARTDM_CR_TX_EN_BMSK, regmap[vid][UARTDM_CR]);
+
+	msm_hsl_write(port, 1, regmap[vid][UARTDM_NCF_TX]);
+	msm_hsl_read(port, regmap[vid][UARTDM_NCF_TX]);
 
 	printk(KERN_INFO "msm_serial_hsl: console setup on port #%d\n",
 	       port->line);
@@ -1559,18 +1562,6 @@ static int __init msm_serial_hsl_init(void)
 {
 	int ret;
 
-#ifdef CONFIG_FEATURE_FIH_SW3_REMOVE_SERIAL_DYNAMICALLY
-	int enable_uart = 0;
-
-	enable_uart = fih_read_uart_switch_from_nv(); 
-
-	if( !enable_uart )
-	{
-		pr_info("%s(): Disable UART console\n", __func__);
-		return 0;
-	}
-#endif
-
 	ret = uart_register_driver(&msm_hsl_uart_driver);
 	if (unlikely(ret))
 		return ret;
@@ -1590,24 +1581,7 @@ static int __init msm_serial_hsl_init(void)
 
 static void __exit msm_serial_hsl_exit(void)
 {
-
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+[ */
-/*FIH-KERNEL-SC-console-suspend-00*[*/
-
-#ifdef CONFIG_FEATURE_FIH_SW3_REMOVE_SERIAL_DYNAMICALLY
-    int enable_uart = 0;
-
-	enable_uart = fih_read_uart_switch_from_nv(); 
-
-	if( !enable_uart )
-	{
-        return;
-    }
-#endif
-
 	debugfs_remove_recursive(debug_base);
-/*FIH-KERNEL-SC-console-suspend-00*]*/
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00+] */     
 #ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	unregister_console(&msm_hsl_console);
 #endif

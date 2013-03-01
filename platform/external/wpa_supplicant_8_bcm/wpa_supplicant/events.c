@@ -1,7 +1,6 @@
 /*
  * WPA Supplicant - Driver event processing
  * Copyright (c) 2003-2011, Jouni Malinen <j@w1.fi>
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -558,7 +557,7 @@ static struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 
 	e = wpa_blacklist_get(wpa_s, bss->bssid);
 	if (e) {
-		int limit = 5;  //MTD_CONN_EC_AssociateFailRetry-02*
+		int limit = 1;
 		if (wpa_supplicant_enabled_networks(wpa_s->conf) == 1) {
 			/*
 			 * When only a single network is enabled, we can
@@ -568,25 +567,11 @@ static struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 			 * single error if there are no other BSSes of the
 			 * current ESS.
 			 */
-			limit = 5;  //MTD_CONN_EC_AssociateFailRetry-02*
+			limit = 0;
 		}
-		wpa_dbg(wpa_s, MSG_DEBUG, "%s (blacklist count=%d limit=%d), ssid='%s'", __func__, e->count, limit, wpa_ssid_txt(ssid_, ssid_len));  //MTD_CONN_EC_AssociateFailRetry-01+
 		if (e->count > limit) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - blacklisted "
 				"(count=%d limit=%d)", e->count, limit);
-//MTD_CONN_EC_AssociateFailRetry-01+[
-            for (ssid = group; ssid; ssid = ssid->pnext) {
-                if (ssid_len != ssid->ssid_len || os_memcmp(ssid_, ssid->ssid, ssid_len) != 0) {
-                    continue;
-                } else {
-                    if (ssid->disabled == 0) {
-                        wpa_supplicant_disable_network(wpa_s, ssid);
-                        wpa_dbg(wpa_s, MSG_DEBUG, "%s disable network ssid(%s)", __func__, wpa_ssid_txt(ssid_, ssid_len));
-                    }
-                    break;
-                }
-            }
-//MTD_CONN_EC_AssociateFailRetry-01+]
 			return NULL;
 		}
 	}
@@ -781,7 +766,6 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s,
 	}
 #endif
 
-	wpa_printf(MSG_DEBUG, " * Try to find non-WAPI AP");  //MTD_CONN_EC_AssociateFailRetry-01+
 	for (i = 0; i < scan_res->num; i++) {
 		struct wpa_scan_res *bss = scan_res->res[i];
 		const u8 *ie, *ssid;
@@ -1147,7 +1131,6 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 
 	if (selected) {
 		int skip;
-        wpa_dbg(wpa_s, MSG_DEBUG, "selected " MACSTR " ssid='%s'", MAC2STR(selected->bssid), wpa_ssid_txt(selected->ssid, selected->ssid_len));  //MTD_CONN_EC_AssociateFailRetry-01+
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid,
 						    scan_res);
 		wpa_scan_results_free(scan_res);

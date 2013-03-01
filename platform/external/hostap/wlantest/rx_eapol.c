@@ -2,14 +2,8 @@
  * Received Data frame processing for EAPOL messages
  * Copyright (c) 2010, Jouni Malinen <j@w1.fi>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "utils/includes.h"
@@ -326,8 +320,8 @@ static u8 * decrypt_eapol_key_data(const u8 *kek, u16 ver,
 }
 
 
-static void learn_kde_keys(struct wlantest_bss *bss, const u8 *buf, size_t len,
-			   const u8 *rsc)
+static void learn_kde_keys(struct wlantest_bss *bss, struct wlantest_sta *sta,
+			   const u8 *buf, size_t len, const u8 *rsc)
 {
 	struct wpa_eapol_ie_parse ie;
 
@@ -361,7 +355,9 @@ static void learn_kde_keys(struct wlantest_bss *bss, const u8 *buf, size_t len,
 			wpa_hexdump(MSG_DEBUG, "GTK", ie.gtk + 2,
 				    ie.gtk_len - 2);
 			bss->gtk_len[id] = ie.gtk_len - 2;
+			sta->gtk_len = ie.gtk_len - 2;
 			os_memcpy(bss->gtk[id], ie.gtk + 2, ie.gtk_len - 2);
+			os_memcpy(sta->gtk, ie.gtk + 2, ie.gtk_len - 2);
 			bss->rsc[id][0] = rsc[5];
 			bss->rsc[id][1] = rsc[4];
 			bss->rsc[id][2] = rsc[3];
@@ -369,6 +365,7 @@ static void learn_kde_keys(struct wlantest_bss *bss, const u8 *buf, size_t len,
 			bss->rsc[id][4] = rsc[1];
 			bss->rsc[id][5] = rsc[0];
 			bss->gtk_idx = id;
+			sta->gtk_idx = id;
 			wpa_hexdump(MSG_DEBUG, "RSC", bss->rsc[id], 6);
 		} else {
 			wpa_printf(MSG_INFO, "Invalid GTK KDE length %u",
@@ -417,7 +414,7 @@ static void rx_data_eapol_key_3_of_4(struct wlantest *wt, const u8 *dst,
 	struct wlantest_sta *sta;
 	const struct ieee802_1x_hdr *eapol;
 	const struct wpa_eapol_key *hdr;
-	const u8 *key_data, *kck;
+	const u8 *key_data, *kck, *kek;
 	int recalc = 0;
 	u16 key_info, ver;
 	u8 *decrypted_buf = NULL;
@@ -454,10 +451,12 @@ static void rx_data_eapol_key_3_of_4(struct wlantest *wt, const u8 *dst,
 		return;
 	}
 
+	kek = sta->ptk.kek;
 	kck = sta->ptk.kck;
 	if (sta->tptk_set) {
 		wpa_printf(MSG_DEBUG, "Use TPTK for validation EAPOL-Key MIC");
 		kck = sta->tptk.kck;
+		kek = sta->tptk.kek;
 	}
 	if (check_mic(kck, key_info & WPA_KEY_INFO_TYPE_MASK, data, len) < 0) {
 		wpa_printf(MSG_INFO, "Mismatch in EAPOL-Key 3/4 MIC");
@@ -474,7 +473,7 @@ static void rx_data_eapol_key_3_of_4(struct wlantest *wt, const u8 *dst,
 		decrypted_len = WPA_GET_BE16(hdr->key_data_length);
 	} else {
 		ver = key_info & WPA_KEY_INFO_TYPE_MASK;
-		decrypted_buf = decrypt_eapol_key_data(sta->ptk.kek, ver, hdr,
+		decrypted_buf = decrypt_eapol_key_data(kek, ver, hdr,
 						       &decrypted_len);
 		if (decrypted_buf == NULL) {
 			wpa_printf(MSG_INFO, "Failed to decrypt EAPOL-Key Key "
@@ -559,7 +558,7 @@ static void rx_data_eapol_key_3_of_4(struct wlantest *wt, const u8 *dst,
 			    bss->rsnie[0] ? 2 + bss->rsnie[1] : 0);
 	}
 
-	learn_kde_keys(bss, decrypted, decrypted_len, hdr->key_rsc);
+	learn_kde_keys(bss, sta, decrypted, decrypted_len, hdr->key_rsc);
 	os_free(decrypted_buf);
 }
 
@@ -709,7 +708,8 @@ static void rx_data_eapol_key_1_of_2(struct wlantest *wt, const u8 *dst,
 				     decrypted, plain_len);
 	}
 	if (sta->proto & WPA_PROTO_RSN)
-		learn_kde_keys(bss, decrypted, decrypted_len, hdr->key_rsc);
+		learn_kde_keys(bss, sta, decrypted, decrypted_len,
+			       hdr->key_rsc);
 	else {
 		int klen = bss->group_cipher == WPA_CIPHER_TKIP ? 32 : 16;
 		if (decrypted_len == klen) {

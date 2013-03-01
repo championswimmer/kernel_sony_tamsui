@@ -1,5 +1,4 @@
 /*
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (C) 2008 Google, Inc.
  * Copyright (c) 2009-2011 Code Aurora Forum. All rights reserved.
  * Author: San Mehat <san@google.com>
@@ -697,17 +696,6 @@ msmrtc_alarmtimer_expired(unsigned long _data,
 	rtc_update_irq(rtc_pdata->rtc, 1, RTC_IRQF | RTC_AF);
 	rtc_pdata->rtcalarm_time = 0;
 }
-/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+[ */
-#ifdef CONFIG_FIH_SW3_BATTERY
-static int RPC_wakeup_cycle_time = 0;
-void msmrtc_set_wakeup_cycle_time(int cycle_time)
-{
-    pr_info("%s, cycle time = %d\n", __func__, cycle_time);    
-    RPC_wakeup_cycle_time = cycle_time;
-}
-EXPORT_SYMBOL(msmrtc_set_wakeup_cycle_time);
-#endif
-/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+] */
 
 static int
 msmrtc_suspend(struct platform_device *dev, pm_message_t state)
@@ -727,13 +715,6 @@ msmrtc_suspend(struct platform_device *dev, pm_message_t state)
 		}
 		rtc_tm_to_time(&tm, &now);
 		diff = rtc_pdata->rtcalarm_time - now;
-        
-/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+[ */
-#ifdef CONFIG_FIH_SW3_BATTERY
-        if (diff > RPC_wakeup_cycle_time && RPC_wakeup_cycle_time != 0)
-            diff = RPC_wakeup_cycle_time;
-#endif
-
 		if (diff <= 0) {
 			msmrtc_alarmtimer_expired(1 , rtc_pdata);
 			msm_pm_set_max_sleep_time(0);
@@ -742,14 +723,8 @@ msmrtc_suspend(struct platform_device *dev, pm_message_t state)
 		}
 		msm_pm_set_max_sleep_time((int64_t)
 			((int64_t) diff * NSEC_PER_SEC));
-	} else {
-#ifdef CONFIG_FIH_SW3_BATTERY
-		msm_pm_set_max_sleep_time((int64_t) ((int64_t) RPC_wakeup_cycle_time * NSEC_PER_SEC));
-#else
+	} else
 		msm_pm_set_max_sleep_time(0);
-#endif
-	}
-/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+] */
 	atomic_inc(&suspend_state.state);
 	return 0;
 }

@@ -249,6 +249,11 @@ static inline void suspend_thaw_processes(void)
 #ifdef CONFIG_WAKELOCK
 /* kernel/power/wakelock.c */
 extern struct workqueue_struct *suspend_work_queue;
+//[Arima Edison] add a queue to separate suspend work and earlysuspend work to test back screen issue++
+#ifdef CONFIG_SET_EARLYSUSPEND_WORK_QUEUE 
+extern struct workqueue_struct *earlysuspend_work_queue;
+#endif
+//[Arima Edison] add a queue to separate suspend work and earlysuspend work to test back screen issue--
 extern struct wake_lock main_wake_lock;
 extern suspend_state_t requested_suspend_state;
 extern void suspend_sys_sync_queue(void);

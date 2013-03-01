@@ -1779,8 +1779,10 @@ static char *one_opt(int option, char *arg, char *gen_prob, int nest)
 		      case 'S':
 			a[leasepos][strlen(a[leasepos]) - 1] = 0;
 		      }
-		    
-		    new->lease_time = atoi(a[leasepos]) * fac;
+		    //felexching 20120624 Set DHCP lease time to 24hr
+		    //new->lease_time = atoi(a[leasepos]) * fac;
+			new->lease_time = DEFLEASE;
+			//felexching 20120624 Set DHCP lease time to 24hr
 		    /* Leases of a minute or less confuse
 		       some clients, notably Apple's */
 		    if (new->lease_time < 120)
@@ -1921,7 +1923,10 @@ static char *one_opt(int option, char *arg, char *gen_prob, int nest)
 		}
 	      else
 		{
-		  new->lease_time = atoi(a[j]) * fac; 
+		  //felexching 20120624 Set DHCP lease time to 24hr
+		  //new->lease_time = atoi(a[j]) * fac;
+		  new->lease_time = DEFLEASE;
+		  //felexching 20120624 Set DHCP lease time to 24hr
 		  /* Leases of a minute or less confuse
 		     some clients, notably Apple's */
 		  if (new->lease_time < 120)

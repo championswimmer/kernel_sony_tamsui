@@ -1,7 +1,6 @@
 /*
  *  linux/kernel/time/tick-sched.c
  *
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright(C) 2005-2006, Thomas Gleixner <tglx@linutronix.de>
  *  Copyright(C) 2005-2007, Red Hat, Inc., Ingo Molnar
  *  Copyright(C) 2006-2007  Timesys Corp., Thomas Gleixner
@@ -27,12 +26,11 @@
 
 #include "tick-internal.h"
 
+
 struct rq_data rq_info;
 struct workqueue_struct *rq_wq;
 spinlock_t rq_lock;
 
-extern long get_cpu_usage(void);
-extern void count_cpu_time(void);
 /*
  * Per cpu nohz control structure
  */
@@ -88,8 +86,6 @@ static void tick_do_update_jiffies64(ktime_t now)
 		tick_next_period = ktime_add(last_jiffies_update, tick_period);
 	}
 	write_sequnlock(&xtime_lock);
-	
-	count_cpu_time();
 }
 
 /*

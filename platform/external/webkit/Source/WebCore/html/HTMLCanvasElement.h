@@ -108,6 +108,7 @@ public:
     void disableGpuRendering()  {   m_gpuRendering = false;    }
     bool isUsingGpuRendering()  {   return m_gpuRendering;  }
     void setSupportedCompositing(bool val)   {   m_supportedCompositing = val;   }
+    static void setGLEnabled(bool val)       {   s_glEnabled = val;              }
 #endif
 
     GraphicsContext* drawingContext() const;
@@ -194,7 +195,9 @@ private:
     bool m_canUseGpuRendering;
     bool m_gpuRendering;
     bool m_supportedCompositing;
+    bool m_gpuAccelerationStatus;
     static int s_canvas_id; //Canvas Ids TODO::recycle and overflow checks
+    static bool s_glEnabled;
     CanvasLayerAndroid* m_canvasLayer;
 #endif
 };

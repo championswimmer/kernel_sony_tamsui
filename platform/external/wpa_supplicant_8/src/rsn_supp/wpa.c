@@ -2556,6 +2556,7 @@ int wpa_sm_set_ap_wpa_ie(struct wpa_sm *sm, const u8 *ie, size_t len)
 	return 0;
 }
 
+
 /**
  * wpa_sm_set_ap_rsn_ie - Set AP RSN IE from Beacon/ProbeResp
  * @sm: Pointer to WPA state machine data from wpa_sm_init()

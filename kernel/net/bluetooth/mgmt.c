@@ -308,7 +308,7 @@ static void mgmt_pending_foreach(u16 opcode, int index,
 
 		cmd = list_entry(p, struct pending_cmd, list);
 
-		if (cmd->opcode != opcode)
+		if (opcode > 0 && cmd->opcode != opcode)
 			continue;
 
 		if (index >= 0 && cmd->index != index)
@@ -1353,20 +1353,23 @@ static int encrypt_link(struct sock *sk, u16 index, unsigned char *data,
 	if (!hdev)
 		return cmd_status(sk, index, MGMT_OP_ENCRYPT_LINK, ENODEV);
 
-	hci_dev_lock(hdev);
+	hci_dev_lock_bh(hdev);
 
 	if (!test_bit(HCI_UP, &hdev->flags)) {
 		err = cmd_status(sk, index, MGMT_OP_ENCRYPT_LINK, ENETDOWN);
-		goto failed;
+		goto done;
 	}
 
-	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK,
-					&cp->bdaddr);
-	if (!conn)
-		return cmd_status(sk, index, MGMT_OP_ENCRYPT_LINK, ENOTCONN);
+	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &cp->bdaddr);
+	if (!conn) {
+		err = cmd_status(sk, index, MGMT_OP_ENCRYPT_LINK, ENOTCONN);
+		goto done;
+	}
 
-	if (test_and_set_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend))
-		return cmd_status(sk, index, MGMT_OP_ENCRYPT_LINK, EINPROGRESS);
+	if (test_and_set_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend)) {
+		err = cmd_status(sk, index, MGMT_OP_ENCRYPT_LINK, EINPROGRESS);
+		goto done;
+	}
 
 	if (conn->link_mode & HCI_LM_AUTH) {
 		enc.handle = cpu_to_le16(conn->handle);
@@ -1383,8 +1386,8 @@ static int encrypt_link(struct sock *sk, u16 index, unsigned char *data,
 		}
 	}
 
-failed:
-	hci_dev_unlock(hdev);
+done:
+	hci_dev_unlock_bh(hdev);
 	hci_dev_put(hdev);
 
 	return err;
@@ -1620,8 +1623,8 @@ static int pair_device(struct sock *sk, u16 index, unsigned char *data, u16 len)
 
 	entry = hci_find_adv_entry(hdev, &cp->bdaddr);
 	if (entry && entry->flags & 0x04) {
-		conn = hci_connect(hdev, LE_LINK, 0, &cp->bdaddr, sec_level,
-								auth_type);
+		conn = hci_le_connect(hdev, 0, &cp->bdaddr, sec_level,
+							auth_type, NULL);
 	} else {
 		/* ACL-SSP does not support io_cap 0x04 (KeyboadDisplay) */
 		if (io_cap == 0x04)
@@ -1823,7 +1826,7 @@ static int set_rssi_reporter(struct sock *sk, u16 index,
 		return cmd_status(sk, index, MGMT_OP_SET_RSSI_REPORTER,
 							ENODEV);
 
-	hci_dev_lock(hdev);
+	hci_dev_lock_bh(hdev);
 
 	conn = hci_conn_hash_lookup_ba(hdev, LE_LINK, &cp->bdaddr);
 
@@ -1838,7 +1841,7 @@ static int set_rssi_reporter(struct sock *sk, u16 index,
 			__le16_to_cpu(cp->interval), cp->updateOnThreshExceed);
 
 failed:
-	hci_dev_unlock(hdev);
+	hci_dev_unlock_bh(hdev);
 	hci_dev_put(hdev);
 
 	return err;
@@ -1862,7 +1865,7 @@ static int unset_rssi_reporter(struct sock *sk, u16 index,
 		return cmd_status(sk, index, MGMT_OP_UNSET_RSSI_REPORTER,
 					ENODEV);
 
-	hci_dev_lock(hdev);
+	hci_dev_lock_bh(hdev);
 
 	conn = hci_conn_hash_lookup_ba(hdev, LE_LINK, &cp->bdaddr);
 
@@ -1875,7 +1878,7 @@ static int unset_rssi_reporter(struct sock *sk, u16 index,
 	hci_conn_unset_rssi_reporter(conn);
 
 failed:
-	hci_dev_unlock(hdev);
+	hci_dev_unlock_bh(hdev);
 	hci_dev_put(hdev);
 
 	return err;
@@ -2126,9 +2129,10 @@ static int start_discovery(struct sock *sk, u16 index)
 
 	err = hci_send_cmd(hdev, HCI_OP_INQUIRY, sizeof(cp), &cp);
 
-	if (err < 0)
+	if (err < 0) {
 		mgmt_pending_remove(cmd);
-	else if (lmp_le_capable(hdev)) {
+		hdev->disco_state = SCAN_IDLE;
+	} else if (lmp_le_capable(hdev)) {
 		cmd = mgmt_pending_find(MGMT_OP_STOP_DISCOVERY, index);
 		if (!cmd)
 			mgmt_pending_add(sk, MGMT_OP_STOP_DISCOVERY, index,
@@ -2140,7 +2144,8 @@ static int start_discovery(struct sock *sk, u16 index)
 		del_timer(&hdev->disco_timer);
 		mod_timer(&hdev->disco_timer,
 				jiffies + msecs_to_jiffies(20000));
-	}
+	} else
+		hdev->disco_state = SCAN_BR;
 
 failed:
 	hci_dev_unlock_bh(hdev);
@@ -2184,9 +2189,7 @@ static int stop_discovery(struct sock *sk, u16 index)
 			err = cmd_complete(sk, index, MGMT_OP_STOP_DISCOVERY,
 								NULL, 0);
 		}
-	}
-
-	if (err < 0)
+	} else if (state == SCAN_BR)
 		err = hci_send_cmd(hdev, HCI_OP_INQUIRY_CANCEL, 0, NULL);
 
 	cmd = mgmt_pending_find(MGMT_OP_STOP_DISCOVERY, index);
@@ -2472,6 +2475,14 @@ done:
 	return err;
 }
 
+static void cmd_status_rsp(struct pending_cmd *cmd, void *data)
+{
+	u8 *status = data;
+
+	cmd_status(cmd->sk, cmd->index, cmd->opcode, *status);
+	mgmt_pending_remove(cmd);
+}
+
 int mgmt_index_added(u16 index)
 {
 	BT_DBG("%d", index);
@@ -2480,7 +2491,12 @@ int mgmt_index_added(u16 index)
 
 int mgmt_index_removed(u16 index)
 {
+	u8 status = ENODEV;
+
 	BT_DBG("%d", index);
+
+	mgmt_pending_foreach(0, index, cmd_status_rsp, &status);
+
 	return mgmt_event(MGMT_EV_INDEX_REMOVED, index, NULL, 0, NULL);
 }
 
@@ -2518,6 +2534,11 @@ int mgmt_powered(u16 index, u8 powered)
 	BT_DBG("hci%u %d", index, powered);
 
 	mgmt_pending_foreach(MGMT_OP_SET_POWERED, index, mode_rsp, &match);
+
+	if (!powered) {
+		u8 status = ENETDOWN;
+		mgmt_pending_foreach(0, index, cmd_status_rsp, &status);
+	}
 
 	ev.val = powered;
 

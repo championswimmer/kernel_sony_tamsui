@@ -49,16 +49,3 @@ obj-$(CONFIG_PM8XXX_CCADC)	+= pm8xxx-ccadc.o
 obj-$(CONFIG_PM8921_BMS)	+= pm8921-bms.o
 obj-$(CONFIG_PM8921_CHARGER)	+= pm8921-charger.o
 obj-$(CONFIG_LTC4088_CHARGER)	+= ltc4088-charger.o
-
-# FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00*[
-ifeq ($(TARGET_BUILD_VARIANT),userdebug)
- ccflags-y += -DGAUGE_ENABLE_EXTRA_LOG
-endif
-obj-$(CONFIG_FIH_SW3_BATTERY)	+= fih_bq27520_fuelgauger.o
-obj-$(CONFIG_FIH_SW3_BATTERY)	+= fih_msm_battery.o
-obj-$(CONFIG_FIH_PROJECT_GUA)	+= fih_bqfs_gua.o
-obj-$(CONFIG_FIH_PROJECT_TAP)	+= fih_bqfs_tap.o
-obj-$(CONFIG_FIH_PROJECT_MES)	+= fih_bqfs_mes.o
-obj-$(CONFIG_FIH_PROJECT_JLO)	+= fih_bqfs_jlo.o
-obj-$(CONFIG_FIH_SW3_BQ275X0_ROMMODE)	+= fih_bq275x0_RomMode.o
-# FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00*]

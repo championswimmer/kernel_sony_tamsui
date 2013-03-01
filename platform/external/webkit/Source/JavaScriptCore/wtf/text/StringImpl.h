@@ -198,7 +198,10 @@ public:
     static PassRefPtr<StringImpl> adopt(StringBuffer&);
 
     SharedUChar* sharedBuffer();
-    const UChar* characters() const { return m_data; }
+    // Arima Rockyang modified 20120620 - pointer check
+    //const UChar* characters() const { return m_data; }
+    const UChar* characters() const { ASSERT(m_data); return m_data; }
+    // Arima Rockyang modified end
 
     size_t cost()
     {

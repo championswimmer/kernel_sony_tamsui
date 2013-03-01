@@ -2,7 +2,6 @@
  * Gadget Function Driver for MTP
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * Author: Mike Lockwood <lockwood@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -228,8 +227,7 @@ static u8 mtp_os_string[] = {
 	/* padding */
 	0
 };
-//MTD-CONN-EH-PCCOMPANION-01*{
-#if 0
+
 /* Microsoft Extended Configuration Descriptor Header Section */
 struct mtp_ext_config_desc_header {
 	__le32	dwLength;
@@ -247,26 +245,7 @@ struct mtp_ext_config_desc_function {
 	__u8	subCompatibleID[8];
 	__u8	reserved[6];
 };
-#else
-struct ms_ext_compatID_desc_head {
-	unsigned int dwLength;
-	unsigned short bcdVersion;
-	unsigned short wIndex;
-	unsigned char bCount;
-	unsigned char reserved[7];
-};
 
-/* extend compat ID descriptor(data section) */
-struct ms_ext_compatID_desc_data{
-	unsigned char bFirstInterfaceNumber;
-	unsigned char reserved1;
-	unsigned char compatibleID[8];
-	unsigned char subCompatibleID[8];
-	unsigned char reserved2[6];
-};
-#endif
-
-#if 0
 /* MTP Extended Configuration Descriptor */
 struct {
 	struct mtp_ext_config_desc_header	header;
@@ -284,8 +263,65 @@ struct {
 		.compatibleID = { 'M', 'T', 'P' },
 	},
 };
-#endif
-//MTD-CONN-EH-PCCOMPANION-01*}
+
+// << FerryWu, 2012/09/20, fix WINXP standard MTP driver not working issue
+/* MTP + ADB */
+struct {
+	struct mtp_ext_config_desc_header	header;
+	struct mtp_ext_config_desc_function    f_mtp;
+	struct mtp_ext_config_desc_function    f_adb;
+} mtp_adb_ext_config_desc = {
+	.header = {
+		.dwLength = __constant_cpu_to_le32(sizeof(mtp_adb_ext_config_desc)),
+		.bcdVersion = __constant_cpu_to_le16(0x0100),
+		.wIndex = __constant_cpu_to_le16(4),
+		.bCount = __constant_cpu_to_le16(2),
+	},
+	.f_mtp = {
+		.bFirstInterfaceNumber = 0,
+		.bInterfaceCount = 1,
+		.compatibleID = { 'M', 'T', 'P' },
+	},
+	.f_adb = {
+		.bFirstInterfaceNumber = 1,
+		.bInterfaceCount = 1,
+	},
+};
+
+/* MTP + ADB eng mode */
+struct {
+	struct mtp_ext_config_desc_header	header;
+	struct mtp_ext_config_desc_function    f_diag;
+	struct mtp_ext_config_desc_function    f_adb;
+	struct mtp_ext_config_desc_function    f_serial;
+	struct mtp_ext_config_desc_function    f_mtp;
+} mtp_adb_eng_ext_config_desc = {
+	.header = {
+		.dwLength = __constant_cpu_to_le32(sizeof(mtp_adb_eng_ext_config_desc)),
+		.bcdVersion = __constant_cpu_to_le16(0x0100),
+		.wIndex = __constant_cpu_to_le16(4),
+		.bCount = __constant_cpu_to_le16(4),
+	},
+	.f_diag = {
+		.bFirstInterfaceNumber = 0,
+		.bInterfaceCount = 1,
+	},
+	.f_adb = {
+		.bFirstInterfaceNumber = 1,
+		.bInterfaceCount = 1,
+	},
+	.f_serial = {
+		.bFirstInterfaceNumber = 2,
+		.bInterfaceCount = 2,
+	},
+	.f_mtp = {
+		.bFirstInterfaceNumber = 4,
+		.bInterfaceCount = 1,
+		.compatibleID = { 'M', 'T', 'P' },
+	},
+};
+// >> FerryWu, 2012/09/20, fix WINXP standard MTP driver not working issue
+
 struct mtp_device_status {
 	__le16	wLength;
 	__le16	wCode;
@@ -508,13 +544,6 @@ requeue_req:
 	req = dev->rx_req[0];
 	req->length = count;
 	dev->rx_done = 0;
-/*MTD-CONN-EH-RAMDUMP-00+{*/
-	if (dev->state == STATE_OFFLINE) {
-		r = -ENODEV;
-		goto done;
-	}
-/*MTD-CONN-EH-RAMDUMP-00+}*/
-	
 	ret = usb_ep_queue(dev->ep_out, req, GFP_KERNEL);
 	if (ret < 0) {
 		r = -EIO;
@@ -737,12 +766,8 @@ static void send_file_work(struct work_struct *data) {
 		ret = usb_ep_queue(dev->ep_in, req, GFP_KERNEL);
 		if (ret < 0) {
 			DBG(cdev, "send_file_work: xfer error %d\n", ret);
-			//MTD-CONN-EH-MTPSWITCHING-00*{
-			//dev->state = STATE_ERROR;
 			if (dev->state != STATE_OFFLINE)
-			dev->state = STATE_ERROR;
-			//MTD-CONN-EH-MTPSWITCHING-00*}
-			
+				dev->state = STATE_ERROR;
 			r = -EIO;
 			break;
 		}
@@ -791,20 +816,11 @@ static void receive_file_work(struct work_struct *data)
 			read_req->length = (count > MTP_BULK_BUFFER_SIZE
 					? MTP_BULK_BUFFER_SIZE : count);
 			dev->rx_done = 0;
-/*MTD-CONN-EH-RAMDUMP-00+{*/
-			if (dev->state == STATE_OFFLINE) {
-				r = -ENODEV;
-				break;
-			}
-/*MTD-CONN-EH-RAMDUMP-00+}*/			
 			ret = usb_ep_queue(dev->ep_out, read_req, GFP_KERNEL);
 			if (ret < 0) {
 				r = -EIO;
-				//MTD-CONN-EH-MTPSWITCHING-00*{
-				//dev->state = STATE_ERROR;
 				if (dev->state != STATE_OFFLINE)
-				dev->state = STATE_ERROR;
-				//MTD-CONN-EH-MTPSWITCHING-00*}
+					dev->state = STATE_ERROR;
 				break;
 			}
 		}
@@ -816,12 +832,8 @@ static void receive_file_work(struct work_struct *data)
 			DBG(cdev, "vfs_write %d\n", ret);
 			if (ret != write_req->actual) {
 				r = -EIO;
-				//MTD-CONN-EH-MTPSWITCHING-00*{
-				//dev->state = STATE_ERROR;
 				if (dev->state != STATE_OFFLINE)
-				dev->state = STATE_ERROR;
-				//MTD-CONN-EH-MTPSWITCHING-00*}
-				
+					dev->state = STATE_ERROR;
 				break;
 			}
 			write_req = NULL;
@@ -1062,55 +1074,9 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 		if (ctrl->bRequest == 1
 				&& (ctrl->bRequestType & USB_DIR_IN)
 				&& (w_index == 4 || w_index == 5)) {
-			//MTD-CONN-EH-PCCOMPANION-01*{	
-			#if 0
 			value = (w_length < sizeof(mtp_ext_config_desc) ?
 					w_length : sizeof(mtp_ext_config_desc));
 			memcpy(cdev->req->buf, &mtp_ext_config_desc, value);
-			#else
-			int total = 0;
-			int func_num = 0;
-			int interface_num = 0;
-			struct ms_ext_compatID_desc_head *head;
-			struct ms_ext_compatID_desc_data *data;
-			struct usb_configuration        *cfg;
-			struct usb_function *f;
-
-			head = (struct ms_ext_compatID_desc_head *) cdev->req->buf;
-			data = (struct ms_ext_compatID_desc_data *)(head + 1);
-
-			/* zero clear */
-			memset( cdev->req->buf, 0x00, cdev->bufsiz);
-
-			list_for_each_entry(cfg, &cdev->configs, list)	{
-
-				list_for_each_entry(f, &cfg->functions, list)	{
-					if (!f)
-						break;
-
-					interface_num++;
-					data->bFirstInterfaceNumber = func_num;
-					printk(KERN_INFO"usb:%s MTP interface bFirstInterfaceNumber: %d\n", __func__,  data->bFirstInterfaceNumber);
-					data->reserved1 = 1;
-					if (!strcmp(f->name, "mtp"))	{
-						memcpy(data->compatibleID, "MTP", 3);
-						VDBG(cdev, "MTP interface found. Interface_num: %d.\n", interface_num );
-					}
-					data++;
-					func_num++;
-				}
-			}
-
-			total = sizeof(*head) + (sizeof(*data) * func_num);
-
-			/* header section */
-			head->dwLength = total;
-			head->bcdVersion = __constant_cpu_to_le16(0x0100);
-			head->wIndex = __constant_cpu_to_le16(4);
-			head->bCount = func_num;
-			value = min(w_length, (u16)total);
-			#endif
-			//MTD-CONN-EH-PCCOMPANION-01*}
 		}
 	} else if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_CLASS) {
 		DBG(cdev, "class request: %d index: %d value: %d length: %d\n",
@@ -1183,6 +1149,9 @@ mtp_function_bind(struct usb_configuration *c, struct usb_function *f)
 	if (id < 0)
 		return id;
 	mtp_interface_desc.bInterfaceNumber = id;
+	// << FerryWu, 2012/09/17, correct bFirstInterfaceNumber of Microsoft Extended Configuration Descriptor of MTP
+	mtp_ext_config_desc.function.bFirstInterfaceNumber = id;
+	// >> FerryWu, 2012/09/17, correct bFirstInterfaceNumber of Microsoft Extended Configuration Descriptor of MTP
 
 	/* allocate endpoints */
 	ret = mtp_create_bulk_endpoints(dev, &mtp_fullspeed_in_desc,
@@ -1211,16 +1180,16 @@ mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	struct usb_request *req;
 	int i;
 
-        usb_ep_fifo_flush(dev->ep_in); //MTD-CONN-EH-MTPSWITCHING-00+
 	while ((req = mtp_req_get(dev, &dev->tx_idle)))
 		mtp_request_free(req, dev->ep_in);
-	usb_ep_fifo_flush(dev->ep_out);//MTD-CONN-EH-MTPSWITCHING-00+
 	for (i = 0; i < RX_REQ_MAX; i++)
 		mtp_request_free(dev->rx_req[i], dev->ep_out);
-	usb_ep_fifo_flush(dev->ep_intr);//MTD-CONN-EH-MTPSWITCHING-00+
 	while ((req = mtp_req_get(dev, &dev->intr_idle)))
 		mtp_request_free(req, dev->ep_intr);
 	dev->state = STATE_OFFLINE;
+	// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+	mtp_string_defs[INTERFACE_STRING_INDEX].id = 0;
+	// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 }
 
 static int mtp_function_set_alt(struct usb_function *f,

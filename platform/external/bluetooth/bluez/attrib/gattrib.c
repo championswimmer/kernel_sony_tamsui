@@ -143,7 +143,7 @@ static gboolean is_response(guint8 opcode)
 
 GAttrib *g_attrib_ref(GAttrib *attrib)
 {
-	DBG(" attrib: %p %d", attrib, attrib ? attrib->refs-1 : 0);
+	DBG(" attrib: %p %d", attrib, attrib ? attrib->refs+1 : 0);
 
 	if (!attrib)
 		return NULL;
@@ -345,6 +345,34 @@ static void wake_up_sender(struct _GAttrib *attrib)
 			attrib, destroy_sender);
 }
 
+static void transport_error(struct _GAttrib *attrib, uint8_t *buf, gsize len)
+{
+	uint8_t err[5];
+	uint16_t handle;
+
+	switch(buf[0]) {
+	case ATT_OP_FIND_INFO_REQ:
+	case ATT_OP_FIND_BY_TYPE_REQ:
+	case ATT_OP_READ_BY_TYPE_REQ:
+	case ATT_OP_READ_REQ:
+	case ATT_OP_READ_BLOB_REQ:
+	case ATT_OP_READ_MULTI_REQ:
+	case ATT_OP_READ_BY_GROUP_REQ:
+	case ATT_OP_WRITE_REQ:
+	case ATT_OP_PREP_WRITE_REQ:
+	case ATT_OP_HANDLE_IND:
+		handle = att_get_u16(&buf[1]);
+		break;
+	default:
+		handle = 0;
+		break;
+	}
+
+	enc_error_resp(buf[0], handle, ATT_ECODE_INVALID_TRANSPORT,
+							err, sizeof(err));
+	g_attrib_send(attrib, 0, err[0], err, sizeof(err), NULL, NULL, NULL);
+}
+
 static gboolean received_data(GIOChannel *io, GIOCondition cond, gpointer data)
 {
 	struct _GAttrib *attrib = data;
@@ -353,7 +381,7 @@ static gboolean received_data(GIOChannel *io, GIOCondition cond, gpointer data)
 	uint8_t buf[512], status;
 	gsize len;
 	GIOStatus iostat;
-	gboolean qempty;
+	gboolean qempty, delivered = FALSE;
 
 	DBG(" io: %p, cond: %d, data: %p", io, cond, data);
 
@@ -388,12 +416,19 @@ static gboolean received_data(GIOChannel *io, GIOCondition cond, gpointer data)
 
 		if (evt->expected == buf[0] ||
 			evt->expected == GATTRIB_ALL_EVENTS ||
-			(evt->expected == GATTRIB_ALL_REQS && !(buf[0] & 1)))
+			(evt->expected == GATTRIB_ALL_REQS && !(buf[0] & 1))) {
+			delivered = TRUE;
 			evt->func(buf, len, evt->user_data);
+		}
 	}
 
-	if (is_response(buf[0]) == FALSE)
+	if (is_response(buf[0]) == FALSE) {
+		/* If response expected and no delivery, return error */
+		if (!delivered && opcode2expected(buf[0]))
+			transport_error(attrib, buf, len);
+
 		return TRUE;
+	}
 
 	/* Auto-elevate security if remote device complains */
 	if (buf[0] == ATT_OP_ERROR && (buf[4] == ATT_ECODE_INSUFF_ENC ||
@@ -498,6 +533,9 @@ guint g_attrib_send(GAttrib *attrib, guint id, guint8 opcode,
 			gpointer user_data, GDestroyNotify notify)
 {
 	struct command *c;
+
+	if(!attrib || !pdu)
+		return 0;
 
 	c = g_try_new0(struct command, 1);
 	if (c == NULL)

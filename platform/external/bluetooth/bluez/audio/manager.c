@@ -382,8 +382,8 @@ static sdp_record_t *hfp_ag_record(uint8_t ch, uint32_t feat)
 	sdp_set_service_classes(record, svclass_id);
 
 	sdp_uuid16_create(&profile.uuid, HANDSFREE_PROFILE_ID);
-	property_get("ro.qualcomm.bluetooth.hfp.wbs", value, "");
-	if (!strcmp("true", value))
+	property_get("ro.bluetooth.hfp.ver", value, "1.5");
+	if (!strcmp("1.6", value))
 		profile.version = 0x0106;
 	else
 		profile.version = 0x0105;
@@ -404,7 +404,7 @@ static sdp_record_t *hfp_ag_record(uint8_t ch, uint32_t feat)
 	/* Due to inconsistency "SupportedFeatures" bitmap for Bit 5
 	 * between Service Record and AT+BRSF
 	 * Bit 5: Wide band speech */
-	if (!strcmp("true", value))
+	if (!strcmp("1.6", value))
 		sdpfeat |= 0x20;
 	features = sdp_data_alloc(SDP_UINT16, &sdpfeat);
 	sdp_attr_add(record, SDP_ATTR_SUPPORTED_FEATURES, features);

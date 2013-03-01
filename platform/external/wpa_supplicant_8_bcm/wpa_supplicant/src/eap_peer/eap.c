@@ -42,13 +42,7 @@
 
 #define EAP_MAX_AUTH_ROUNDS 50
 #define EAP_CLIENT_TIMEOUT_DEFAULT 60
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-typedef enum identity_format_type {
-     IMSI = 0,
-	 IMSI_relam,
-	 IMSI_UNKNOW
-}identity_format_type;
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM-- */
+
 
 static Boolean eap_sm_allowMethod(struct eap_sm *sm, int vendor,
 				  EapType method);
@@ -884,34 +878,15 @@ static void eap_sm_processIdentity(struct eap_sm *sm, const struct wpabuf *req)
 	wpa_hexdump_ascii(MSG_DEBUG, "EAP: EAP-Request Identity data",
 			  pos, be_to_host16(hdr->length) - 5);
 }
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-static identity_format_type check_identity_format() {
-	char identity_format[PROPERTY_VALUE_MAX] = {0};
-	static identity_format_type support_format = IMSI_UNKNOW;
-	if(support_format != IMSI_UNKNOW) {
-		return support_format;
-	}
-	
-	if (property_get("wlan.eapsim.identity_format",
-					 identity_format, NULL) != 0) {
-		if(strncmp(identity_format, "IMSI@relam", sizeof("IMSI@relam")) == 0) {
-             return IMSI_relam;
-		}
-    }
-	return IMSI; // return default type
-}
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM-- */
 
-#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_FIH)
+
+#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_Tamsui1)
 static int eap_sm_imsi_identity(struct eap_sm *sm,
 				struct eap_peer_config *conf)
 {
 	int aka = 0;
 	char imsi[100];
 	size_t imsi_len;
-	char realm[256] = { 0 };  /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-	size_t realm_len = 0;     /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-
 	struct eap_method_type *m = conf->eap_methods;
 	int i;
 
@@ -931,53 +906,9 @@ static int eap_sm_imsi_identity(struct eap_sm *sm,
 			break;
 		}
 	}
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-#if (defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_FIH)) && defined(ANDROID)
-
-    if(check_identity_format() == IMSI_relam) {
-		if (conf->pcsc) {
-			/*
-			 * Following code is required to comply with 3GPP TS 23.003
-			 *
-			 * Identity should have a form of:
-			 * "0<IMSI>@wlan.mnc<MNC>.mcc<MCC>.3gppnetwork.org" for EAP-AKA
-			 * "1<IMSI>@wlan.mnc<MNC>.mcc<MCC>.3gppnetwork.org" for EAP-SIM
-			 */
-			char operator_id[PROPERTY_VALUE_MAX];
-			char mcc[4] = { 0 };
-			char mnc[4] = { 0 };
-			if (property_get("gsm.sim.operator.numeric",
-					 operator_id, NULL) != 0) {
-				strncpy(mcc, operator_id, 3);
-				/* MNC can be 2 or 3 characters in length */
-				if (os_strlen(operator_id) == 5) {
-					mnc[0] = '0';
-					strncpy(mnc + 1, operator_id + 3, 2);
-				} else {
-					strncpy(mnc, operator_id + 3, 3);
-				}
-				realm_len = sizeof(realm);
-				os_snprintf(realm, realm_len,
-						"@wlan.mnc%s.mcc%s.3gppnetwork.org",
-						mnc, mcc);
-				realm_len = os_strlen(realm);
-				wpa_printf(MSG_INFO, "Adding identity realm '%s'",
-					   realm);
-			} else {
-				wpa_printf(MSG_ERROR,
-					   "Could not get Android property "
-					   "'gsm.sim.operator.numeric'. "
-					   "Proceeding without realm!");
-				realm_len = 0;
-			}
-	
-		}
-    } 
-#endif /* PCSC_FUNCS_SEMC && ANDROID */
-/* MTD-Connectivity-FY-SupportSwisscomEAP-SIM-- */
 
 	os_free(conf->identity);
-	conf->identity = os_malloc(1 + imsi_len + realm_len); /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
+	conf->identity = os_malloc(1 + imsi_len);
 	if (conf->identity == NULL) {
 		wpa_printf(MSG_WARNING, "Failed to allocate buffer for "
 			   "IMSI-based identity");
@@ -986,12 +917,11 @@ static int eap_sm_imsi_identity(struct eap_sm *sm,
 
 	conf->identity[0] = aka ? '0' : '1';
 	os_memcpy(conf->identity + 1, imsi, imsi_len);
-	os_memcpy(conf->identity + 1 + imsi_len, realm, realm_len);  /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-	conf->identity_len = 1 + imsi_len + realm_len;               /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
+	conf->identity_len = 1 + imsi_len;
 
 	return 0;
 }
-#endif /* PCSC_FUNCS || PCSC_FUNCS_SEMC  || defined(PCSC_FUNCS_FIH)*/
+#endif /* PCSC_FUNCS || PCSC_FUNCS_SEMC  || defined(PCSC_FUNCS_Tamsui1)*/
 
 
 static int eap_sm_set_scard_pin(struct eap_sm *sm,
@@ -1011,25 +941,25 @@ static int eap_sm_set_scard_pin(struct eap_sm *sm,
 		return -1;
 	}
 	return 0;
-#elif defined(PCSC_FUNCS_FIH) /* PCSC_FUNCS || PCSC_FUNCS_SEMC */
-     wpa_printf(MSG_WARNING, "FIH solution skip PIN validation");
+#elif defined(PCSC_FUNCS_Tamsui1) /* PCSC_FUNCS || PCSC_FUNCS_SEMC */
+     wpa_printf(MSG_WARNING, "Tamsui1 solution skip PIN validation");
      return 0;
 #else  
 	return -1;
-#endif /* PCSC_FUNCS_FIH*/
+#endif /* PCSC_FUNCS_Tamsui1*/
 }
 
 static int eap_sm_get_scard_identity(struct eap_sm *sm,
 				     struct eap_peer_config *conf)
 {
-#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_FIH)
+#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_Tamsui1)
 	if (eap_sm_set_scard_pin(sm, conf))
 		return -1;
 
 	return eap_sm_imsi_identity(sm, conf);
-#else /* PCSC_FUNCS || PCSC_FUNCS_SEMC || defined(PCSC_FUNCS_FIH)*/
+#else /* PCSC_FUNCS || PCSC_FUNCS_SEMC || defined(PCSC_FUNCS_Tamsui1)*/
 	return -1;
-#endif /* PCSC_FUNCS || PCSC_FUNCS_SEMC || defined(PCSC_FUNCS_FIH)*/
+#endif /* PCSC_FUNCS || PCSC_FUNCS_SEMC || defined(PCSC_FUNCS_Tamsui1)*/
 }
 
 
@@ -1096,43 +1026,41 @@ struct wpabuf * eap_sm_buildIdentity(struct eap_sm *sm, int id, int encrypted)
 			return NULL;
 	}
 
-#if (defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_FIH)) && defined(ANDROID)
-    if(check_identity_format() == IMSI) {   /* MTD-Connectivity-FY-SupportSwisscomEAP-SIM++ */
-		if (config->pcsc) {
-			/*
-			 * Following code is required to comply with 3GPP TS 23.003
-			 *
-			 * Identity should have a form of:
-			 * "0<IMSI>@wlan.mnc<MNC>.mcc<MCC>.3gppnetwork.org" for EAP-AKA
-			 * "1<IMSI>@wlan.mnc<MNC>.mcc<MCC>.3gppnetwork.org" for EAP-SIM
-			 */
-			char operator_id[PROPERTY_VALUE_MAX];
-			char mcc[4] = { 0 };
-			char mnc[4] = { 0 };
-			if (property_get("gsm.sim.operator.numeric",
-					 operator_id, NULL) != 0) {
-				strncpy(mcc, operator_id, 3);
-				/* MNC can be 2 or 3 characters in length */
-				if (os_strlen(operator_id) == 5) {
-					mnc[0] = '0';
-					strncpy(mnc + 1, operator_id + 3, 2);
-				} else {
-					strncpy(mnc, operator_id + 3, 3);
-				}
-				realm_len = sizeof(realm);
-				os_snprintf(realm, realm_len,
-					    "@wlan.mnc%s.mcc%s.3gppnetwork.org",
-					    mnc, mcc);
-				realm_len = os_strlen(realm);
-				wpa_printf(MSG_INFO, "Adding identity realm '%s'",
-					   realm);
+#if (defined(PCSC_FUNCS_SEMC) || defined(PCSC_FUNCS_Tamsui1)) && defined(ANDROID)
+	if (config->pcsc) {
+		/*
+		 * Following code is required to comply with 3GPP TS 23.003
+		 *
+		 * Identity should have a form of:
+		 * "0<IMSI>@wlan.mnc<MNC>.mcc<MCC>.3gppnetwork.org" for EAP-AKA
+		 * "1<IMSI>@wlan.mnc<MNC>.mcc<MCC>.3gppnetwork.org" for EAP-SIM
+		 */
+		char operator_id[PROPERTY_VALUE_MAX];
+		char mcc[4] = { 0 };
+		char mnc[4] = { 0 };
+		if (property_get("gsm.sim.operator.numeric",
+				 operator_id, NULL) != 0) {
+			strncpy(mcc, operator_id, 3);
+			/* MNC can be 2 or 3 characters in length */
+			if (os_strlen(operator_id) == 5) {
+				mnc[0] = '0';
+				strncpy(mnc + 1, operator_id + 3, 2);
 			} else {
-				wpa_printf(MSG_ERROR,
-					   "Could not get Android property "
-					   "'gsm.sim.operator.numeric'. "
-					   "Proceeding without realm!");
-				realm_len = 0;
+				strncpy(mnc, operator_id + 3, 3);
 			}
+			realm_len = sizeof(realm);
+			os_snprintf(realm, realm_len,
+				    "@wlan.mnc%s.mcc%s.3gppnetwork.org",
+				    mnc, mcc);
+			realm_len = os_strlen(realm);
+			wpa_printf(MSG_INFO, "Adding identity realm '%s'",
+				   realm);
+		} else {
+			wpa_printf(MSG_ERROR,
+				   "Could not get Android property "
+				   "'gsm.sim.operator.numeric'. "
+				   "Proceeding without realm!");
+			realm_len = 0;
 		}
 	}
 #endif /* PCSC_FUNCS_SEMC && ANDROID */

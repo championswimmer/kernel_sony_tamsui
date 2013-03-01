@@ -783,6 +783,7 @@ static int wpa_supplicant_ctrl_iface_ctrl_rsp(struct wpa_supplicant *wpa_s,
 #endif /* IEEE8021X_EAPOL */
 }
 
+
 static int wpa_supplicant_ctrl_iface_status(struct wpa_supplicant *wpa_s,
 					    const char *params,
 					    char *buf, size_t buflen)
@@ -871,6 +872,7 @@ static int wpa_supplicant_ctrl_iface_status(struct wpa_supplicant *wpa_s,
 				return pos - buf;
 			pos += ret;
 		}
+
 #ifdef CONFIG_AP
 		if (wpa_s->ap_iface) {
 			pos += ap_ctrl_iface_wpa_get_status(wpa_s, pos,

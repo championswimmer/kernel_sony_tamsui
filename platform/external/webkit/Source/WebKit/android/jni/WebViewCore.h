@@ -562,13 +562,7 @@ namespace android {
         void splitContent(PictureSet*);
 
         void notifyWebAppCanBeInstalled();
-        // +{ ASD-NET-JC-MES4560-01
-        // find on page
-        void resetFindOnPage();
-        int findTextOnPage(const WTF::String &text);
-        int findNextOnPage(bool forward);
-        void updateMatchCount() const;
-        // ASD-NET-JC-MES4560-01 }+
+
 #if ENABLE(VIDEO)
         void enterFullscreenForVideoLayer(int layerId, const WTF::String& url);
 #endif
@@ -590,7 +584,9 @@ namespace android {
         int  screenHeight() const { return m_screenHeight; }
 #if USE(CHROME_NETWORK_STACK)
         void setWebRequestContextUserAgent();
+        // BU1SW1_SoMC_SS_Patches ....... begin
         void setWebRequestContextUserAgentProfile();
+       // BU1SW1_SoMC_SS_Patches ....... end
         void setWebRequestContextCacheMode(int mode);
         WebRequestContext* webRequestContext();
 #endif
@@ -712,14 +708,6 @@ namespace android {
         bool m_isPaused;
         int m_cacheMode;
         bool m_shouldPaintCaret;
-
-        // +{ ASD-NET-JC-MES4560-01
-        // find on page data
-        WTF::String m_searchText;
-        int m_matchCount;
-        int m_activeMatchIndex;
-        RefPtr<WebCore::Range> m_activeMatch;
-        // ASD-NET-JC-MES4560-01 }+
 
         SkTDArray<PluginWidgetAndroid*> m_plugins;
         WebCore::Timer<WebViewCore> m_pluginInvalTimer;

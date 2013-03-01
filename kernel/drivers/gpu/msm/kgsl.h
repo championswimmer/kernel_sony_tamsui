@@ -95,6 +95,8 @@ struct kgsl_driver {
 	struct {
 		unsigned int vmalloc;
 		unsigned int vmalloc_max;
+		unsigned int page_alloc;
+		unsigned int page_alloc_max;
 		unsigned int coherent;
 		unsigned int coherent_max;
 		unsigned int mapped;
@@ -193,6 +195,16 @@ static inline int kgsl_gpuaddr_in_memdesc(const struct kgsl_memdesc *memdesc,
 	}
 	return 0;
 }
+
+static inline void *kgsl_memdesc_map(struct kgsl_memdesc *memdesc)
+{
+	if (memdesc->hostptr == NULL && memdesc->ops &&
+		memdesc->ops->map_kernel_mem)
+		memdesc->ops->map_kernel_mem(memdesc);
+
+	return memdesc->hostptr;
+}
+
 static inline uint8_t *kgsl_gpuaddr_to_vaddr(struct kgsl_memdesc *memdesc,
 					     unsigned int gpuaddr)
 {

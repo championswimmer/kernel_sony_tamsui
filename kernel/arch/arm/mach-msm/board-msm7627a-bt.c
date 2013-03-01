@@ -24,12 +24,23 @@
 #include "board-msm7627a.h"
 #include "devices-msm7x2xa.h"
 
+//+ murphy 2011.11.07
+#define CONFIG_ARIMA_BT_DBG_INFO
+//- murphy 2011.11.07
+
 #if defined(CONFIG_BT) && defined(CONFIG_MARIMBA_CORE)
 
 
 static struct bt_vreg_info bt_vregs[] = {
+//+ murphy 2011.11.07
+#if 0
 	{"msme1", 2, 1800000, 1800000, 0, NULL},
-	{"bt", 21, 2900000, 3300000, 1, NULL}
+	{"bt", 21, 3000000, 3000000, 1, NULL}
+#else
+	{"msme1", 2, 1800000, 1800000, 0, NULL},
+	{"bt", 21, 3300000, 3300000, 1, NULL} //alvinchen modified 20120618. Original:{"bt", 21, 2900000, 3300000, 1, NULL}
+#endif
+//- murphy 2011.11.07
 };
 
 struct platform_device msm_bt_power_device = {
@@ -95,11 +106,11 @@ static unsigned fm_i2s_config_power_off[] = {
 	GPIO_CFG(71, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 };
 
-int gpio_bt_sys_rest_en = 133;
+int gpio_bt_sys_rest_en = 12;  //murphy 2011.11.07  original: 133
 static void gpio_bt_config(void)
 {
 	if (machine_is_msm7627a_qrd1())
-		gpio_bt_sys_rest_en = 114;
+		gpio_bt_sys_rest_en = 12;  //murphy 2011.11.07  original: 114
 }
 
 static int bt_set_gpio(int on)
@@ -107,15 +118,53 @@ static int bt_set_gpio(int on)
 	int rc = 0;
 	struct marimba config = { .mod_id =  SLAVE_ID_BAHAMA};
 
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+	if (on)
+	{
+		printk(KERN_INFO "[BT_DBG] - bt_set_gpio(), on, %d \n", on);
+	}
+	else
+	{
+		printk(KERN_INFO "[BT_DBG] - bt_set_gpio(), off, %d \n", on);
+	}
+#endif
+
 	if (on) {
+		//+ murphy 2011.09.19
+		#if 1  //re-configure GPIO setting in case AMSS part is not executed okay
+		printk(KERN_INFO "[BT_DBG] - bt_set_gpio(), on = %d, if cond exec \n", on);
+
+		rc = gpio_tlmm_config(GPIO_CFG(gpio_bt_sys_rest_en, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+		                      GPIO_CFG_ENABLE);
+		if (rc < 0)
+		{
+			printk(KERN_INFO "[BT_DBG] - GPIO 12 enable fail \n");
+		}
+		else
+		{
+			printk(KERN_INFO "[BT_DBG] - GPIO 12 enable OK \n");
+		}
+		#endif
+		//- murphy 2011.09.19
+
 		rc = gpio_direction_output(gpio_bt_sys_rest_en, 1);
-		msleep(100);
+
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+		printk(KERN_INFO "[BT_DBG] - bt_set_gpio(), msleep(%d) \n", 150);
+#endif
+
+		msleep(150);  //murphy 2011.11.07
 	} else {
 		if (!marimba_get_fm_status(&config) &&
 				!marimba_get_bt_status(&config)) {
 			gpio_set_value_cansleep(gpio_bt_sys_rest_en, 0);
 			rc = gpio_direction_input(gpio_bt_sys_rest_en);
+      //+ murphy 2012.08.14
+      //Fixed for BT CTS failed case - test_enableDisable
+      //restore back to original sleep time to avoid unvisitable side effect at 2012.10.22
 			msleep(100);
+			//msleep(75);
+      //- murphy 2012.08.14
 		}
 	}
 	if (rc)
@@ -134,6 +183,11 @@ static int fm_radio_setup(struct marimba_fm_platform_data *pdata)
 	u8 value;
 
 	/* Voting for 1.8V Regulator */
+  
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+	printk(KERN_INFO "[BT_DBG] - vreg_enable(\"msme1\") by fm_radio_setup() \n");
+#endif
+
 	fm_regulator = regulator_get(NULL , "msme1");
 	if (IS_ERR(fm_regulator)) {
 		rc = PTR_ERR(fm_regulator);
@@ -616,6 +670,17 @@ static int bluetooth_switch_regulators(int on)
 			goto reg_disable;
 		}
 
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+    if (on)
+    {
+      printk(KERN_INFO "[BT_DBG] - vreg_enable(\"msme1\") by bluetooth_switch_regulators() \n");
+    }
+    else
+    {
+      printk(KERN_INFO "[BT_DBG] - vreg_disable(\"msme1\") by bluetooth_switch_regulators() \n");
+    }
+#endif
+
 		if (bt_vregs[i].is_pin_controlled) {
 			rc = pmapp_vreg_lpm_pincntrl_vote(id,
 				bt_vregs[i].pmapp_id,
@@ -658,6 +723,21 @@ static struct regulator *reg_s3;
 static unsigned int msm_bahama_setup_power(void)
 {
 	int rc = 0;
+
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+	printk(KERN_INFO "[BT_DBG] - msm_bahama_setup_power() \n");
+	printk(KERN_INFO "[BT_DBG] - vreg_enable(\"msme1\") by msm_bahama_setup_power() \n");
+#endif
+
+//+ murphy 2011.11.07
+//enable touch ic 2.8v power, or I2C bus will be drop down by some reason.
+#if 0
+#ifdef CONFIG_TOUCHSCREEN_ELAN_EKTF2040
+	printk(KERN_INFO "[BT_DBG] - Power on touch IC (EKTF2040) \n");
+	elan_ktf2k_ts_power(1);
+#endif
+#endif
+//- murphy 2011.11.07
 
 	reg_s3 = regulator_get(NULL, "msme1");
 	if (IS_ERR(reg_s3)) {
@@ -715,6 +795,16 @@ static unsigned int msm_bahama_shutdown_power(int value)
 {
 	int rc = 0;
 
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+	printk(KERN_INFO "[BT_DBG] - msm_bahama_shutdown_power(), value = %d", value);
+	printk(KERN_INFO "[BT_DBG] - vreg_disable(\"msme1\") by msm_bahama_shutdown_power() \n");
+	printk(KERN_INFO "[BT_DBG] - \" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \" \n");
+	printk(KERN_INFO "[BT_DBG] - \" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \" \n");
+	printk(KERN_INFO "[BT_DBG] - \" !!!!!!!!!!!!!!!!!!! BT ERROR !!!!!!!!!!!!!!!!!!!!!!! \" \n");
+	printk(KERN_INFO "[BT_DBG] - \" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \" \n");
+	printk(KERN_INFO "[BT_DBG] - \" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \" \n");
+#endif
+
 	if (IS_ERR_OR_NULL(reg_s3)) {
 		rc = reg_s3 ? PTR_ERR(reg_s3) : -ENODEV;
 		goto out;
@@ -726,6 +816,16 @@ static unsigned int msm_bahama_shutdown_power(int value)
 		goto out;
 	}
 
+//+ murphy 2011.11.07
+#if 1
+	rc = bt_set_gpio(0);
+	if (rc) {
+		pr_err("%s: bt_set_gpio = %d\n",
+				__func__, rc);
+		goto reg_enable;
+	}
+	gpio_free(gpio_bt_sys_rest_en);
+#else
 	if (value == BAHAMA_ID) {
 		rc = bt_set_gpio(0);
 		if (rc) {
@@ -735,6 +835,8 @@ static unsigned int msm_bahama_shutdown_power(int value)
 		}
 		gpio_free(gpio_bt_sys_rest_en);
 	}
+#endif
+//- murphy 2011.11.07
 
 	regulator_put(reg_s3);
 	reg_s3 = NULL;
@@ -750,6 +852,10 @@ out:
 static unsigned int msm_bahama_core_config(int type)
 {
 	int rc = 0;
+
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+	printk(KERN_INFO "[BT_DBG] - msm_bahama_core_config(), type = %d", type);
+#endif
 
 	if (type == BAHAMA_ID) {
 		int i;
@@ -793,6 +899,10 @@ static int bluetooth_power(int on)
 	int pin, rc = 0;
 	const char *id = "BTPW";
 	int cid = 0;
+
+#if defined (CONFIG_ARIMA_BT_DBG_INFO)
+	printk(KERN_INFO "[BT_DBG] - bluetooth_power(), on = %d \n", on);
+#endif
 
 	cid = adie_get_detected_connectivity_type();
 	if (cid != BAHAMA_ID) {

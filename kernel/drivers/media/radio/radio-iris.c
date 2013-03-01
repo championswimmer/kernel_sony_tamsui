@@ -87,6 +87,7 @@ struct iris_device {
 	unsigned char power_mode;
 	int search_on;
 	unsigned int tone_freq;
+	unsigned char spur_table_size;
 	unsigned char g_scan_time;
 	unsigned int g_antenna;
 	unsigned int g_rds_grp_proc_ps;
@@ -100,11 +101,13 @@ struct iris_device {
 	struct hci_fm_sig_threshold_rsp sig_th;
 	struct hci_fm_ch_det_threshold ch_det_threshold;
 	struct hci_fm_data_rd_rsp default_data;
+	struct hci_fm_spur_data spur_data;
 };
 
 static struct video_device *priv_videodev;
 static int iris_do_calibration(struct iris_device *radio);
 
+static int update_spur_table(struct iris_device *radio);
 static struct v4l2_queryctrl iris_v4l2_queryctrl[] = {
 	{
 	.id	= V4L2_CID_AUDIO_VOLUME,
@@ -963,7 +966,8 @@ static int hci_def_data_write_req(struct radio_hci_dev *hdev,
 
 	opcode = hci_opcode_pack(HCI_OGF_FM_COMMON_CTRL_CMD_REQ,
 		HCI_OCF_FM_DEFAULT_DATA_WRITE);
-	return radio_hci_send_cmd(hdev, opcode, sizeof((*def_data_wr)),
+
+	return radio_hci_send_cmd(hdev, opcode, (def_data_wr->length+2),
 	def_data_wr);
 }
 
@@ -1589,8 +1593,8 @@ static void hci_cc_fm_disable_rsp(struct radio_hci_dev *hdev,
 
 	if (status)
 		return;
-
-	iris_q_event(radio, IRIS_EVT_RADIO_DISABLED);
+	if (radio->mode != FM_CALIB)
+		iris_q_event(radio, IRIS_EVT_RADIO_DISABLED);
 
 	radio_hci_req_complete(hdev, status);
 }
@@ -1628,8 +1632,8 @@ static void hci_cc_fm_enable_rsp(struct radio_hci_dev *hdev,
 
 	if (rsp->status)
 		return;
-
-	iris_q_event(radio, IRIS_EVT_RADIO_READY);
+	if (radio->mode != FM_CALIB)
+		iris_q_event(radio, IRIS_EVT_RADIO_READY);
 
 	radio_hci_req_complete(hdev, rsp->status);
 }
@@ -2454,23 +2458,27 @@ static int iris_do_calibration(struct iris_device *radio)
 	int retval = 0x00;
 
 	cal_mode = PROCS_CALIB_MODE;
+	radio->mode = FM_CALIB;
 	retval = hci_cmd(HCI_FM_ENABLE_RECV_CMD,
 			radio->fm_hdev);
 	if (retval < 0) {
 		FMDERR("Enable failed before calibration %x", retval);
+		radio->mode = FM_OFF;
 		return retval;
 	}
 	retval = radio_hci_request(radio->fm_hdev, hci_fm_do_cal_req,
 		(unsigned long)cal_mode, RADIO_HCI_TIMEOUT);
 	if (retval < 0) {
 		FMDERR("Do Process calibration failed %x", retval);
+		radio->mode = FM_RECV;
 		return retval;
 	}
 	retval = hci_cmd(HCI_FM_DISABLE_RECV_CMD,
 			radio->fm_hdev);
 	if (retval < 0)
 		FMDERR("Disable Failed after calibration %d", retval);
-		return retval;
+	radio->mode = FM_OFF;
+	return retval;
 }
 static int iris_vidioc_g_ctrl(struct file *file, void *priv,
 		struct v4l2_control *ctrl)
@@ -2726,10 +2734,44 @@ static int iris_vidioc_s_ext_ctrls(struct file *file, void *priv,
 	case V4L2_CID_PRIVATE_IRIS_WRITE_DEFAULT:
 		data = (ctrl->controls[0]).string;
 		memset(&default_data, 0, sizeof(default_data));
-		if (copy_from_user(&default_data, data, sizeof(default_data)))
+		/*
+		 * Check if length of the 'FM Default Data' to be sent
+		 * is within the maximum  'FM Default Data' packet limit.
+		 * Max. 'FM Default Data' packet length is 251 bytes:
+		 *	1 byte    - XFR Mode
+		 *	1 byte    - length of the default data
+		 *	249 bytes - actual data to be configured
+		 */
+		if (ctrl->controls[0].size > (DEFAULT_DATA_SIZE + 2)) {
+			pr_err("%s: Default data buffer overflow!\n", __func__);
+			return -EINVAL;
+		}
+
+		/* copy only 'size' bytes of data as requested by user */
+		retval = copy_from_user(&default_data, data,
+			ctrl->controls[0].size);
+		if (retval > 0) {
+			pr_err("%s: Failed to copy %d bytes of default data"
+				" passed by user\n", __func__, retval);
 			return -EFAULT;
+		}
+		FMDBG("%s: XFR Mode\t: 0x%x\n", __func__, default_data.mode);
+		FMDBG("%s: XFR Data Length\t: %d\n", __func__,
+			default_data.length);
+		/*
+		 * Check if the 'length' of the actual XFR data to be configured
+		 * is valid or not. Length of actual XFR data should be always
+		 * 2 bytes less than the total length of the 'FM Default Data'.
+		 * Length of 'FM Default Data' DEF_DATA_LEN: (1+1+XFR Data Size)
+		 * Length of 'Actual XFR Data' XFR_DATA_LEN: (DEF_DATA_LEN - 2)
+		 */
+		if (default_data.length != (ctrl->controls[0].size - 2)) {
+			pr_err("%s: Invalid 'length' parameter passed for "
+				"actual xfr data\n", __func__);
+			return -EINVAL;
+		}
 		retval = hci_def_data_write(&default_data, radio->fm_hdev);
-			break;
+		break;
 	case V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION:
 		data = (ctrl->controls[0]).string;
 		bytes_to_copy = (ctrl->controls[0]).size;
@@ -2845,32 +2887,39 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		case FM_TRANS:
 			retval = hci_cmd(HCI_FM_ENABLE_TRANS_CMD,
 							 radio->fm_hdev);
-			radio->mode = FM_TRANS;
 			if (retval < 0) {
 				FMDERR("Error while enabling TRANS FM"
 							" %d\n", retval);
 				return retval;
 			}
+			radio->mode = FM_TRANS;
 			retval = hci_cmd(HCI_FM_GET_TX_CONFIG, radio->fm_hdev);
 			if (retval < 0)
 				FMDERR("get frequency failed %d\n", retval);
 			break;
 		case FM_OFF:
+			radio->spur_table_size = 0;
 			switch (radio->mode) {
 			case FM_RECV:
 				retval = hci_cmd(HCI_FM_DISABLE_RECV_CMD,
 						radio->fm_hdev);
-				if (retval < 0)
+				if (retval < 0) {
 					FMDERR("Err on disable recv FM"
 						   " %d\n", retval);
+					return retval;
+				}
+				radio->mode = FM_OFF;
 				break;
 			case FM_TRANS:
 				retval = hci_cmd(HCI_FM_DISABLE_TRANS_CMD,
 						radio->fm_hdev);
 
-				if (retval < 0)
+				if (retval < 0) {
 					FMDERR("Err disabling trans FM"
 						" %d\n", retval);
+					return retval;
+				}
+				radio->mode = FM_OFF;
 				break;
 			default:
 				retval = -EINVAL;
@@ -3202,9 +3251,113 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		*/
 		retval = 0;
 		break;
+	case V4L2_CID_PRIVATE_SPUR_FREQ:
+		if (radio->spur_table_size >= MAX_SPUR_FREQ_LIMIT) {
+			FMDERR("%s: Spur Table Full!\n", __func__);
+			retval = -1;
+		} else
+			radio->spur_data.freq[radio->spur_table_size] =
+				ctrl->value;
+		break;
+	case V4L2_CID_PRIVATE_SPUR_FREQ_RMSSI:
+		if (radio->spur_table_size >= MAX_SPUR_FREQ_LIMIT) {
+			FMDERR("%s: Spur Table Full!\n", __func__);
+			retval = -1;
+		} else
+			radio->spur_data.rmssi[radio->spur_table_size] =
+				ctrl->value;
+		break;
+	case V4L2_CID_PRIVATE_SPUR_SELECTION:
+		if (radio->spur_table_size >= MAX_SPUR_FREQ_LIMIT) {
+			FMDERR("%s: Spur Table Full!\n", __func__);
+			retval = -1;
+		} else {
+			radio->spur_data.enable[radio->spur_table_size] =
+				ctrl->value;
+			radio->spur_table_size++;
+		}
+		break;
+	case V4L2_CID_PRIVATE_UPDATE_SPUR_TABLE:
+		update_spur_table(radio);
+		break;
 	default:
 		retval = -EINVAL;
 	}
+	return retval;
+}
+
+static int update_spur_table(struct iris_device *radio)
+{
+	struct hci_fm_def_data_wr_req default_data;
+	int len = 0, index = 0, offset = 0, i = 0;
+	int retval = 0, temp = 0, cnt = 0;
+
+	memset(&default_data, 0, sizeof(default_data));
+
+	/* Pass the mode of SPUR_CLK */
+	default_data.mode = CKK_SPUR;
+
+	temp = radio->spur_table_size;
+	for (cnt = 0; cnt < (temp / 5); cnt++) {
+		offset = 0;
+		/*
+		 * Program the spur entries in spur table in following order:
+		 *    Spur index
+		 *    Length of the spur data
+		 *    Spur Data:
+		 *        MSB of the spur frequency
+		 *        LSB of the spur frequency
+		 *        Enable/Disable the spur frequency
+		 *        RMSSI value of the spur frequency
+		 */
+		default_data.data[offset++] = ENTRY_0 + cnt;
+		for (i = 0; i < SPUR_ENTRIES_PER_ID; i++) {
+			default_data.data[offset++] = GET_FREQ(COMPUTE_SPUR(
+				radio->spur_data.freq[index]), 0);
+			default_data.data[offset++] = GET_FREQ(COMPUTE_SPUR(
+				radio->spur_data.freq[index]), 1);
+			default_data.data[offset++] =
+				radio->spur_data.enable[index];
+			default_data.data[offset++] =
+				radio->spur_data.rmssi[index];
+			index++;
+		}
+		len = (SPUR_ENTRIES_PER_ID * SPUR_DATA_SIZE);
+		default_data.length = (len + 1);
+		retval = hci_def_data_write(&default_data, radio->fm_hdev);
+		if (retval < 0) {
+			FMDBG("%s: Failed to configure entries for ID : %d\n",
+				__func__, default_data.data[0]);
+			return retval;
+		}
+	}
+
+	/* Compute balance SPUR frequencies to be programmed */
+	temp %= SPUR_ENTRIES_PER_ID;
+	if (temp > 0) {
+		offset = 0;
+		default_data.data[offset++] = (radio->spur_table_size / 5);
+		for (i = 0; i < temp; i++) {
+			default_data.data[offset++] = GET_FREQ(COMPUTE_SPUR(
+				radio->spur_data.freq[index]), 0);
+			default_data.data[offset++] = GET_FREQ(COMPUTE_SPUR(
+				radio->spur_data.freq[index]), 1);
+			default_data.data[offset++] =
+				radio->spur_data.enable[index];
+			default_data.data[offset++] =
+				radio->spur_data.rmssi[index];
+			index++;
+		}
+		len = (temp * SPUR_DATA_SIZE);
+		default_data.length = (len + 1);
+		retval = hci_def_data_write(&default_data, radio->fm_hdev);
+		if (retval < 0) {
+			FMDERR("%s: Failed to configure entries for ID : %d\n",
+				__func__, default_data.data[0]);
+			return retval;
+		}
+	}
+
 	return retval;
 }
 
@@ -3377,7 +3530,12 @@ static int iris_vidioc_s_hw_freq_seek(struct file *file, void *priv,
 					struct v4l2_hw_freq_seek *seek)
 {
 	struct iris_device *radio = video_get_drvdata(video_devdata(file));
-	return iris_search(radio, CTRL_ON, seek->seek_upward);
+	int dir;
+	if (seek->seek_upward)
+		dir = SRCH_DIR_UP;
+	else
+		dir = SRCH_DIR_DOWN;
+	return iris_search(radio, CTRL_ON, dir);
 }
 
 static int iris_vidioc_querycap(struct file *file, void *priv,

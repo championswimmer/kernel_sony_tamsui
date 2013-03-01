@@ -1,19 +1,17 @@
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This software may be distributed under the terms of the BSD license.
+# See README for more details.
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
+
+#   Copyright (c) 2011-2012 Qualcomm Atheros, Inc.
+#   All Rights Reserved.
+#   Qualcomm Atheros Confidential and Proprietary.
+#   Notifications and licenses are retained for attribution purposes only
+
+#   For this file, which was received with alternative licensing options for
+#   distribution, Qualcomm Atheros, Inc. has selected the BSD license.
 
 LOCAL_PATH := $(call my-dir)
 PKG_CONFIG ?= pkg-config
@@ -24,26 +22,63 @@ ifneq ($(BOARD_WPA_SUPPLICANT_DRIVER),)
   CONFIG_DRIVER_$(BOARD_WPA_SUPPLICANT_DRIVER) := y
 endif
 
+ifeq ($(BOARD_HAS_QCOM_WLAN), true)
+  CONFIG_QMI_OFFLOAD := y
+endif
+
+ifeq ($(BOARD_HAS_ATH_WLAN), true)
+  CONFIG_QMI_OFFLOAD := y
+endif
+
 ifeq ($(WPA_BUILD_SUPPLICANT),true)
 
-include $(LOCAL_PATH)/.config
+include $(LOCAL_PATH)/android.config
+
+ifdef CONFIG_WAPI
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES:= wapi/ECC2.2-2008/ecc.c \
+                  wapi/ECC2.2-2008/hmac.c
+LOCAL_CFLAGS += -DWN_ECC_GCCINT64 -DASUE
+LOCAL_MODULE := libecc
+LOCAL_MODULE_TAGS := debug eng optional
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := wapi/libiwnwai_asue/cert.c \
+          wapi/libiwnwai_asue/common.c \
+          wapi/libiwnwai_asue/interface.c \
+          wapi/libiwnwai_asue/wapi.c
+LOCAL_MODULE := libiwnwai_asue
+LOCAL_MODULE_TAGS := debug eng optional
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := wapi/sms4/sms4c.c \
+           wapi/sms4/wpi_pcrypt.c
+ifeq ($(TARGET_ARCH), arm)
+LOCAL_CFLAGS += -DLE
+endif
+LOCAL_CFLAGS += -DWN_ECC_GCCINT64 -DASUE
+LOCAL_MODULE := libsms4
+LOCAL_MODULE_TAGS := debug eng optional
+include $(BUILD_STATIC_LIBRARY)
+endif # CONFIG_WAPI
 
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
 
+L_CFLAGS += -DVERSION_STR_POSTFIX=\"-$(PLATFORM_VERSION)\"
+
 # Set Android log name
 L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
 
+# Disable roaming in wpa_supplicant
+ifdef CONFIG_NO_ROAMING
+L_CFLAGS += -DCONFIG_NO_ROAMING
+endif
+
 ifeq ($(BOARD_WLAN_DEVICE), bcmdhd)
 L_CFLAGS += -DANDROID_BRCM_P2P_PATCH
-endif
-
-ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
-L_CFLAGS += -DANDROID_QCOM_P2P_PATCH
-endif
-
-ifdef CONFIG_ROAMING
-L_CFLAGS += -DCONFIG_ROAMING
 endif
 
 # Use Android specific directory for control interface sockets
@@ -79,6 +114,13 @@ INCLUDES += $(LOCAL_PATH)/src/utils
 INCLUDES += $(LOCAL_PATH)/src/wps
 INCLUDES += external/openssl/include
 INCLUDES += frameworks/base/cmds/keystore
+ifdef CONFIG_QMI_OFFLOAD
+INCLUDES += vendor/qcom/proprietary/qmi/inc
+INCLUDES += vendor/qcom/proprietary/qmi/platform
+INCLUDES += vendor/qcom/proprietary/qmi/src
+INCLUDES += vendor/qcom/proprietary/qmi/services
+INCLUDES += vendor/qcom/proprietary/qmi/core/lib/inc
+endif
 ifdef CONFIG_DRIVER_NL80211
 INCLUDES += external/libnl-headers
 endif
@@ -137,9 +179,6 @@ endif
 OBJS += src/utils/$(CONFIG_ELOOP).c
 OBJS_c += src/utils/$(CONFIG_ELOOP).c
 
-ifdef CONFIG_SEAMLESS_ROAMING
-L_CFLAGS += -DSEAMLESS_ROAMING
-endif
 
 ifdef CONFIG_EAPOL_TEST
 L_CFLAGS += -Werror -DEAPOL_TEST
@@ -249,14 +288,6 @@ CONFIG_AP=y
 ifdef CONFIG_P2P_STRICT
 L_CFLAGS += -DCONFIG_P2P_STRICT
 endif
-endif
-
-ifdef CONFIG_WFD
-OBJS += wfd_supplicant.c
-OBJS += src/wfd/wfd.c
-OBJS += src/wfd/wfd_parse.c
-OBJS += src/wfd/wfd_build.c
-L_CFLAGS += -DCONFIG_WFD
 endif
 
 ifdef CONFIG_INTERWORKING
@@ -429,6 +460,13 @@ endif
 CONFIG_IEEE8021X_EAPOL=y
 CONFIG_EAP_SIM_COMMON=y
 NEED_AES_CBC=y
+endif
+ifdef CONFIG_QMI_OFFLOAD
+L_CFLAGS += -DSIM_AKA_QUALCOMM
+L_CFLAGS += -DSIM_AKA_IDENTITY_IMSI
+#L_CFLAGS += -DSIM_AKA_IMSI_RAW_ENABLED
+OBJS += eap_proxy.c
+CONFIG_IEEE8021X_EAPOL=y
 endif
 
 ifdef CONFIG_EAP_LEAP
@@ -699,6 +737,9 @@ endif
 ifdef CONFIG_IEEE8021X_EAPOL
 # IEEE 802.1X/EAPOL state machines (e.g., for RADIUS authentication)
 L_CFLAGS += -DIEEE8021X_EAPOL
+ifdef CONFIG_QMI_OFFLOAD
+L_CFLAGS += -DSIM_AKA_QUALCOMM
+endif
 OBJS += src/eapol_supp/eapol_supp_sm.c
 OBJS += src/eap_peer/eap.c src/eap_peer/eap_methods.c
 NEED_EAP_COMMON=y
@@ -1194,17 +1235,6 @@ endif
 ifndef DBUS_INCLUDE
 DBUS_INCLUDE := $(shell $(PKG_CONFIG) --cflags dbus-1)
 endif
-dbus_version=$(subst ., ,$(shell $(PKG_CONFIG) --modversion dbus-1))
-DBUS_VERSION_MAJOR=$(word 1,$(dbus_version))
-DBUS_VERSION_MINOR=$(word 2,$(dbus_version))
-ifeq ($(DBUS_VERSION_MAJOR),)
-DBUS_VERSION_MAJOR=0
-endif
-ifeq ($(DBUS_VERSION_MINOR),)
-DBUS_VERSION_MINOR=0
-endif
-DBUS_INCLUDE += -DDBUS_VERSION_MAJOR=$(DBUS_VERSION_MAJOR)
-DBUS_INCLUDE += -DDBUS_VERSION_MINOR=$(DBUS_VERSION_MINOR)
 DBUS_CFLAGS += $(DBUS_INCLUDE)
 endif
 
@@ -1266,7 +1296,7 @@ endif
 ifdef CONFIG_NO_STDOUT_DEBUG
 L_CFLAGS += -DCONFIG_NO_STDOUT_DEBUG
 ifndef CONFIG_CTRL_IFACE
-L_CFLAGS += -DCONFIG_NO_WPA_MSG
+#L_CFLAGS += -DCONFIG_NO_WPA_MSG
 endif
 endif
 
@@ -1408,6 +1438,11 @@ OBJS += $(OBJS_d) src/drivers/drivers.c
 OBJS += $(OBJS_l2)
 endif
 
+ifdef CONFIG_WAPI
+L_CFLAGS += -DCONFIG_WAPI
+OBJS += wapi.c
+endif
+
 ifdef CONFIG_NDIS_EVENTS_INTEGRATED
 L_CFLAGS += -DCONFIG_NDIS_EVENTS_INTEGRATED
 OBJS += src/drivers/ndis_events.c
@@ -1440,16 +1475,24 @@ LOCAL_MODULE := wpa_supplicant
 ifdef CONFIG_DRIVER_CUSTOM
 LOCAL_STATIC_LIBRARIES := libCustomWifi
 endif
+ifdef CONFIG_WAPI
+LOCAL_STATIC_LIBRARIES += libiwnwai_asue libsms4 libecc
+endif
 ifneq ($(BOARD_WPA_SUPPLICANT_PRIVATE_LIB),)
 ##Build as part of wpa_supplicant build now
 ##LOCAL_STATIC_LIBRARIES += $(BOARD_WPA_SUPPLICANT_PRIVATE_LIB)
 endif
 LOCAL_SHARED_LIBRARIES := libc libcutils
+ifdef CONFIG_QMI_OFFLOAD
+LOCAL_SHARED_LIBRARIES += libqmi
+LOCAL_SHARED_LIBRARIES += libqmiservices
+LOCAL_SHARED_LIBRARIES += libidl
+endif
 ifeq ($(CONFIG_TLS), openssl)
 LOCAL_SHARED_LIBRARIES += libcrypto libssl
 endif
 ifdef CONFIG_DRIVER_NL80211
-LOCAL_STATIC_LIBRARIES += libnl_2
+LOCAL_SHARED_LIBRARIES += libnl_2
 endif
 LOCAL_CFLAGS := $(L_CFLAGS)
 LOCAL_SRC_FILES := $(OBJS)

@@ -329,6 +329,7 @@ struct msm_isp_event_ctrl {
 		struct msm_cam_evt_divert_frame div_frame;
 		struct msm_mctl_pp_event_info pp_event_info;
 	} isp_data;
+	uint32_t evt_id;
 };
 
 #define MSM_CAM_RESP_CTRL              0
@@ -642,6 +643,8 @@ struct msm_stats_buf {
 	uint32_t status_bits;
 	unsigned long buffer;
 	int fd;
+	int length;
+	struct ion_handle *handle;
 	uint32_t frame_id;
 };
 #define MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT 0
@@ -767,11 +770,10 @@ struct msm_snapshot_pp_status {
 #define CFG_GET_EEPROM_DATA		33
 #define CFG_SET_ACTUATOR_INFO		34
 #define CFG_GET_ACTUATOR_INFO		35
-#define CFG_SET_AE_METER	36 /* FIH-SW3-MM-SL-Add WB-00+ */
-#define CFG_SET_SCENE		37 /* FIH-SW3-MM-SL-Add WB-00+ */
-#define CFG_SET_TOUCH_FOCUS 38//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+
-#define CFG_GET_FLASH_STATE	39 /*MTD-MM-SL-ModifyPicDetailInfo-01+*/
-#define CFG_MAX			40//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00* /*MTD-MM-SL-ModifyPicDetailInfo-01**/
+#define CFG_SET_ISO			36
+#define CFG_SET_SCENE		37/*++ PeterShih 20120425 add the camera sensor function ++*/
+#define CFG_MAX			38 //Flea modify for camera API
+
 
 #define MOVE_NEAR	0
 #define MOVE_FAR	1
@@ -782,7 +784,6 @@ struct msm_snapshot_pp_status {
 #define SENSOR_HFR_60FPS_MODE 3
 #define SENSOR_HFR_90FPS_MODE 4
 #define SENSOR_HFR_120FPS_MODE 5
-#define SENSOR_RESET_MODE 6 /* FIH-SW3-MM-SL-camframe timeout-00+ */
 
 #define SENSOR_QTR_SIZE			0
 #define SENSOR_FULL_SIZE		1
@@ -885,31 +886,6 @@ struct msm_snapshot_pp_status {
 #define CAMERA_EXPOSURE_COMPENSATION_LV3			-6
 #define CAMERA_EXPOSURE_COMPENSATION_LV4			-12
 
-/* FIH-SW3-MM-SL-Add WB-00*{ */
-#define WB_AUTO      1  
-#define WB_CUSTOM      2
-#define WB_INCANDESCENT    3
-#define WB_FLUORESCENT    4
-#define WB_DAYLIGHT        5
-#define WB_CLOUDY_DAYLIGHT    6
-#define WB_TWILIGHT    7
-#define WB_SHADE   8
-#define WB_OFF    9
-
-#define AE_MULTI  0  
-#define AE_CENTER      1
-#define AE_SPOT    2
-#define AE_AUTO   3
-
-#define SCENE_AUTO      0
-#define SCENE_LANDSCAPE 1//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+
-#define SCENE_SNOW      2
-#define SCENE_BEACH     3
-#define SCENE_NIGHT     5
-#define SCENE_SPORT     8
-#define SCENE_DOCUMENT 18//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+
-
-/* FIH-SW3-MM-SL-Add WB-00*} */
 enum msm_v4l2_saturation_level {
 	MSM_V4L2_SATURATION_L0,
 	MSM_V4L2_SATURATION_L1,
@@ -994,6 +970,7 @@ struct focus_cfg {
 };
 
 struct fps_cfg {
+	uint16_t fps_type;//Flea add for driver.
 	uint16_t f_mult;
 	uint16_t fps_div;
 	uint32_t pict_fps_div;
@@ -1098,20 +1075,6 @@ struct cord {
 	uint32_t y;
 };
 
-/* FIH-SW3-MM-UW-add touch AF-00+*/
-//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+{
-struct touch_af_rect {
-  uint16_t x;
-  uint16_t y;
-  uint16_t dx;
-  uint16_t dy;
-  uint8_t num_roi;
-  uint16_t preview_ratio; 
-};
-//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+}
-/* FIH-SW3-MM-UW-add touch AF-00-*/
-
-
 struct sensor_cfg_data {
 	int cfgtype;
 	int mode;
@@ -1119,12 +1082,6 @@ struct sensor_cfg_data {
 	uint8_t max_steps;
 
 	union {
-		/* FIH-SW3-MM-SL-Add WB-00+ */
-		int8_t wb; 
-		int8_t meter; 
-		int8_t scene; 
-		/* FIH-SW3-MM-SL-Add WB-00- */		
-        int32_t af_mode;//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+
 		int8_t effect;
 		uint8_t lens_shading;
 		uint16_t prevl_pf;
@@ -1133,8 +1090,6 @@ struct sensor_cfg_data {
 		uint16_t pictp_pl;
 		uint32_t pict_max_exp_lc;
 		uint16_t p_fps;
-		uint16_t v_fps; /* FIH-SW3-MM-SL-Set FPS-00+ */
-		int8_t flash_state;/*MTD-MM-SL-ModifyPicDetailInfo-01+*/
 		struct sensor_init_cfg init_info;
 		struct sensor_pict_fps gfps;
 		struct exp_gain_cfg exp_gain;
@@ -1155,9 +1110,9 @@ struct sensor_cfg_data {
 		uint8_t wb_val;
 		int8_t exp_compensation;
 		struct cord aec_cord;
-        struct touch_af_rect af_rect;//FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+
 		int is_autoflash;
 		struct mirror_flip mirror_flip;
+		int8_t iso;//Flea modify 
 	} cfg;
 };
 
@@ -1233,6 +1188,13 @@ struct msm_camera_info {
 	uint32_t s_mount_angle[MSM_MAX_CAMERA_SENSORS];
 	const char *video_dev_name[MSM_MAX_CAMERA_SENSORS];
 	enum sensor_type_t sensor_type[MSM_MAX_CAMERA_SENSORS];
+/*++ PeterShih - 20120417 for camera HW version ++*/
+        /**
+         * The direction that the camera hardware version.
+         * 
+         */
+   int hw_version[MSM_MAX_CAMERA_SENSORS];
+/*-- PeterShih - 20120417 for camera HW version --*/
 
 };
 
@@ -1249,7 +1211,6 @@ struct msm_mctl_node_info {
 
 struct flash_ctrl_data {
 	int flashtype;
-    int ledmode;//SW2D2-MM-MC-Camera-BringUpLm3561ForFlashLed-00+
 	union {
 		int led_state;
 		struct strobe_flash_ctrl_data strobe_ctrl;

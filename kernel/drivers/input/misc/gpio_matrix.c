@@ -104,6 +104,50 @@ static void remove_phantom_keys(struct gpio_kp *kp)
 	}
 }
 
+#if 0  // [Arima Edison] block it 20120523
+/*<<Skies-2012/04/11, key sequence of generating crash for ram dump*/
+#define FORCE_CRASH_TIMEOUT	(HZ*2)
+#define VOL_U KEY_VOLUMEUP
+#define VOL_D KEY_VOLUMEDOWN
+static unsigned char check_crash_step[] = {VOL_U, VOL_U, VOL_D, VOL_D, VOL_D, VOL_U, VOL_D, VOL_U, VOL_D,\
+					   VOL_U, VOL_U, VOL_D, VOL_D, VOL_D, VOL_U, VOL_D, VOL_U, VOL_D};
+
+static unsigned char force_crash_step = 0;
+static unsigned long force_crash_basetime = 0;
+
+void check_crash_seq(unsigned short keycode)
+{
+	if (keycode == check_crash_step[force_crash_step++]) {
+		unsigned long curtime = 0;
+
+		curtime = jiffies;
+#if 0
+		pr_emerg("key(%x), dur(%ld)", keycode, curtime - force_crash_basetime);
+#endif
+		if ((force_crash_basetime) && time_before((force_crash_basetime + FORCE_CRASH_TIMEOUT), curtime)) {
+			force_crash_step = 0;
+			force_crash_basetime = 0;							
+		}
+		force_crash_basetime = curtime;
+
+	} else {
+		force_crash_step = 0;
+		force_crash_basetime = 0;
+	}
+	
+	if (force_crash_step == sizeof(check_crash_step)/sizeof(check_crash_step[0])) {
+		//if (! ramdump on progress)
+		pr_emerg("*************FORCE CRASH***************\n");
+		{
+			*(int* const)(0x0) = 0;
+		}
+	}	
+}
+
+
+/*>>Skies-2012/04/11, key sequence of generating crash for ram dump*/
+#endif
+
 static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 {
 	struct gpio_event_matrix_info *mi = kp->keypad_info;
@@ -126,6 +170,17 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
 			input_report_key(kp->input_devs->dev[dev], keycode, pressed);
+#if 0	//[Arima Ediosn] block it 20120523		
+/*<<Skies-2012/04/11, key sequence of generating crash for ram dump*/
+			pr_info("gpiomatrix: key %x, %d-%d (%d-%d) "
+					"changed to %d\n", keycode,
+					out, in, mi->output_gpios[out],
+					mi->input_gpios[in], pressed);
+			if (pressed == 0)			
+				check_crash_seq(keycode);
+		
+/*>>Skies-2012/04/11, key sequence of generating crash for ram dump*/
+#endif			
 		}
 	}
 }

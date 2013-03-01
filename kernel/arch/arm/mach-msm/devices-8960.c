@@ -45,7 +45,7 @@
 #include <mach/msm_dcvs.h>
 
 #ifdef CONFIG_MSM_MPM
-#include "mpm.h"
+#include <mach/mpm.h>
 #endif
 #ifdef CONFIG_MSM_DSPS
 #include <mach/msm_dsps.h>
@@ -489,6 +489,58 @@ static struct msm_bus_vectors vidc_vdec_1080p_vectors[] = {
 		.ib  = 10000000,
 	},
 };
+static struct msm_bus_vectors vidc_venc_1080p_turbo_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_HD_CODEC_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 222298112,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_HD_CODEC_PORT1,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 330301440,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 700000000,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 10000000,
+	},
+};
+static struct msm_bus_vectors vidc_vdec_1080p_turbo_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_HD_CODEC_PORT0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 222298112,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_HD_CODEC_PORT1,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 330301440,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 700000000,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 10000000,
+	},
+};
 
 static struct msm_bus_paths vidc_bus_client_config[] = {
 	{
@@ -518,6 +570,14 @@ static struct msm_bus_paths vidc_bus_client_config[] = {
 	{
 		ARRAY_SIZE(vidc_vdec_1080p_vectors),
 		vidc_vdec_1080p_vectors,
+	},
+	{
+		ARRAY_SIZE(vidc_venc_1080p_turbo_vectors),
+		vidc_vdec_1080p_turbo_vectors,
+	},
+	{
+		ARRAY_SIZE(vidc_vdec_1080p_turbo_vectors),
+		vidc_vdec_1080p_turbo_vectors,
 	},
 };
 
@@ -575,6 +635,7 @@ struct msm_vidc_platform_data vidc_platform_data = {
 #endif
 	.disable_dmx = 0,
 	.disable_fullhd = 0,
+	.cont_mode_dpb_count = 18,
 };
 
 struct platform_device msm_device_vidc = {
@@ -593,7 +654,6 @@ struct platform_device msm_device_vidc = {
 #define MSM_SDC2_BASE         0x12140000
 #define MSM_SDC2_DML_BASE     (MSM_SDC2_BASE + 0x800)
 #define MSM_SDC2_BAM_BASE     (MSM_SDC2_BASE + 0x2000)
-#define MSM_SDC2_BASE         0x12140000
 #define MSM_SDC3_BASE         0x12180000
 #define MSM_SDC3_DML_BASE     (MSM_SDC3_BASE + 0x800)
 #define MSM_SDC3_BAM_BASE     (MSM_SDC3_BASE + 0x2000)
@@ -1199,6 +1259,21 @@ static struct resource msm_csiphy1_resources[] = {
 	},
 };
 
+static struct resource msm_csiphy2_resources[] = {
+	{
+		.name	= "csiphy",
+		.start	= 0x04801400,
+		.end	= 0x04801400 + SZ_1K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "csiphy",
+		.start	= MSM8960_CSIPHY_2_2LN_IRQ,
+		.end	= MSM8960_CSIPHY_2_2LN_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
 struct platform_device msm8960_device_csiphy0 = {
 	.name           = "msm_csiphy",
 	.id             = 0,
@@ -1211,6 +1286,13 @@ struct platform_device msm8960_device_csiphy1 = {
 	.id             = 1,
 	.resource       = msm_csiphy1_resources,
 	.num_resources  = ARRAY_SIZE(msm_csiphy1_resources),
+};
+
+struct platform_device msm8960_device_csiphy2 = {
+	.name           = "msm_csiphy",
+	.id             = 2,
+	.resource       = msm_csiphy2_resources,
+	.num_resources  = ARRAY_SIZE(msm_csiphy2_resources),
 };
 
 static struct resource msm_csid0_resources[] = {
@@ -1243,6 +1325,21 @@ static struct resource msm_csid1_resources[] = {
 	},
 };
 
+static struct resource msm_csid2_resources[] = {
+	{
+		.name	= "csid",
+		.start	= 0x04801800,
+		.end	= 0x04801800 + SZ_1K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "csid",
+		.start	= CSI_2_IRQ,
+		.end	= CSI_2_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
 struct platform_device msm8960_device_csid0 = {
 	.name           = "msm_csid",
 	.id             = 0,
@@ -1255,6 +1352,13 @@ struct platform_device msm8960_device_csid1 = {
 	.id             = 1,
 	.resource       = msm_csid1_resources,
 	.num_resources  = ARRAY_SIZE(msm_csid1_resources),
+};
+
+struct platform_device msm8960_device_csid2 = {
+	.name           = "msm_csid",
+	.id             = 2,
+	.resource       = msm_csid2_resources,
+	.num_resources  = ARRAY_SIZE(msm_csid2_resources),
 };
 
 struct resource msm_ispif_resources[] = {

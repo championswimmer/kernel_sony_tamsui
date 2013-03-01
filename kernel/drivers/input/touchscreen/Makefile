@@ -69,6 +69,9 @@ obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
 obj-$(CONFIG_TOUCHSCREEN_MSM_LEGACY)		+= msm_touch.o
 obj-$(CONFIG_TOUCHSCREEN_CY8C_TS)	+= cy8c_ts.o
 obj-$(CONFIG_TOUCHSCREEN_CYTTSP_I2C)       += cyttsp-i2c.o
-obj-$(CONFIG_FIH_TOUCHSCREEN_CYTTSP_I2C_TMA340) += cyttsp_i2c_tma340.o
-obj-$(CONFIG_FIH_TOUCHSCREEN_CYTTSP_I2C_TMA340) += cyttsp_core.o
-obj-$(CONFIG_FIH_TOUCHSCREEN_SYNAPTICS_T1320) += synaptics_i2c_t1320.o
+##<<MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+obj-$(CONFIG_TOUCHSCREEN_ELAN_EKTF2040)    += ektf2k.o
+##obj-$(CONFIG_TOUCHSCREEN_ILITEK_2103T)    += ili2103t_ts.o
+obj-$(CONFIG_TOUCHSCREEN_ILITEK_2103T)    += ilitek_aimv8.o
+##>>MelChang,[Harry] Add ELAN eKTF2040 and ILITEK ILI2013t touch panel IC
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CY8CTMA340)    += cy8c_ts.o

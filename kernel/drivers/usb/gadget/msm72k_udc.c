@@ -5,7 +5,6 @@
  * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  * Author: Mike Lockwood <lockwood@android.com>
  *         Brian Swetland <swetland@google.com>
- * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -223,8 +222,6 @@ struct usb_info {
 	struct otg_transceiver *xceiv;
 	enum usb_device_state usb_state;
 	struct wake_lock	wlock;
-
-	bool checked;//MTD-CONN-EH-CHARGING-00+
 };
 
 static const struct usb_ep_ops msm72k_ep_ops;
@@ -325,21 +322,8 @@ static int usb_get_max_power(struct usb_info *ui)
 	if (temp == USB_CHG_TYPE__WALLCHARGER)
 		return USB_WALLCHARGER_CHG_CURRENT;
 
-        /*
-        * FIH-MTD-CONN-MW-USB_Charging-00+[
-        */
 	if (suspended || !configured)
-	{
-        printk(KERN_INFO "msm72k_udc: %s, suspended || !configured... \n", __func__);//PC State:S3        
-        #ifdef CONFIG_FIH_USB_CHARGING_WHEN_CONNECT_TO_PC_WHICH_UNDER_STANDBY_MODE
-	        return 500;
-        #else
 		return 0;
-        #endif
-	}	  
-        /*
-        * FIH-MTD-CONN-MW-USB_Charging-00+]
-        */
 
 	return bmaxpow;
 }
@@ -434,7 +418,7 @@ static void usb_chg_detect(struct work_struct *w)
 	enum chg_type temp = USB_CHG_TYPE__INVALID;
 	unsigned long flags;
 	int maxpower;
-        printk(KERN_INFO"%s:enter \n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */
+
 	spin_lock_irqsave(&ui->lock, flags);
 	if (ui->usb_state == USB_STATE_NOTATTACHED) {
 		spin_unlock_irqrestore(&ui->lock, flags);
@@ -442,12 +426,14 @@ static void usb_chg_detect(struct work_struct *w)
 	}
 
 	temp = usb_get_chg_type(ui);
-	printk(KERN_INFO"%s:usb_get_chg_type =%d\n", __func__,temp);
-	ui->checked = false;//MTD-CONN-EH-CHARGING-00+
 	spin_unlock_irqrestore(&ui->lock, flags);
 
 	atomic_set(&otg->chg_type, temp);
 	maxpower = usb_get_max_power(ui);
+	//[Arima Edison] add to enable perform chargin through D+ & D- opened charger++
+	if(temp==USB_CHG_TYPE__SDP)
+		maxpower = 500;
+	//[Arima Edison] add to enable perform chargin through D+ & D- opened charger++
 	if (maxpower > 0)
 		otg_set_power(ui->xceiv, maxpower);
 
@@ -1518,7 +1504,6 @@ static void usb_do_work(struct work_struct *w)
 				pm_runtime_resume(&ui->pdev->dev);
 				dev_dbg(&ui->pdev->dev,
 					"msm72k_udc: IDLE -> ONLINE\n");
-				printk(KERN_INFO"msm72k_udc:%s: IDLE -> ONLINE\n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */
 				usb_reset(ui);
 				ret = request_irq(otg->irq, usb_interrupt,
 							IRQF_SHARED,
@@ -1566,7 +1551,7 @@ static void usb_do_work(struct work_struct *w)
 
 				dev_dbg(&ui->pdev->dev,
 					"msm72k_udc: ONLINE -> OFFLINE\n");
-                                printk(KERN_INFO"msm72k_udc:%s:  ONLINE -> OFFLINE\n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */
+
 				atomic_set(&ui->running, 0);
 				atomic_set(&ui->remote_wakeup, 0);
 				atomic_set(&ui->configured, 0);
@@ -1606,7 +1591,6 @@ static void usb_do_work(struct work_struct *w)
 				switch_set_state(&ui->sdev, 0);
 
 				ui->state = USB_STATE_OFFLINE;
-				ui->checked = false;//MTD-CONN-EH-CHARGING-00+
 				usb_do_work_check_vbus(ui);
 				pm_runtime_put_noidle(&ui->pdev->dev);
 				pm_runtime_suspend(&ui->pdev->dev);
@@ -1650,13 +1634,11 @@ static void usb_do_work(struct work_struct *w)
 			if (flags & USB_FLAG_RESET) {
 				dev_dbg(&ui->pdev->dev,
 					"msm72k_udc: ONLINE -> RESET\n");
-                                printk(KERN_INFO"msm72k_udc:%s:  ONLINE -> RESET\n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */				
 				msm72k_pullup_internal(&ui->gadget, 0);
 				usb_reset(ui);
 				msm72k_pullup_internal(&ui->gadget, 1);
 				dev_dbg(&ui->pdev->dev,
 					"msm72k_udc: RESET -> ONLINE\n");
-                                printk(KERN_INFO"msm72k_udc:%s:  RESET -> ONLINE \n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */				
 				break;
 			}
 			break;
@@ -1671,10 +1653,9 @@ static void usb_do_work(struct work_struct *w)
 				pm_runtime_resume(&ui->pdev->dev);
 				dev_dbg(&ui->pdev->dev,
 					"msm72k_udc: OFFLINE -> ONLINE\n");
-                                printk(KERN_INFO"msm72k_udc:%s: OFFLINE  -> ONLINE\n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */		
+
 				usb_reset(ui);
 				ui->state = USB_STATE_ONLINE;
-				ui->checked = true;//MTD-CONN-EH-CHARGING-00+
 				usb_do_work_check_vbus(ui);
 				ret = request_irq(otg->irq, usb_interrupt,
 							IRQF_SHARED,
@@ -1692,10 +1673,7 @@ static void usb_do_work(struct work_struct *w)
 				enable_irq_wake(otg->irq);
 
 				if (!atomic_read(&ui->softconnect))
-				{
-					printk(KERN_INFO"msm72k_udc:%s: USB not probe!!!\n", __func__);
 					break;
-				}
 				msm72k_pullup_internal(&ui->gadget, 1);
 
 				if (!ui->gadget.is_a_peripheral)
@@ -2015,14 +1993,12 @@ static void usb_debugfs_init(struct usb_info *ui)
 		return;
 
 	debugfs_create_file("status", 0444, dent, ui, &debug_stat_ops);
-	/*MTD-CONN-EH-FS_PERMISSION-00*{*/
-	debugfs_create_file("reset", 0220, dent, ui, &debug_reset_ops);
-	debugfs_create_file("cycle", 0220, dent, ui, &debug_cycle_ops);
-	debugfs_create_file("release_wlocks", 0331, dent, ui,
+	debugfs_create_file("reset", 0222, dent, ui, &debug_reset_ops);
+	debugfs_create_file("cycle", 0222, dent, ui, &debug_cycle_ops);
+	debugfs_create_file("release_wlocks", 0666, dent, ui,
 						&debug_wlocks_ops);
-	/*MTD-CONN-EH-FS_PERMISSION-00*}*/
-	debugfs_create_file("prime_fail_countt", 0664, dent, ui,
-						&prime_fail_ops);	/*MTD-CONN-MW-FS_PERMISSION-00*}*/
+	debugfs_create_file("prime_fail_countt", 0666, dent, ui,
+						&prime_fail_ops);
 }
 #else
 static void usb_debugfs_init(struct usb_info *ui) {}
@@ -2273,7 +2249,6 @@ static int msm72k_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
 					 == USB_CHG_TYPE__WALLCHARGER)
 		wake_lock(&ui->wlock);
 
-	printk(KERN_INFO"usb:%s: vbus state = %d\n", __func__, is_active);//MTD-CONN-EH-LOG-02+
 	msm_hsusb_set_vbus_state(is_active);
 	return 0;
 }
@@ -2310,12 +2285,14 @@ static int msm72k_pullup_internal(struct usb_gadget *_gadget, int is_active)
 static int msm72k_pullup(struct usb_gadget *_gadget, int is_active)
 {
 	struct usb_info *ui = container_of(_gadget, struct usb_info, gadget);
+	struct msm_otg *otg = to_msm_otg(ui->xceiv);
 	unsigned long flags;
 
 	atomic_set(&ui->softconnect, is_active);
 
 	spin_lock_irqsave(&ui->lock, flags);
-	if (ui->usb_state == USB_STATE_NOTATTACHED || ui->driver == NULL) {
+	if (ui->usb_state == USB_STATE_NOTATTACHED || ui->driver == NULL ||
+		atomic_read(&otg->chg_type) == USB_CHG_TYPE__WALLCHARGER) {
 		spin_unlock_irqrestore(&ui->lock, flags);
 		return 0;
 	}
@@ -2323,11 +2300,8 @@ static int msm72k_pullup(struct usb_gadget *_gadget, int is_active)
 
 	msm72k_pullup_internal(_gadget, is_active);
 
-	if (ui->checked)//MTD-CONN-EH-CHARGING-00+
-	{
 	if (is_active && !ui->gadget.is_a_peripheral)
 		schedule_delayed_work(&ui->chg_det, USB_CHG_DET_DELAY);
-		}
 
 	return 0;
 }
@@ -2569,7 +2543,7 @@ static int msm72k_probe(struct platform_device *pdev)
 	struct usb_info *ui;
 	struct msm_otg *otg;
 	int retval;
-        printk(KERN_INFO"msm72k_udc: %s:enter \n", __func__);/* MTD-CONN-MW-USB_ADD_DBG_LOG-01+ */
+
 	dev_dbg(&pdev->dev, "msm72k_probe\n");
 	ui = kzalloc(sizeof(struct usb_info), GFP_KERNEL);
 	if (!ui)
@@ -2599,8 +2573,6 @@ static int msm72k_probe(struct platform_device *pdev)
 	dev_set_name(&ui->gadget.dev, "gadget");
 	ui->gadget.dev.parent = &pdev->dev;
 	ui->gadget.dev.dma_mask = pdev->dev.dma_mask;
-
-	ui->checked = false;//MTD-CONN-EH-CHARGING-00+
 
 #ifdef CONFIG_USB_OTG
 	ui->gadget.is_otg = 1;

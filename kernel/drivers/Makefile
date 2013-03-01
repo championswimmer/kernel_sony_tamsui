@@ -9,6 +9,9 @@ obj-y				+= gpio/
 obj-$(CONFIG_PCI)		+= pci/
 obj-$(CONFIG_PARISC)		+= parisc/
 obj-$(CONFIG_RAPIDIO)		+= rapidio/
+#[Arima Edison] modify the init sequence++
+obj-y				+= leds/
+#[Arima Edison] modify the init sequence--
 obj-y				+= video/
 obj-y				+= idle/
 obj-$(CONFIG_ACPI)		+= acpi/
@@ -99,7 +102,9 @@ obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
 obj-$(CONFIG_CPU_IDLE)		+= cpuidle/
 obj-$(CONFIG_MMC)		+= mmc/
 obj-$(CONFIG_MEMSTICK)		+= memstick/
-obj-$(CONFIG_NEW_LEDS)		+= leds/
+#[Arima Edison] modify the init sequence ++
+#obj-y				+= leds/
+#[Arima Edison] modify the init sequence --
 obj-$(CONFIG_SWITCH)		+= switch/
 obj-$(CONFIG_INFINIBAND)	+= infiniband/
 obj-$(CONFIG_SGI_SN)		+= sn/
@@ -123,6 +128,5 @@ obj-y				+= platform/
 obj-y				+= ieee802154/
 #common clk code
 obj-y				+= clk/
-obj-$(CONFIG_FIH_VIBRATOR_CLASS)	+= vibrators/
+
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
-obj-$(CONFIG_FIH_DEVELOPMENT_TOOL)	+= development_tool/

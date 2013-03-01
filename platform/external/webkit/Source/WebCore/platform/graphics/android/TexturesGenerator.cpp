@@ -104,7 +104,9 @@ void TexturesGenerator::removeOperationsForFilter(OperationFilter* filter, bool 
             // The solution is use this as a flag to tell Tex Gen thread that
             // UI thread is waiting now, Tex Gen thread should not wait for the
             // queue any more.
-            m_tilesManager->transferQueue()->interruptTransferQueue(true);
+            //TPSW1_SoMC_2nd_Patches_Begin   
+           m_tilesManager->transferQueue()->interruptTransferQueue(true);
+            //TPSW1_SoMC_2nd_Patches_End   
         }
 
         delete filter;
@@ -122,6 +124,8 @@ void TexturesGenerator::removeOperationsForFilter(OperationFilter* filter, bool 
 
 status_t TexturesGenerator::readyToRun()
 {
+    //TPSW1_SoMC_2nd_Patches_Begin  
+     //TPSW1_SoMC_2nd_Patches_End  
     XLOG("Thread ready to run");
     return NO_ERROR;
 }
@@ -191,7 +195,9 @@ bool TexturesGenerator::threadLoop()
             stop = true;
         if (m_waitForCompletion) {
             m_waitForCompletion = false;
+             //TPSW1_SoMC_2nd_Patches_Begin  
             m_tilesManager->transferQueue()->interruptTransferQueue(false);
+             //TPSW1_SoMC_2nd_Patches_End  
             mRequestedOperationsCond.signal();
         }
         mRequestedOperationsLock.unlock();

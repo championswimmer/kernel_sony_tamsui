@@ -307,11 +307,28 @@ static struct i2c_board_info i2c_camera_devices[] = {
 };
 #else
 static uint32_t camera_off_gpio_table[] = {
-	GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+	// << FerryWu, 2012/06/13, SoMC S1 boot integration
+	GPIO_CFG(10, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	// >> FerryWu, 2012/06/13, SoMC S1 boot integration
+	GPIO_CFG(14, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	GPIO_CFG(26, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	GPIO_CFG(27, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	/* Tracy moify-20120829 Disable Tearing function for white screen issue, only turn on TE when entry camera preview */
+	GPIO_CFG(97, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 };
 
 static uint32_t camera_on_gpio_table[] = {
-	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+	// << FerryWu, 2012/06/13, SoMC S1 boot integration
+	GPIO_CFG(10, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	// >> FerryWu, 2012/06/13, SoMC S1 boot integration
+	GPIO_CFG(14, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(26, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(27, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	/* Tracy moify-20120829 Disable Tearing function for white screen issue, only turn on TE when entry camera preview */
+	GPIO_CFG(97, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	/*-- PeterShih - 20110909 for samsung camera sensor --*/
 };
 
 #ifdef CONFIG_MSM_CAMERA_FLASH
@@ -322,11 +339,29 @@ static struct msm_camera_sensor_flash_src msm_flash_src = {
 };
 #endif
 
+//Jordan-20111230 , Arima modification for Samsung sensor
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
+static struct regulator_bulk_data regs_camera[] = {
+	{ .supply = "emmc", .min_uV = 2850000, .max_uV = 2850000 },
+};
+#endif
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
+static struct regulator_bulk_data regs_camera[] = {
+	{ .supply = "emmc", .min_uV = 2850000, .max_uV = 2850000 },
+};
+#endif
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
+static struct regulator_bulk_data regs_camera[] = {
+	{ .supply = "emmc", .min_uV = 2850000, .max_uV = 2850000 },
+};
+#endif
+#if 0//orignal
 static struct regulator_bulk_data regs_camera[] = {
 	{ .supply = "msme1", .min_uV = 1800000, .max_uV = 1800000 },
 	{ .supply = "gp2",   .min_uV = 2850000, .max_uV = 2850000 },
 	{ .supply = "usb2",  .min_uV = 1800000, .max_uV = 1800000 },
 };
+#endif //Jordan-20111230 , Arima modification for Samsung sensor
 
 static void qrd1_camera_gpio_cfg(void)
 {
@@ -387,13 +422,59 @@ static void qrd1_camera_gpio_cfg(void)
 
 static void msm_camera_vreg_config(int vreg_en)
 {
-	int rc = vreg_en ?
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
+	int rc=0;
+#endif
+//Jordan-20111230 , Arima modification for Samsung sensor
+#ifdef CONFIG_S5K5CA
+	
+	if (vreg_en) 
+		/* set 1v8 pin to high*/
+        gpio_set_value(14, 1);
+	else
+	   /* set 1v8 pin to low*/
+        gpio_set_value(14, 0);
+	
+#endif //Jordan-20111230 , Arima modification for Samsung sensor
+#ifdef CONFIG_MT9P111
+	
+	if (vreg_en) 
+		/* set 1v8 pin to high*/
+        gpio_set_value(14, 1);
+	else
+	   /* set 1v8 pin to low*/
+        gpio_set_value(14, 0);
+	
+#endif //Jordan-20111230 , Arima modification for Samsung sensor#ifdef CONFIG_S5K5CA
+
+#ifdef CONFIG_MT9V115_FRONT
+	
+	if (vreg_en) 
+		/* set 1v8 pin to high*/
+        gpio_set_value(14, 1);
+	else
+	   /* set 1v8 pin to low*/
+        gpio_set_value(14, 0);
+	
+#endif //Jordan-20111230 , Arima modification for Samsung sensor
+
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
+	rc = vreg_en ?
 		regulator_bulk_enable(ARRAY_SIZE(regs_camera), regs_camera) :
 		regulator_bulk_disable(ARRAY_SIZE(regs_camera), regs_camera);
 
 	if (rc)
 		pr_err("%s: could not %sable regulators: %d\n",
 				__func__, vreg_en ? "en" : "dis", rc);
+#endif //Jordan-20111230 , Arima modification for Samsung sensor
+//For 5855++
+       if (vreg_en) 
+		/* set 1v8 pin to high*/
+        gpio_set_value(10, 1);
+	else
+	   /* set 1v8 pin to low*/
+        gpio_set_value(10, 0);
+//For 5855--
 }
 
 static int config_gpio_table(uint32_t *table, int len)
@@ -417,6 +498,19 @@ static int config_camera_on_gpios_rear(void)
 {
 	int rc = 0;
 
+/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+#if 1//def CONFIG_S5K5CA //Jordan-20111230 modified
+	pr_emerg("Peter-config_camera_on_gpios_rear()");
+	rc = config_gpio_table(camera_on_gpio_table,
+			ARRAY_SIZE(camera_on_gpio_table));
+	if (rc < 0) {
+		pr_err("%s: CAMSENSOR gpio table request"
+			"failed\n", __func__);
+		return rc;
+	}
+	msm_camera_vreg_config(1);
+#else
+
 	if (machine_is_msm7x27a_ffa() || machine_is_msm7625a_ffa()
 				|| machine_is_msm7627a_qrd1())
 		msm_camera_vreg_config(1);
@@ -429,25 +523,37 @@ static int config_camera_on_gpios_rear(void)
 		return rc;
 	}
 
+#endif
+/*-- PeterShih - 20110909 for samsung camera sensor --*/
+
 	return rc;
 }
 
 static void config_camera_off_gpios_rear(void)
 {
+/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+#if 1//def CONFIG_S5K5CA //Jordan-20111230 , modifed
+	pr_emerg("Peter-config_camera_off_gpios_rear()");
+	config_gpio_table(camera_off_gpio_table,
+			ARRAY_SIZE(camera_off_gpio_table));
+	/* Tracy modify-20120831 Disable Tearing function for white screen issue, only turn on TE when entry camera preview */
+	gpio_tlmm_config(GPIO_CFG(97, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_DISABLE);
+	msm_camera_vreg_config(0);
+#else
 	if (machine_is_msm7x27a_ffa() || machine_is_msm7625a_ffa()
 				|| machine_is_msm7627a_qrd1())
 		msm_camera_vreg_config(0);
 
 	config_gpio_table(camera_off_gpio_table,
 			ARRAY_SIZE(camera_off_gpio_table));
+#endif
+/*-- PeterShih - 20110909 for samsung camera sensor --*/
 }
 
 static int config_camera_on_gpios_front(void)
 {
 	int rc = 0;
-
-	if (machine_is_msm7x27a_ffa() || machine_is_msm7625a_ffa()
-				|| machine_is_msm7627a_qrd1())
+	pr_emerg("Peter-config_camera_on_gpios_front()");
 		msm_camera_vreg_config(1);
 
 	rc = config_gpio_table(camera_on_gpio_table,
@@ -463,12 +569,13 @@ static int config_camera_on_gpios_front(void)
 
 static void config_camera_off_gpios_front(void)
 {
-	if (machine_is_msm7x27a_ffa() || machine_is_msm7625a_ffa()
-				|| machine_is_msm7627a_qrd1())
+	pr_emerg("Peter-config_camera_off_gpios_front()");
 		msm_camera_vreg_config(0);
 
 	config_gpio_table(camera_off_gpio_table,
 			ARRAY_SIZE(camera_off_gpio_table));
+	/* Tracy modify-20120831 Disable Tearing function for white screen issue, only turn on TE when entry camera preview */
+	gpio_tlmm_config(GPIO_CFG(97, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_DISABLE);
 }
 
 struct msm_camera_device_platform_data msm_camera_device_data_rear = {
@@ -557,7 +664,6 @@ static struct platform_device msm_camera_sensor_imx072 = {
 };
 #endif
 
-static struct msm_camera_sensor_info msm_camera_sensor_ov9726_data;
 #ifdef CONFIG_WEBCAM_OV9726
 static struct msm_camera_sensor_platform_info ov9726_sensor_7627a_info = {
 	.mount_angle = 90
@@ -575,7 +681,9 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov9726_data = {
 	.sensor_pwd	     = 85,
 	.vcm_pwd		= 1,
 	.vcm_enable	     = 0,
-	.pdata			= &msm_camera_device_data_front,
+	/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+	.pdata                  = &msm_camera_device_data_rear,
+	/*-- PeterShih - 20110909 for samsung camera sensor --*/
 	.flash_data	     = &flash_ov9726,
 	.sensor_platform_info   = &ov9726_sensor_7627a_info,
 	.csi_if			= 1
@@ -587,9 +695,103 @@ static struct platform_device msm_camera_sensor_ov9726 = {
 		.platform_data = &msm_camera_sensor_ov9726_data,
 	},
 };
-#else
-static inline void msm_camera_vreg_init(void) { }
+//Jordan-20111230 , removed 
+//#else
+//static inline void msm_camera_vreg_init(void) { }
 #endif
+
+/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+#ifdef CONFIG_S5K5CA
+static struct msm_camera_sensor_platform_info s5k5ca_sensor_s5k5ca_info = {
+	.mount_angle = 90
+};
+
+static struct msm_camera_sensor_flash_data flash_s5k5ca = {
+	.flash_type             = MSM_CAMERA_FLASH_NONE,
+	.flash_src              = &msm_flash_src
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_s5k5ca_data = {
+	.sensor_name    = "s5k5ca",
+	.sensor_reset_enable = 1,
+	.sensor_reset   = 26,
+	.sensor_pwd             = 85,
+	.vcm_pwd                = 27,
+	.vcm_enable             = 0,
+	.pdata                  = &msm_camera_device_data_rear,
+	.flash_data             = &flash_s5k5ca,
+	.sensor_platform_info   = &s5k5ca_sensor_s5k5ca_info,
+	.csi_if                 = 1
+};
+
+static struct platform_device msm_camera_sensor_s5k5ca = {
+	.name   = "msm_camera_s5k5ca",
+	.dev    = {
+		.platform_data = &msm_camera_sensor_s5k5ca_data,
+	},
+};
+#endif
+#ifdef CONFIG_MT9P111
+static struct msm_camera_sensor_platform_info mt9p111_sensor_7627a_info = {
+	.mount_angle = 90
+};
+
+static struct msm_camera_sensor_flash_data flash_mt9p111 = {
+	.flash_type             = MSM_CAMERA_FLASH_NONE,
+	.flash_src              = &msm_flash_src
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_mt9p111_data = {
+	.sensor_name    = "mt9p111",
+	.sensor_reset_enable = 1,
+	.sensor_reset   = 26,
+	.sensor_pwd             = 85,
+	.vcm_pwd                = 27,
+	.vcm_enable             = 0,
+	.pdata                  = &msm_camera_device_data_rear,
+	.flash_data             = &flash_mt9p111,
+	.sensor_platform_info   = &mt9p111_sensor_7627a_info,
+	.csi_if                 = 1
+};
+static struct platform_device msm_camera_sensor_mt9p111 = {
+	.name   = "msm_camera_mt9p111",
+	.dev    = {
+		.platform_data = &msm_camera_sensor_mt9p111_data,
+	},
+};
+#endif
+
+#ifdef CONFIG_MT9V115_FRONT
+static struct msm_camera_sensor_platform_info mt9v115_front_sensor_7627a_info = {
+	.mount_angle = 90
+};
+
+static struct msm_camera_sensor_flash_data flash_mt9v115_front = {
+	.flash_type             = MSM_CAMERA_FLASH_NONE,
+	.flash_src              = &msm_flash_src
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_mt9v115_front_data = {
+	.sensor_name    = "mt9v115_front",
+	.sensor_reset_enable = 1,
+	.sensor_reset   = 26,
+	.sensor_pwd             = 85,
+	.vcm_pwd                = 27,
+	.vcm_enable             = 0,
+	.pdata                  = &msm_camera_device_data_front,
+	.flash_data             = &flash_mt9v115_front,
+	.sensor_platform_info   = &mt9v115_front_sensor_7627a_info,
+	.csi_if                 = 1
+};
+
+static struct platform_device msm_camera_sensor_mt9v115_front = {
+	.name   = "msm_camera_mt9v115_front",
+	.dev    = {
+		.platform_data = &msm_camera_sensor_mt9v115_front_data,
+	},
+};
+#endif
+/*-- PeterShih - 20110909 for samsung camera sensor --*/
 
 #ifdef CONFIG_MT9E013
 static struct msm_camera_sensor_platform_info mt9e013_sensor_7627a_info = {
@@ -700,9 +902,31 @@ static struct i2c_board_info i2c_camera_devices[] = {
 	#endif
 	#ifdef CONFIG_WEBCAM_OV9726
 	{
-		I2C_BOARD_INFO("ov9726", 0x10),
+		/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+		I2C_BOARD_INFO("ov9726", 0x78>>1),
+		/*-- PeterShih - 20110909 for samsung camera sensor --*/
 	},
 	#endif
+/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+	#ifdef CONFIG_S5K5CA
+	{
+		I2C_BOARD_INFO("s5k5ca", 0x78>>1),
+	},
+	#endif
+/*-- PeterShih - 20110909 for samsung camera sensor --*/
+/*++ PeterShih - 20111226 for Aptina camera sensor ++*/
+	#ifdef CONFIG_MT9P111
+	{
+		I2C_BOARD_INFO("mt9p111", 0x78>>1),//Test Flea
+	},
+	#endif
+		#ifdef CONFIG_MT9V115_FRONT
+	{
+		I2C_BOARD_INFO("mt9v115_front", 0x7A>>1),//Test Flea
+	},
+	#endif
+
+/*-- PeterShih - 20111226 for Aptina camera sensor --*/
 	#ifdef CONFIG_IMX072
 	{
 		I2C_BOARD_INFO("imx072", 0x34),
@@ -741,6 +965,20 @@ static struct platform_device *camera_devices_msm[] __initdata = {
 #ifdef CONFIG_WEBCAM_OV9726
 	&msm_camera_sensor_ov9726,
 #endif
+/*++ PeterShih - 20110909 for samsung camera sensor ++*/
+#ifdef CONFIG_S5K5CA
+	&msm_camera_sensor_s5k5ca,
+#endif
+/*-- PeterShih - 20110909 for samsung camera sensor --*/
+/*++ PeterShih - 20111226 for Aptina camera sensor ++*/
+#ifdef CONFIG_MT9P111
+	&msm_camera_sensor_mt9p111,
+#endif
+#ifdef CONFIG_MT9V115_FRONT
+	&msm_camera_sensor_mt9v115_front,
+#endif
+
+/*-- PeterShih - 20111226 for Aptina camera sensor --*/
 #ifdef CONFIG_MT9E013
 	&msm_camera_sensor_mt9e013,
 #endif
@@ -787,7 +1025,9 @@ static void __init register_i2c_devices(void)
 
 void __init msm7627a_camera_init(void)
 {
-	int rc;
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
+	int rc=0;
+#endif
 
 #ifndef CONFIG_MSM_CAMERA_V4L2
 	if (machine_is_msm7627a_qrd1()) {
@@ -800,6 +1040,7 @@ void __init msm7627a_camera_init(void)
 #endif
 	if (!machine_is_msm7627a_qrd1())
 		register_i2c_devices();
+#if 0  /* PeterShih 20120405 - remove the camera regulator for Harry3.5 & Dragon*/
 	rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs_camera), regs_camera);
 
 	if (rc) {
@@ -813,6 +1054,7 @@ void __init msm7627a_camera_init(void)
 		pr_err("%s: could not set voltages: %d\n", __func__, rc);
 		return;
 	}
+#endif
 
 #if defined(CONFIG_MSM_CAMERA_V4L2)
 	msm7x27a_init_cam();

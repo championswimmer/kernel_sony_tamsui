@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+Copyright (c) 2012, Code Aurora Forum. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -337,7 +337,7 @@ bool CanvasLayerShader::drawPrimitives(std::vector<SkRect>& primitives, std::vec
         float height = fBottom - fTop;
 
         TransformationMatrix translate;
-        translate.translate3d(fLeft, fTop + m_titleBarHeight, 0.0);
+        translate.translate3d(fLeft, fTop, 0.0);
         TransformationMatrix scale;
         scale.scale3d(width, height, 1.0);
 

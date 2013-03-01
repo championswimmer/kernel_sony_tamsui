@@ -71,6 +71,11 @@ int suspend_valid_only_mem(suspend_state_t state)
 
 static int suspend_test(int level)
 {
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE"%s : level = %d \n",__func__,level);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
+
 #ifdef CONFIG_PM_DEBUG
 	if (pm_test_level == level) {
 		printk(KERN_INFO "suspend debug: Waiting for 5 seconds.\n");
@@ -93,6 +98,10 @@ static int suspend_prepare(void)
 
 	if (!suspend_ops || !suspend_ops->enter)
 		return -EPERM;
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "%s \n",__func__);
+	//[Arima Edison] add log to capture black screen issue 20121019--
 
 	pm_prepare_console();
 
@@ -137,6 +146,10 @@ void __attribute__ ((weak)) arch_suspend_enable_irqs(void)
 static int suspend_enter(suspend_state_t state)
 {
 	int error;
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "%s : state = %d \n",__func__,state);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	if (suspend_ops->prepare) {
 		error = suspend_ops->prepare();
@@ -182,6 +195,11 @@ static int suspend_enter(suspend_state_t state)
 	enable_nonboot_cpus();
 
  Platform_wake:
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "Platform_wake \n");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
+	
 	if (suspend_ops->wake)
 		suspend_ops->wake();
 
@@ -205,6 +223,10 @@ int suspend_devices_and_enter(suspend_state_t state)
 
 	if (!suspend_ops)
 		return -ENOSYS;
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "%s : state = %d \n",__func__,state);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	trace_machine_suspend(state);
 	if (suspend_ops->begin) {
@@ -226,6 +248,11 @@ int suspend_devices_and_enter(suspend_state_t state)
 	error = suspend_enter(state);
 
  Resume_devices:
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE" Resume_devices \n");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
+	
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
 	suspend_test_finish("resume devices");
@@ -275,6 +302,10 @@ int enter_state(suspend_state_t state)
 
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE"%s : satet = %d \n",__func__,state);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	suspend_sys_sync_queue();
 
@@ -309,7 +340,13 @@ int enter_state(suspend_state_t state)
 int pm_suspend(suspend_state_t state)
 {
 	if (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX)
+	{
+		//[Arima Edison] add log to capture black screen issue 20121019++
+		if(console_printk[4]>0)
+			printk(KERN_NOTICE "%s \n",__func__);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		return enter_state(state);
+	}	
 	return -EINVAL;
 }
 EXPORT_SYMBOL(pm_suspend);

@@ -39,6 +39,7 @@ using namespace android;
 
 class BaseLayerAndroid;
 class LayerAndroid;
+ //TPSW1_SoMC_2nd_Patches_Begin  
 class TilesManager;
 
 class TexturesGenerator : public Thread {
@@ -47,7 +48,9 @@ public:
         , m_waitForCompletion(false)
         , m_currentOperation(0)
         , m_tilesManager(instance) { }
-    virtual ~TexturesGenerator() { }
+   
+ //TPSW1_SoMC_2nd_Patches_End  
+ virtual ~TexturesGenerator() { }
     virtual status_t readyToRun();
 
     void removeOperationsForPage(TiledPage* page);
@@ -65,7 +68,9 @@ private:
     android::Condition mRequestedOperationsCond;
     bool m_waitForCompletion;
     QueuedOperation* m_currentOperation;
+     //TPSW1_SoMC_2nd_Patches_Begin  
     TilesManager* m_tilesManager;
+     //TPSW1_SoMC_2nd_Patches_End  
 };
 
 } // namespace WebCore

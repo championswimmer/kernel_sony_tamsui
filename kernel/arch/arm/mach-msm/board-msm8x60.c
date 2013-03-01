@@ -85,12 +85,13 @@
 #include <mach/rpm-regulator.h>
 #include <mach/restart.h>
 #include <mach/board-msm8660.h>
+#include <mach/iommu_domains.h>
 
 #include "devices.h"
 #include "devices-msm8x60.h"
 #include <mach/cpuidle.h>
 #include "pm.h"
-#include "mpm.h"
+#include <mach/mpm.h>
 #include "spm.h"
 #include "rpm_log.h"
 #include "timer.h"
@@ -101,6 +102,7 @@
 #include "rpm_resources.h"
 #include "acpuclock.h"
 #include "pm-boot.h"
+#include "board-storage-common-a.h"
 
 #include <linux/ion.h>
 #include <mach/ion.h>
@@ -2633,26 +2635,16 @@ static void __init msm8x60_init_dsps(void)
 #define MSM_FB_EXT_BUF_SIZE  \
 		(roundup((720 * 576 * 2), 4096) * 2) /* 2 bpp x 2 pages */
 #else
-#define MSM_FB_EXT_BUFT_SIZE	0
+#define MSM_FB_EXT_BUF_SIZE	0
 #endif
 
 /* Note: must be multiple of 4096 */
 #define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE + \
 				MSM_FB_DSUB_PMEM_ADDER, 4096)
 
-<<<<<<< .working
 #define MSM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
-<<<<<<< .working
 #define MSM_HDMI_PRIM_PMEM_SF_SIZE 0x8000000 /* 128 Mbytes */
 
-=======
-#define MSM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
-#define MSM_HDMI_PRIM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
-=======
-#define MSM_HDMI_PRIM_PMEM_SF_SIZE 0x8000000 /* 128 Mbytes */
->>>>>>> .merge-right.r7893
-
->>>>>>> .merge-right.r7079
 #ifdef CONFIG_FB_MSM_HDMI_AS_PRIMARY
 unsigned char hdmi_is_primary = 1;
 #else
@@ -2672,14 +2664,18 @@ unsigned char hdmi_is_primary;
 #endif  /* CONFIG_FB_MSM_OVERLAY1_WRITEBACK */
 
 #define MSM_PMEM_KERNEL_EBI1_SIZE  0x600000
-#define MSM_PMEM_ADSP_SIZE         0x2000000
+#define MSM_PMEM_ADSP_SIZE         0x4200000
 #define MSM_PMEM_AUDIO_SIZE        0x28B000
 
 #define MSM_SMI_BASE          0x38000000
 #define MSM_SMI_SIZE          0x4000000
 
 #define KERNEL_SMI_BASE       (MSM_SMI_BASE)
+#if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
+#define KERNEL_SMI_SIZE       0x000000
+#else
 #define KERNEL_SMI_SIZE       0x600000
+#endif
 
 #define USER_SMI_BASE         (KERNEL_SMI_BASE + KERNEL_SMI_SIZE)
 #define USER_SMI_SIZE         (MSM_SMI_SIZE - KERNEL_SMI_SIZE)
@@ -2688,24 +2684,15 @@ unsigned char hdmi_is_primary;
 #define MSM_ION_SF_SIZE		0x4000000 /* 64MB */
 #define MSM_ION_CAMERA_SIZE     MSM_PMEM_ADSP_SIZE
 #define MSM_ION_MM_FW_SIZE	0x200000 /* (2MB) */
-#define MSM_ION_MM_SIZE		0x3600000 /* (54MB) */
+#define MSM_ION_MM_SIZE		0x3c00000 /* (60MB) Must be a multiple of 64K */
 #define MSM_ION_MFC_SIZE	SZ_8K
 #ifdef CONFIG_FB_MSM_OVERLAY1_WRITEBACK
 #define MSM_ION_WB_SIZE		0xC00000 /* 12MB */
 #else
 #define MSM_ION_WB_SIZE		0x600000 /* 6MB */
-<<<<<<< .working
-<<<<<<< .working
 #endif
 
-=======
-#endif
-
->>>>>>> .merge-right.r7893
 #define MSM_ION_QSECOM_SIZE	0x600000 /* (6MB) */
-=======
-#define MSM_ION_QSECOM_SIZE	0x600000 /* (6MB) */
->>>>>>> .merge-right.r7079
 #define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
 
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
@@ -3114,13 +3101,17 @@ static struct resource hdmi_msm_resources[] = {
 
 static int hdmi_enable_5v(int on);
 static int hdmi_core_power(int on, int show);
+static int hdmi_gpio_config(int on);
 static int hdmi_cec_power(int on);
+static int hdmi_panel_power(int on);
 
 static struct msm_hdmi_platform_data hdmi_msm_data = {
 	.irq = HDMI_IRQ,
 	.enable_5v = hdmi_enable_5v,
 	.core_power = hdmi_core_power,
 	.cec_power = hdmi_cec_power,
+	.panel_power = hdmi_panel_power,
+	.gpio_config = hdmi_gpio_config,
 };
 
 static struct platform_device hdmi_msm_device = {
@@ -3879,6 +3870,7 @@ static struct regulator_consumer_supply vreg_consumers_PM8058_L14[] = {
 static struct regulator_consumer_supply vreg_consumers_PM8058_L15[] = {
 	REGULATOR_SUPPLY("8058_l15",		NULL),
 	REGULATOR_SUPPLY("cam_vana",		"1-001a"),
+	REGULATOR_SUPPLY("cam_vana",		"1-006c"),
 };
 static struct regulator_consumer_supply vreg_consumers_PM8058_L16[] = {
 	REGULATOR_SUPPLY("8058_l16",		NULL),
@@ -3910,6 +3902,7 @@ static struct regulator_consumer_supply vreg_consumers_PM8058_L24[] = {
 static struct regulator_consumer_supply vreg_consumers_PM8058_L25[] = {
 	REGULATOR_SUPPLY("8058_l25",		NULL),
 	REGULATOR_SUPPLY("cam_vdig",		"1-001a"),
+	REGULATOR_SUPPLY("cam_vdig",		"1-006c"),
 };
 static struct regulator_consumer_supply vreg_consumers_PM8058_S0[] = {
 	REGULATOR_SUPPLY("8058_s0",		NULL),
@@ -3929,6 +3922,7 @@ static struct regulator_consumer_supply vreg_consumers_PM8058_S4[] = {
 static struct regulator_consumer_supply vreg_consumers_PM8058_LVS0[] = {
 	REGULATOR_SUPPLY("8058_lvs0",		NULL),
 	REGULATOR_SUPPLY("cam_vio",			"1-001a"),
+	REGULATOR_SUPPLY("cam_vio",			"1-006c"),
 };
 static struct regulator_consumer_supply vreg_consumers_PM8058_LVS1[] = {
 	REGULATOR_SUPPLY("8058_lvs1",		NULL),
@@ -5315,10 +5309,12 @@ static struct platform_device *surf_devices[] __initdata = {
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 static struct ion_cp_heap_pdata cp_mm_ion_pdata = {
 	.permission_type = IPT_TYPE_MM_CARVEOUT,
-	.align = PAGE_SIZE,
+	.align = SZ_64K,
 	.request_region = request_smi_region,
 	.release_region = release_smi_region,
 	.setup_region = setup_smi_region,
+	.iommu_map_all = 1,
+	.iommu_2x_map_domain = VIDEO_DOMAIN,
 };
 
 static struct ion_cp_heap_pdata cp_mfc_ion_pdata = {
@@ -5481,6 +5477,23 @@ static void reserve_ion_memory(void)
 				pr_debug("msm_ion_sf_size 0x%x\n",
 					msm_ion_sf_size);
 				break;
+			}
+		}
+	}
+
+	/* Verify size of heap is a multiple of 64K */
+	for (i = 0; i < ion_pdata.nr; i++) {
+		struct ion_platform_heap *heap = &(ion_pdata.heaps[i]);
+
+		if (heap->extra_data && heap->type == ION_HEAP_TYPE_CP) {
+			int map_all = ((struct ion_cp_heap_pdata *)
+				heap->extra_data)->iommu_map_all;
+
+			if (map_all && (heap->size & (SZ_64K-1))) {
+				heap->size = ALIGN(heap->size, SZ_64K);
+				pr_err("Heap %s size is not a multiple of 64K. Adjusting size to %x\n",
+					heap->name, heap->size);
+
 			}
 		}
 	}
@@ -8365,44 +8378,10 @@ static unsigned int msm8x60_sdcc_slot_status(struct device *dev)
 }
 #endif
 #endif
-
-#ifdef	CONFIG_MMC_MSM_SDC4_SUPPORT
-static int msm_sdcc_cfg_mpm_sdiowakeup(struct device *dev, unsigned mode)
-{
-	struct platform_device *pdev;
-	enum msm_mpm_pin pin;
-	int ret = 0;
-
-	pdev = container_of(dev, struct platform_device, dev);
-
-	/* Only SDCC4 slot connected to WLAN chip has wakeup capability */
-	if (pdev->id == 4)
-		pin = MSM_MPM_PIN_SDC4_DAT1;
-	else
-		return -EINVAL;
-
-	switch (mode) {
-	case SDC_DAT1_DISABLE:
-		ret = msm_mpm_enable_pin(pin, 0);
-		break;
-	case SDC_DAT1_ENABLE:
-		ret = msm_mpm_set_pin_type(pin, IRQ_TYPE_LEVEL_LOW);
-		ret = msm_mpm_enable_pin(pin, 1);
-		break;
-	case SDC_DAT1_ENWAKE:
-		ret = msm_mpm_set_pin_wake(pin, 1);
-		break;
-	case SDC_DAT1_DISWAKE:
-		ret = msm_mpm_set_pin_wake(pin, 0);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-	return ret;
-}
 #endif
-#endif
+
+#define MSM_MPM_PIN_SDC3_DAT1	21
+#define MSM_MPM_PIN_SDC4_DAT1	23
 
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static struct mmc_platform_data msm8x60_sdc1_data = {
@@ -8418,6 +8397,7 @@ static struct mmc_platform_data msm8x60_sdc1_data = {
 	.msmsdcc_fmax	= 48000000,
 	.nonremovable	= 1,
 	.pclk_src_dfab	= 1,
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 
@@ -8436,6 +8416,7 @@ static struct mmc_platform_data msm8x60_sdc2_data = {
 #ifdef CONFIG_MSM_SDIO_AL
 	.is_sdio_al_client = 1,
 #endif
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 
@@ -8456,6 +8437,8 @@ static struct mmc_platform_data msm8x60_sdc3_data = {
 	.msmsdcc_fmax	= 48000000,
 	.nonremovable	= 0,
 	.pclk_src_dfab  = 1,
+	.mpm_sdiowakeup_int = MSM_MPM_PIN_SDC3_DAT1,
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 
@@ -8469,7 +8452,8 @@ static struct mmc_platform_data msm8x60_sdc4_data = {
 	.msmsdcc_fmax	= 48000000,
 	.nonremovable	= 0,
 	.pclk_src_dfab  = 1,
-	.cfg_mpm_sdiowakeup = msm_sdcc_cfg_mpm_sdiowakeup,
+	.mpm_sdiowakeup_int = MSM_MPM_PIN_SDC4_DAT1,
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 
@@ -8488,6 +8472,7 @@ static struct mmc_platform_data msm8x60_sdc5_data = {
 #ifdef CONFIG_MSM_SDIO_AL
 	.is_sdio_al_client = 1,
 #endif
+	.msm_bus_voting_data = &sps_to_ddr_bus_voting_data,
 };
 #endif
 
@@ -8526,10 +8511,8 @@ static void __init msm8x60_init_mmc(void)
 	if (machine_is_msm8x60_fusion())
 		msm8x60_sdc2_data.msmsdcc_fmax = 24000000;
 	if (machine_is_msm8x60_fusion() || machine_is_msm8x60_fusn_ffa()) {
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 		msm8x60_sdc2_data.sdiowakeup_irq = gpio_to_irq(144);
 		msm_sdcc_setup_gpio(2, 1);
-#endif
 		msm_add_sdcc(2, &msm8x60_sdc2_data);
 	}
 #endif
@@ -8590,10 +8573,8 @@ static void __init msm8x60_init_mmc(void)
 	if (machine_is_msm8x60_fusion())
 		msm8x60_sdc5_data.msmsdcc_fmax = 24000000;
 	if (machine_is_msm8x60_fusion() || machine_is_msm8x60_fusn_ffa()) {
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 		msm8x60_sdc5_data.sdiowakeup_irq = gpio_to_irq(99);
 		msm_sdcc_setup_gpio(5, 1);
-#endif
 		msm_add_sdcc(5, &msm8x60_sdc5_data);
 	}
 #endif
@@ -9037,6 +9018,29 @@ static int hdmi_core_power(int on, int show)
 				"8058_l16", rc);
 			return rc;
 		}
+		pr_debug("%s(on): success\n", __func__);
+	} else {
+		rc = regulator_disable(reg_8058_l16);
+		if (rc)
+			pr_warning("'%s' regulator disable failed, rc=%d\n",
+				"8058_l16", rc);
+		pr_debug("%s(off): success\n", __func__);
+	}
+
+	prev_on = on;
+
+	return 0;
+}
+
+static int hdmi_gpio_config(int on)
+{
+	int rc = 0;
+	static int prev_on;
+
+	if (on == prev_on)
+		return 0;
+
+	if (on) {
 		rc = gpio_request(170, "HDMI_DDC_CLK");
 		if (rc) {
 			pr_err("'%s'(%d) gpio_request failed, rc=%d\n",
@@ -9055,20 +9059,15 @@ static int hdmi_core_power(int on, int show)
 				"HDMI_HPD", 172, rc);
 			goto error3;
 		}
-		pr_info("%s(on): success\n", __func__);
+		pr_debug("%s(on): success\n", __func__);
 	} else {
 		gpio_free(170);
 		gpio_free(171);
 		gpio_free(172);
-		rc = regulator_disable(reg_8058_l16);
-		if (rc)
-			pr_warning("'%s' regulator disable failed, rc=%d\n",
-				"8058_l16", rc);
-		pr_info("%s(off): success\n", __func__);
+		pr_debug("%s(off): success\n", __func__);
 	}
 
 	prev_on = on;
-
 	return 0;
 
 error3:
@@ -9076,7 +9075,6 @@ error3:
 error2:
 	gpio_free(170);
 error1:
-	regulator_disable(reg_8058_l16);
 	return rc;
 }
 
@@ -9125,6 +9123,18 @@ error:
 	return rc;
 }
 
+static int hdmi_panel_power(int on)
+{
+	int rc;
+
+	pr_debug("%s: HDMI Core: %s\n", __func__, (on ? "ON" : "OFF"));
+	rc = hdmi_core_power(on, 1);
+	if (rc)
+		rc = hdmi_cec_power(on);
+
+	pr_debug("%s: HDMI Core: %s Success\n", __func__, (on ? "ON" : "OFF"));
+	return rc;
+}
 #undef _GET_REGULATOR
 
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
@@ -9593,6 +9603,7 @@ static struct msm_bus_scale_pdata dtv_bus_scale_pdata = {
 
 static struct lcdc_platform_data dtv_pdata = {
 	.bus_scale_table = &dtv_bus_scale_pdata,
+	.lcdc_power_save = hdmi_panel_power,
 };
 
 static struct msm_bus_paths dtv_hdmi_prim_bus_scale_usecases[] = {

@@ -1,5 +1,5 @@
 /* arch/arm/mach-msm/proc_comm.h
- * Copyright (C) 2011 FIH Co., Ltd.  All rights reserved.
+ *
  * Copyright (c) 2007-2009,2011 Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -169,93 +169,6 @@ enum {
 	PCOM_CMD_FAIL_PROC_COMM_NOT_INIT,
 };
 
-//MTD-BSP-REXER-PROC-00+[
-#define SMEM_OEM_CMD_BUF_SIZE  32
-#define smem_oem_locked_flag	0x10000000
-#define smem_oem_unlocked_flag	0x20000000
-
-typedef enum
-{
-  SMEM_PROC_COMM_OEM_ADC_READ = 0,              
-  SMEM_PROC_COMM_OEM_PM_SET_LED_INTENSITY,  
-  SMEM_PROC_COMM_OEM_PM_MIC_EN,
-  SMEM_PROC_COMM_OEM_EBOOT_SLEEP_REQ,      
-  SMEM_PROC_COMM_OEM_RESET_PM_RTC,         
-  SMEM_PROC_COMM_OEM_PWR_KEY_DECT,       
-  SMEM_PROC_COMM_OEM_PRODUCT_ID_READ,         
-  SMEM_PROC_COMM_OEM_PRODUCT_ID_WRITE,          
-  SMEM_PROC_COMM_OEM_SERIAL_NUM_READ,         
-  SMEM_PROC_COMM_OEM_SERIAL_NUM_WRITE,         
-  SMEM_PROC_COMM_OEM_TEST_FLAG_READ,          
-  SMEM_PROC_COMM_OEM_TEST_FLAG_WRITE,         
-  SMEM_PROC_COMM_OEM_RESET_CHIP_EBOOT,
-  SMEM_PROC_COMM_OEM_NV_WRITE,
-  SMEM_PROC_COMM_OEM_NV_READ,
-  SMEM_PROC_COMM_OEM_ADIE_ADC_READ,
-  SMEM_PROC_COMM_OEM_POWER_OFF,
-  SMEM_PROC_COMM_OEM_UPDATE_TCP_FILTER,
-  SMEM_PROC_COMM_OEM_SET_RTC_ALARM,     
-  SMEM_PROC_COMM_OEM_GET_RTC_ALARM,   
-  SMEM_PROC_COMM_OEM_GET_SYSTEM_TIME,
-  SMEM_PROC_COMM_OEM_ALLOC_SD_DL_INFO,
-  SMEM_PRPC_COMM_OEM_FIX_AXI_CLOCK = 22, 
-  SMEM_PROC_COMM_OEM_BACKUP_UNIQUE_NV,
-  SMEM_PROC_COMM_OEM_BACKUP_NV_FLAG,
-  SMEM_PROC_COMM_OEM_WRITE_FUSE, 
-  SMEM_PROC_COMM_OEM_READ_FUSE, 
-  SMEM_PROC_COMM_OEM_OTP_PROCESS,
-  SMEM_PROC_COMM_OEM_LED_INDICATION,
-  SMEM_PROC_COMM_OEM_SIM_STATE,
-  SMEM_PROC_COMM_OEM_PERSO_RESET,
-  SMEM_PROC_COMM_OEM_BLOW_FUSE,
-// MTD_MM_YW_FTM_AUDIO_SMEM+[
-  SMEM_PROC_COMM_OEM_AUDIO_ADIE_WRITE,
-  SMEM_PROC_COMM_OEM_AUDIO_ADIE_READ, 
-  SMEM_PROC_COMM_OEM_AUDIO_LOOPBACK,  
-// MTD_MM_YW_FTM_AUDIO_SMEM+]   
-  SMEM_PROC_COMM_OEM_VIB, // MTD-KERNEL-EL-VIB00+
-  SMEM_PROC_COMM_OEM_GET_VCOIN,	/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00 */
-  SMEM_PROC_COMM_OEM_LIGHT,		//KERNEL-EL-FTM00+
-  SMEM_PROC_COMM_OEM_VIB2, // MTD-KERNEL-EL-VIB01+
-  SMEM_PROC_COMM_OEM_LIGHT2,	//KERNEL-EL-led_blink00+
-  SMEM_PROC_COMM_OEM_IS_CHARGER_CONNECTED,		/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00 */
-  SMEM_PROC_COMM_OEM_HOTSPOT_PWR,
-  SMEM_PROC_COMM_OEM_LIGHT_CONTROL, // FIH-SW3-BSP-Y.S-LED smem command-00
-  SMEM_PROC_COMM_OEM_CHG_MODE, /*FIH-SW3-KERNEL-JC-FTMDEEPSLEEP-01+ */
-  SMEM_PROC_COMM_OEM_GET_HSED_VOLTAGE, /* FIH-SW2-MM-AY-hsed_type-00 */
-  SMEM_PROC_COMM_OEM_GET_BTN_TYPE, /* FIH-SW2-MM-AY-TAP_MultiBtn_00 */
-  SMEM_PROC_COMM_OEM_NUM_CMDS  /* always last! */
-} smem_proc_comm_oem_cmd_type;
-
-typedef union smem_oem_cmd_data
-{
-  struct t_cmd_data
-  {
-    unsigned int check_flag;
-    unsigned int cmd_parameter[SMEM_OEM_CMD_BUF_SIZE];
-  }cmd_data;
-
-  struct t_return_data
-  {
-    unsigned int check_flag;
-    unsigned int return_value[SMEM_OEM_CMD_BUF_SIZE];
-  }return_data;
-  
-} smem_oem_cmd_data;
-
-/* FIH-SW3-KERNEL-TH-porting_dbgcfgtool-00+[ */
-#define NV_FIHDBG_I    8045
-#define NV_ERR_FATAL_OPTIONS_I    905
-#define FIH_DEBUG_CMD_DATA_SIZE  5
-#define FIH_DEBUG_CFG_LEN  4 * sizeof(unsigned int)
-
-int msm_proc_comm_oem_multi(unsigned cmd, unsigned *data1, unsigned *data2, unsigned *cmd_parameter, int number);
-/* FIH-SW3-KERNEL-TH-porting_dbgcfgtool-00+] */
-
-int msm_proc_comm_oem(unsigned cmd, unsigned *data1, unsigned *data2, unsigned *cmd_parameter);
-int msm_proc_comm_oem_n(unsigned cmd, unsigned *data1, unsigned *data2, unsigned *cmd_parameter, int para_size);
-//MTD-BSP-REXER-PROC-00+]
-int smem_proc_oem_light_control( int32_t[], int); //MTD-Peripheral-Y.S-SMEM_OEM_COMMAND-00+
 #ifdef CONFIG_MSM_PROC_COMM
 void msm_proc_comm_reset_modem_now(void);
 int msm_proc_comm(unsigned cmd, unsigned *data1, unsigned *data2);
@@ -265,22 +178,4 @@ static inline int msm_proc_comm(unsigned cmd, unsigned *data1, unsigned *data2)
 { return 0; }
 #endif
 
-/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00*[ */
-#ifdef CONFIG_FIH_FTM
-int proc_comm_get_vcoin(int vset, int *voltage, int status);
-#endif
-
-#ifdef CONFIG_FIH_SW3_POWER_OFF_CHARGING
-int proc_comm_is_pwr_key_pressed(int *isPressed);
-int proc_comm_is_charger_connected(int *isConnected);
-#endif
-/* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00*] */
-
-void proc_comm_ftm_wlanaddr_write(char* buf);
-int proc_comm_ftm_wlanaddr_read(char * buf);
-/* FIH-SW3-CONN-JL-HotspotSAR_Backup-00+[ */
-int proc_comm_hotspot_sar_control(int state);
-/* FIH-SW3-CONN-JL-HotspotSAR_Backup-00+] */
-int proc_comm_get_hsed_voltage(int vset, int *voltage, int status); /* FIH-SW2-MM-AY-hsed_type-00 */
-int proc_comm_get_btn_type(int vset, int *voltage, int status); /* FIH-SW2-MM-AY-TAP_MultiBtn_00 */
 #endif

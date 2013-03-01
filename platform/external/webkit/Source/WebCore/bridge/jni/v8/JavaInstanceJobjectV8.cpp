@@ -41,15 +41,8 @@
 
 using namespace JSC::Bindings;
 
-#if PLATFORM(ANDROID)
-JavaInstanceJobject::JavaInstanceJobject(jobject instance, bool requireAnnotation)
-#else
 JavaInstanceJobject::JavaInstanceJobject(jobject instance)
-#endif	
     : m_instance(new JobjectWrapper(instance))
-#if PLATFORM(ANDROID)
-    , m_requireAnnotation(requireAnnotation)
-#endif    	
 {
 }
 
@@ -68,11 +61,7 @@ void JavaInstanceJobject::end()
 JavaClass* JavaInstanceJobject::getClass() const
 {
     if (!m_class)
-    	#if PLATFORM(ANDROID)
-        m_class = adoptPtr(new JavaClassJobject(javaInstance(), m_requireAnnotation));
-      #else
         m_class = adoptPtr(new JavaClassJobject(javaInstance()));
-      #endif  
     return m_class.get();
 }
 
@@ -84,8 +73,7 @@ JavaValue JavaInstanceJobject::invokeMethod(const JavaMethod* method, JavaValue*
     for (unsigned int i = 0; i < numParams; ++i)
         jvalueArgs[i] = javaValueToJvalue(args[i]);
     jvalue result = callJNIMethod(javaInstance(), method->returnType(), method->name().utf8().data(), method->signature(), jvalueArgs.get());
-
-    return jvalueToJavaValue(result, method->returnType(), m_requireAnnotation);    
+    return jvalueToJavaValue(result, method->returnType());
 }
 
 static void appendClassName(StringBuilder& builder, const char* className)
@@ -111,11 +99,7 @@ JavaValue JavaInstanceJobject::getField(const JavaField* field)
         appendClassName(signature, field->typeClassName());
         signature.append(';');
     }
-#if PLATFORM(ANDROID)
-    return jvalueToJavaValue(getJNIField(javaInstance(), field->type(), field->name().utf8().data(), signature.toString().utf8().data()), field->type(), m_requireAnnotation);
-#else    
     return jvalueToJavaValue(getJNIField(javaInstance(), field->type(), field->name().utf8().data(), signature.toString().utf8().data()), field->type());
-#endif    
 }
 
 #endif // ENABLE(JAVA_BRIDGE)

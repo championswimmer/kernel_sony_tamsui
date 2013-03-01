@@ -1,19 +1,17 @@
 project(dbus)
 
-set (DBUS_MAJOR_VERSION "1")
-set (DBUS_MINOR_VERSION "3")
-set (DBUS_MICRO_VERSION "1")
+#########################################################################
+# detect version
+#########################################################################
+file (READ ../configure.ac configure_ac)
+string (REGEX REPLACE ".*dbus_major_version], .([0-9]+).*" "\\1" DBUS_MAJOR_VERSION ${configure_ac})
+string (REGEX REPLACE ".*dbus_minor_version], .([0-9]+).*" "\\1" DBUS_MINOR_VERSION ${configure_ac})
+string (REGEX REPLACE ".*dbus_micro_version], .([0-9]+).*" "\\1" DBUS_MICRO_VERSION ${configure_ac})
 # used by file version info
-set (DBUS_PATCH_VERSION "1")
+set (DBUS_PATCH_VERSION "0")
 set (DBUS_VERSION ${DBUS_MAJOR_VERSION}.${DBUS_MINOR_VERSION}.${DBUS_MICRO_VERSION})
-endif (DBUS_PATCH_VERSION)
 
 set (DBUS_VERSION_STRING "${DBUS_VERSION}")
-
-if (NOT DBUS_BUILD_TIMESTAMP)
-    message(STATUS "FIXME set DBUS_BUILD_TIMESTAMP to current date or fix current time stamp generation for having actual build date in version file info")
-    set (DBUS_BUILD_TIMESTAMP 20091231)
-endif (NOT DBUS_BUILD_TIMESTAMP)
 
 # we need to be up to date
 CMAKE_MINIMUM_REQUIRED(VERSION 2.4.4 FATAL_ERROR)
@@ -23,6 +21,54 @@ endif(COMMAND cmake_policy)
 
 # where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/modules")
+
+include(Macros)
+TIMESTAMP(DBUS_BUILD_TIMESTAMP)
+
+########### basic vars ###############
+
+
+if (DBUSDIR)
+	set(DBUS_INSTALL_DIR "${DBUSDIR}")
+endif (DBUSDIR)
+if ($ENV{DBUSDIR})
+	set(DBUS_INSTALL_DIR "$ENV{DBUSDIR}")
+endif ($ENV{DBUSDIR})
+
+if (DBUS_INSTALL_DIR)
+	set(CMAKE_INSTALL_PREFIX "${DBUS_INSTALL_DIR}" CACHE PATH "install prefix" FORCE)
+else (DBUS_INSTALL_DIR)
+	set(DBUS_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}")
+endif (DBUS_INSTALL_DIR)
+
+# autotools style
+if (NOT DATAROOTDIR)
+    set (DATAROOTDIR share)
+endif()
+
+if (NOT DATADIR)
+    set (DATADIR ${DATAROOTDIR})
+endif()
+
+if (NOT DOCDIR)
+    SET(DOCDIR ${DATAROOTDIR}/doc/dbus)
+endif()
+
+if (NOT DBUS_DATADIR)
+    SET(DBUS_DATADIR ${DATADIR})
+endif()
+
+set(prefix                   ${DBUS_INSTALL_DIR})
+set(exec_prefix              ${prefix})
+set(EXPANDED_LIBDIR          ${DBUS_INSTALL_DIR}/lib)
+set(EXPANDED_INCLUDEDIR      ${DBUS_INSTALL_DIR}/include)
+set(EXPANDED_BINDIR          ${DBUS_INSTALL_DIR}/bin)
+set(EXPANDED_SYSCONFDIR      ${DBUS_INSTALL_DIR}/etc)
+set(EXPANDED_DATADIR         ${DBUS_INSTALL_DIR}/${DBUS_DATADIR})
+set(DBUS_MACHINE_UUID_FILE   ${DBUS_INSTALL_DIR}/lib/dbus/machine-id)
+set(DBUS_BINDIR              ${EXPANDED_BINDIR})
+set(DBUS_DAEMONDIR 			 ${EXPANDED_BINDIR})
+
 
 #enable building of shared library
 SET(BUILD_SHARED_LIBS ON)
@@ -39,9 +85,8 @@ if (WIN32)
     include(Win32Macros)
     addExplorerWrapper(${CMAKE_PROJECT_NAME})
 endif (WIN32)
-find_package(LibXml2)
-find_package(LibExpat)
-find_package(X11)
+
+option (DBUS_USE_EXPAT "Use expat (== ON) or libxml2 (==OFF)" ON)
 
 if(NOT WIN32)
 	OPTION(DBUS_ENABLE_ABSTRACT_SOCKETS "enable support for abstract sockets" ON)
@@ -49,6 +94,18 @@ endif(NOT WIN32)
 
 #AC_ARG_ENABLE(asserts, AS_HELP_STRING([--enable-asserts],[include assertion checks]),enable_asserts=$enableval,enable_asserts=$USE_MAINTAINER_MODE)
 OPTION(DBUS_DISABLE_ASSERTS "Disable assertion checking" OFF)
+
+option (DBUS_ENABLE_STATS "enable bus daemon usage statistics" OFF)
+
+if (DBUS_USE_EXPAT)
+    find_package(LibExpat)
+else ()
+    find_package(LibXml2)
+endif ()
+find_package(X11)
+
+# analogous to AC_USE_SYSTEM_EXTENSIONS in configure.ac
+add_definitions(-D_POSIX_C_SOURCE=199309L -D_GNU_SOURCE)
 
 # do config checks
 INCLUDE(ConfigureChecks.cmake)
@@ -60,8 +117,7 @@ SET(DBUS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/..)
 include (MacroLibrary)
 
 if(VCS)
-	set(DBUS_VERBOSE_C_S 1 CACHE TYPE STRING FORCE)
-	set(DBUS_VERBOSE_C_S 1)
+	set(DBUS_VERBOSE_C_S 1 CACHE STRING "verbose mode" FORCE)
 endif(VCS)
 
 if(WIN32)
@@ -78,8 +134,8 @@ if(WIN32)
 
 		# Use the highest warning level
 		if (WALL)
-			set(WALL 1 CACHE TYPE STRING FORCE)
-			set(CMAKE_CXX_WARNING_LEVEL 4 CACHE TYPE STRING FORCE)
+			set(WALL 1 CACHE STRING "all warnings"  FORCE)
+			set(CMAKE_CXX_WARNING_LEVEL 4 CACHE STRING "warning level" FORCE)
 
 			if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
 				STRING(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -93,7 +149,7 @@ if(WIN32)
 				SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
 			endif(CMAKE_C_FLAGS MATCHES "/W[0-4]")
 		else (WALL)
-			set(CMAKE_CXX_WARNING_LEVEL 3 CACHE TYPE STRING FORCE)
+			set(CMAKE_CXX_WARNING_LEVEL 3 CACHE STRING "warning level" FORCE)
 		endif (WALL)
 
 		SET(MSVC_W_ERROR   " /we4028 /we4013 /we4133 /we4047 /we4031 /we4002 /we4003 /we4114")
@@ -171,33 +227,6 @@ set(DBUS_INCLUDES)
 
 ENABLE_TESTING()
 
-
-########### basic vars ###############
-
-if (DBUSDIR)
-	set(DBUS_INSTALL_DIR "${DBUSDIR}")
-endif (DBUSDIR)
-if ($ENV{DBUSDIR})
-	set(DBUS_INSTALL_DIR "$ENV{DBUSDIR}")
-endif ($ENV{DBUSDIR})
-
-if (DBUS_INSTALL_DIR)
-	set(CMAKE_INSTALL_PREFIX "${DBUS_INSTALL_DIR}" CACHE TYPE PATH FORCE)
-else (DBUS_INSTALL_DIR)
-	set(DBUS_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}")
-endif (DBUS_INSTALL_DIR)
-
-set(prefix                   ${DBUS_INSTALL_DIR})
-set(exec_prefix              ${prefix})
-set(EXPANDED_LIBDIR          ${DBUS_INSTALL_DIR}/lib)
-set(EXPANDED_INCLUDEDIR      ${DBUS_INSTALL_DIR}/include)
-set(EXPANDED_BINDIR          ${DBUS_INSTALL_DIR}/bin)
-set(EXPANDED_SYSCONFDIR      ${DBUS_INSTALL_DIR}/etc)
-set(EXPANDED_DATADIR         ${DBUS_INSTALL_DIR}/data)
-set(DBUS_MACHINE_UUID_FILE   ${DBUS_INSTALL_DIR}/lib/dbus/machine-id)
-set(DBUS_BINDIR              ${EXPANDED_BINDIR})
-set(DBUS_DAEMONDIR 			 ${EXPANDED_BINDIR})
-
 ########### command line options ###############
 # TODO: take check from configure.in
 
@@ -205,7 +234,7 @@ set(DBUS_DAEMONDIR 			 ${EXPANDED_BINDIR})
 OPTION(DBUS_BUILD_TESTS "enable unit test code" ON)
  
 if(DBUS_BUILD_TESTS)
-    add_definitions(-DDBUS_BUILD_TESTS)
+    add_definitions(-DDBUS_BUILD_TESTS -DDBUS_ENABLE_EMBEDDED_TESTS)
 endif(DBUS_BUILD_TESTS)
 
 OPTION(DBUS_USE_OUTPUT_DEBUG_STRING "enable win32 debug port for message output" OFF)
@@ -264,7 +293,7 @@ STRING(TOUPPER ${CMAKE_SYSTEM_NAME} sysname)
 if("${sysname}" MATCHES ".*SOLARIS.*")
     OPTION(HAVE_CONSOLE_OWNER_FILE "enable console owner file (solaris only)" ON)
     if(HAVE_CONSOLE_OWNER_FILE)
-        SET(DBUS_CONSOLE_OWNER_FILE "/dev/console" CACHE STRING "Directory to check for console ownerhip")
+        set (DBUS_CONSOLE_OWNER_FILE "/dev/console" CACHE STRING "Directory to check for console ownerhip")
     endif(HAVE_CONSOLE_OWNER_FILE)
 endif("${sysname}" MATCHES ".*SOLARIS.*")
 
@@ -272,12 +301,6 @@ endif("${sysname}" MATCHES ".*SOLARIS.*")
 if(NOT LIBXML2_FOUND AND NOT LIBEXPAT_FOUND)
     message(FATAL "Neither expat nor libxml2 found!")
 endif(NOT LIBXML2_FOUND AND NOT LIBEXPAT_FOUND)
-
-if(LIBEXPAT_FOUND)
-    OPTION(DBUS_USE_EXPAT "Use expat (== ON) or libxml2 (==OFF)" ON)
-else(LIBEXPAT_FOUND)
-    OPTION(DBUS_USE_EXPAT "Use expat (== ON) or libxml2 (==OFF)" OFF)
-endif(LIBEXPAT_FOUND)
 
 if(DBUS_USE_EXPAT)
     SET(XML_LIB "Expat")
@@ -324,11 +347,11 @@ if(CMAKE_COMPILER_IS_GNUCC AND NOT DBUS_ENABLE_ANSI)
     endif(UNAME_EXECUTABLE)
 endif(CMAKE_COMPILER_IS_GNUCC AND NOT DBUS_ENABLE_ANSI)
 
-OPTION(DBUS_HAVE_ATOMIC_INT    "Some atomic integer implementation present" ${atomic_int})
-OPTION(DBUS_USE_ATOMIC_INT_486 "Use atomic integer implementation for 486" ${atomic_int_486})
+set (DBUS_HAVE_ATOMIC_INT ${atomic_int} CACHE STRING "Some atomic integer implementation present")
+set (DBUS_USE_ATOMIC_INT_486 ${atomic_int_486} CACHE STRING "Use atomic integer implementation for 486")
 
 if(X11_FOUND)
-  OPTION(DBUS_BUILD_X11 "Build X11-dependent code " ON)
+  OPTION(DBUS_BUILD_X11 "Build with X11 autolaunch support " ON)
 endif(X11_FOUND)
 
 # test binary names
@@ -425,7 +448,6 @@ if (WIN32)
   set (DBUS_SESSION_CONFIG_FILE "etc/dbus-1/session.conf")
   # bus-test expects a non empty string
   set (DBUS_USER "Administrator")
-  set (DBUS_DATADIR "data")
 else (WIN32)
   set (DBUS_SYSTEM_BUS_DEFAULT_ADDRESS "unix:tmpdir=" CACHE STRING "system bus default address" )
   set (DBUS_SESSION_BUS_DEFAULT_ADDRESS "unix:path=${DBUS_SESSION_SOCKET_DIR}" CACHE STRING "session bus default address" )
@@ -434,7 +456,6 @@ else (WIN32)
   set (DBUS_SYSTEM_CONFIG_FILE  ${configdir}/system.conf)
   set (DBUS_SESSION_CONFIG_FILE ${configdir}/session.conf)
   set (DBUS_USER "root")
-  set (DBUS_DATADIR ${EXPANDED_DATADIR})
 endif (WIN32)
 
 set(DBUS_DAEMON_NAME dbus-daemon CACHE STRING "The name of the dbus daemon executable")
@@ -462,8 +483,8 @@ if (DBUS_BUILD_TESTS)
     set(TEST_LAUNCH_HELPER_BINARY ${EXECUTABLE_OUTPUT_PATH}/dbus-daemon-launch-helper-test)
     set(TEST_PRIVSERVER_BINARY ${EXECUTABLE_OUTPUT_PATH}/test-privserver)
     if (UNIX)
-        set (TEST_LISTEN "debug-pipe:name=test-server")
-        set (TEST_CONNECTION "${TEST_LISTEN}")
+        set (TEST_LISTEN "debug-pipe:name=test-server</listen><listen>unix:tmpdir=${TEST_SOCKET_DIR}")
+        set (TEST_CONNECTION "debug-pipe:name=test-server")
     endif (UNIX)
     if (WIN32)
         set (TEST_LISTEN "tcp:host=localhost,port=12436")
@@ -481,8 +502,12 @@ set (DBUS_INTERNAL_LIBRARY_DEFINITIONS "-DDBUS_STATIC_BUILD")
 set (DBUS_INTERNAL_CLIENT_DEFINITIONS "-DDBUS_STATIC_BUILD")
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
+
+if (WIN32)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/dbus-env.bat.cmake ${CMAKE_BINARY_DIR}/bin/dbus-env.bat )
 install_files(/bin FILES ${CMAKE_BINARY_DIR}/bin/dbus-env.bat)
+endif()
+
 add_definitions(-DHAVE_CONFIG_H=1)
 
 ########### subdirs ###############
@@ -538,6 +563,7 @@ message("        Building unit tests:      ${DBUS_BUILD_TESTS}                 "
 message("        Building verbose mode:    ${DBUS_ENABLE_VERBOSE_MODE}         ")
 message("        Building w/o assertions:  ${DBUS_DISABLE_ASSERTS}             ")
 message("        Building w/o checks:      ${DBUS_DISABLE_CHECKS}              ")
+message("        Building bus stats API:   ${DBUS_ENABLE_STATS}                ")
 message("        installing system libs:   ${DBUS_INSTALL_SYSTEM_LIBS}         ")
 #message("        Building SELinux support: ${have_selinux}                     ")
 #message("        Building dnotify support: ${have_dnotify}                     ")
@@ -592,3 +618,8 @@ endif(DBUS_DISABLE_CHECKS)
 MESSAGE(" ")
 
 INCLUDE(modules/CPackInstallConfig.cmake)
+
+add_custom_target(help-options
+    cmake -LH 
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)

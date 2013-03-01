@@ -139,14 +139,7 @@ DEFINE_SIMPLE_ATTRIBUTE(clock_hwcg_fops, clock_debug_hwcg_get,
 			NULL, "%llu\n");
 
 static struct dentry *debugfs_base;
-/*MTD-KERNEL-SC-enable_debug_suspend_clock-00*[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-static u32 debug_suspend = 1; //default show clock info when suspend
-#else
 static u32 debug_suspend;
-#endif
-/*MTD-KERNEL-SC-enable_debug_suspend_clock-00*] */
-
 static struct clk_lookup *msm_clocks;
 static size_t num_msm_clocks;
 

@@ -1,6 +1,5 @@
 /*
  * Copyright 2007, The Android Open Source Project
- * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,11 +34,6 @@
 #define OFFSETOF(type, field) ((char*)&(((type*)1)->field) - (char*)1) // avoids gnu warning
 
 #define MIN_OVERLAP 3 // if rects overlap by 2 pixels or fewer, treat them as non-intersecting
-
-// +{ ASD-NET-LawrecneWu-IGNORE_LARGE_NODE-01
-#define LARGE_RAGE 409920 //FWVGA(854x480)
-#define LARGE_EDGE 854
-// ASD-NET-LawrecneWu-IGNORE_LARGE_NODE-01 }+
 
 namespace android {
 
@@ -399,17 +393,6 @@ const CachedNode* CachedFrame::findBestAt(const WebCore::IntRect& rect,
         bool checkForHidden = checkForHiddenStart;
         for (size_t part = 0; part < parts; part++) {
             WebCore::IntRect testRect = test->ring(this, part);
-
-            // +{ ASD-NET-LawrecneWu-IGNORE_LARGE_NODE-01
-            // Judge Large Node
-            if (testRect.width() > LARGE_EDGE || testRect.height() > LARGE_EDGE) {
-                if ((testRect.width() * testRect.height()) > LARGE_RAGE) {
-                    // This is a large node, ignore it. 
-                    continue;
-                }
-            }
-            // ASD-NET-LawrecneWu-IGNORE_LARGE_NODE-01 }+
-
             if (testRect.intersects(rect)) {
 #if DEBUG_NAV_UI
                 if (test->isInLayer()) {

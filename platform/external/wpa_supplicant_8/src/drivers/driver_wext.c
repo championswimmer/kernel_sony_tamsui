@@ -37,6 +37,7 @@
 #include "driver.h"
 #include "driver_wext.h"
 
+
 static int wpa_driver_wext_flush_pmkid(void *priv);
 static int wpa_driver_wext_get_range(void *priv);
 static int wpa_driver_wext_finish_drv_init(struct wpa_driver_wext_data *drv);
@@ -1596,6 +1597,7 @@ static int wpa_driver_wext_get_range(void *priv)
 	os_free(range);
 	return 0;
 }
+
 
 static int wpa_driver_wext_set_psk(struct wpa_driver_wext_data *drv,
 				   const u8 *psk)

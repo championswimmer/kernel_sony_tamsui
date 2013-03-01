@@ -4,7 +4,6 @@
  *  Copyright (C) 2003-2004 Russell King, All Rights Reserved.
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *  MMCv4 support Copyright (C) 2006 Philip Langdale, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -1747,11 +1746,8 @@ void mmc_rescan(struct work_struct *work)
 		container_of(work, struct mmc_host, detect.work);
 	bool extend_wakelock = false;
 
-    printk(KERN_INFO "%s:%s rescan\n", __func__, mmc_hostname(host));
-	if (host->rescan_disable) {
-        printk("%s %d [THSU]:: rescan disabled rutern directly\n", __func__, __LINE__);
+	if (host->rescan_disable)
 		return;
-    }
 
 	mmc_bus_get(host);
 
@@ -1760,10 +1756,8 @@ void mmc_rescan(struct work_struct *work)
 	 * still present
 	 */
 	if (host->bus_ops && host->bus_ops->detect && !host->bus_dead
-	    && !(host->caps & MMC_CAP_NONREMOVABLE)) {
-        printk("%s %d [THSU]:: bus_ops detect\n", __func__, __LINE__);
+	    && !(host->caps & MMC_CAP_NONREMOVABLE))
 		host->bus_ops->detect(host);
-    }
 
 	/* If the card was removed the bus will be marked
 	 * as dead - extend the wakelock so userspace
@@ -1782,7 +1776,6 @@ void mmc_rescan(struct work_struct *work)
 
 	/* if there still is a card present, stop here */
 	if (host->bus_ops != NULL) {
-        printk("%s %d [THSU]:: bus_ops != NULL\n", __func__, __LINE__);
 		mmc_bus_put(host);
 		goto out;
 	}
@@ -1793,10 +1786,8 @@ void mmc_rescan(struct work_struct *work)
 	 */
 	mmc_bus_put(host);
 
-	if (host->ops->get_cd && host->ops->get_cd(host) == 0) {
-        printk("%s %d [THSU]:: ops->get_cd\n", __func__, __LINE__);
+	if (host->ops->get_cd && host->ops->get_cd(host) == 0)
 		goto out;
-    }
 
 	mmc_claim_host(host);
 	if (!mmc_rescan_try_freq(host, host->f_min))
@@ -1809,7 +1800,6 @@ void mmc_rescan(struct work_struct *work)
 	else
 		wake_unlock(&host->detect_wake_lock);
 	if (host->caps & MMC_CAP_NEEDS_POLL) {
-        printk("%s %d [THSU]:: mmc_schedule_delayed_work\n", __func__, __LINE__);
 		wake_lock(&host->detect_wake_lock);
 		mmc_schedule_delayed_work(&host->detect, HZ);
 	}
@@ -2086,19 +2076,14 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		if (!host->bus_ops || host->bus_ops->suspend)
 			break;
 
-        /* FIH-CONN-EC-WiFiSuspendResume-01+[ */
-        if (!host->card || (host->card && (host->card->type != MMC_TYPE_SDIO))) {
-            mmc_claim_host(host);
+		mmc_claim_host(host);
 
-            if (host->bus_ops->remove)
-                host->bus_ops->remove(host);
+		if (host->bus_ops->remove)
+			host->bus_ops->remove(host);
 
-            mmc_detach_bus(host);
-            mmc_release_host(host);
-            host->pm_flags = 0;
-        }
-        /* FIH-CONN-EC-WiFiSuspendResume-01+] */
-
+		mmc_detach_bus(host);
+		mmc_release_host(host);
+		host->pm_flags = 0;
 		break;
 
 	case PM_POST_SUSPEND:
@@ -2112,12 +2097,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		}
 		host->rescan_disable = 0;
 		spin_unlock_irqrestore(&host->lock, flags);
-        /* FIH-CONN-EC-WiFiSuspendResume-01+[ */
-        if (!host->card || (host->card && (host->card->type != MMC_TYPE_SDIO))) {
-		    mmc_detect_change(host, 0);
-        }
-        /* FIH-CONN-EC-WiFiSuspendResume-01+] */
-
+		mmc_detect_change(host, 0);
 
 	}
 

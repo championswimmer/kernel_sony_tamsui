@@ -2,7 +2,6 @@
  * Linux cfg80211 driver - Android related functions
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -45,7 +44,6 @@ int wl_android_post_init(void);
 int wl_android_wifi_on(struct net_device *dev);
 int wl_android_wifi_off(struct net_device *dev);
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd);
-void* wl_android_prealloc(int section, unsigned long size);  //FIH-ADD+
 
 #if defined(CONFIG_WIFI_CONTROL_FUNC)
 int wl_android_wifictrl_func_add(void);

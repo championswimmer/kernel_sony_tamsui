@@ -46,6 +46,7 @@
 #include "mlme.h"
 #include "scan.h"
 
+
 static int wpa_supplicant_select_config(struct wpa_supplicant *wpa_s)
 {
 	struct wpa_ssid *ssid, *old_ssid;
@@ -1242,6 +1243,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 		return;
 	}
 #endif /* CONFIG_AP */
+
 	ft_completed = wpa_ft_is_completed(wpa_s->wpa);
 	if (data && wpa_supplicant_event_associnfo(wpa_s, data) < 0)
 		return;
@@ -1611,7 +1613,6 @@ wpa_supplicant_event_interface_status(struct wpa_supplicant *wpa_s,
 		ibss_rsn_deinit(wpa_s->ibss_rsn);
 		wpa_s->ibss_rsn = NULL;
 #endif /* CONFIG_IBSS_RSN */
-
 #ifdef CONFIG_TERMINATE_ONLASTIF
 		/* check if last interface */
 		if (!any_interfaces(wpa_s->global->ifaces))

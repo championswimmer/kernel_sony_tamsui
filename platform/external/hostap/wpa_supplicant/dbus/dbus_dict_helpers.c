@@ -2,14 +2,8 @@
  * WPA Supplicant / dbus-based control interface
  * Copyright (c) 2006, Dan Williams <dcbw@redhat.com> and Red Hat, Inc.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "includes.h"
@@ -739,7 +733,7 @@ static dbus_bool_t _wpa_dbus_dict_entry_get_byte_array(
 {
 	dbus_uint32_t count = 0;
 	dbus_bool_t success = FALSE;
-	char *buffer, *nbuffer;;
+	char *buffer, *nbuffer;
 
 	entry->bytearray_value = NULL;
 	entry->array_type = DBUS_TYPE_BYTE;

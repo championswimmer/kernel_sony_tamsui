@@ -2,14 +2,8 @@
  * hostapd / main()
  * Copyright (c) 2002-2011, Jouni Malinen <j@w1.fi>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "utils/includes.h"
@@ -27,6 +21,7 @@
 #include "eap_server/tncs.h"
 #include "ap/hostapd.h"
 #include "ap/ap_config.h"
+#include "ap/ap_drv_ops.h"
 #include "config_file.h"
 #include "eap_register.h"
 #include "dump_state.h"
@@ -46,29 +41,6 @@ struct hapd_global {
 };
 
 static struct hapd_global global;
-
-
-struct hapd_interfaces {
-	size_t count;
-	struct hostapd_iface **iface;
-};
-
-
-static int hostapd_for_each_interface(struct hapd_interfaces *interfaces,
-				      int (*cb)(struct hostapd_iface *iface,
-						void *ctx), void *ctx)
-{
-	size_t i;
-	int ret;
-
-	for (i = 0; i < interfaces->count; i++) {
-		ret = cb(interfaces->iface[i], ctx);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
 
 
 #ifndef CONFIG_NO_HOSTAPD_LOGGER
@@ -303,8 +275,10 @@ static int hostapd_driver_init(struct hostapd_iface *iface)
 	}
 
 	if (hapd->driver->get_capa &&
-	    hapd->driver->get_capa(hapd->drv_priv, &capa) == 0)
+	    hapd->driver->get_capa(hapd->drv_priv, &capa) == 0) {
 		iface->drv_flags = capa.flags;
+		iface->probe_resp_offloads = capa.probe_resp_offloads;
+	}
 
 	return 0;
 }
@@ -319,7 +293,7 @@ static void hostapd_interface_deinit_free(struct hostapd_iface *iface)
 	driver = iface->bss[0]->driver;
 	drv_priv = iface->bss[0]->drv_priv;
 	hostapd_interface_deinit(iface);
-	if (driver && driver->hapd_deinit)
+	if (driver && driver->hapd_deinit && drv_priv)
 		driver->hapd_deinit(drv_priv);
 	hostapd_interface_free(iface);
 }
@@ -343,10 +317,13 @@ hostapd_interface_init(struct hapd_interfaces *interfaces,
 			iface->bss[0]->conf->logger_stdout_level--;
 	}
 
-	if (hostapd_driver_init(iface) ||
-	    hostapd_setup_interface(iface)) {
-		hostapd_interface_deinit_free(iface);
-		return NULL;
+	if (iface->conf->bss[0].iface[0] != 0 ||
+	    hostapd_drv_none(iface->bss[0])) {
+		if (hostapd_driver_init(iface) ||
+			hostapd_setup_interface(iface)) {
+			hostapd_interface_deinit_free(iface);
+			return NULL;
+		}
 	}
 
 	return iface;
@@ -511,7 +488,7 @@ static void show_version(void)
 		"hostapd v" VERSION_STR "\n"
 		"User space daemon for IEEE 802.11 AP management,\n"
 		"IEEE 802.1X/WPA/WPA2/EAP/RADIUS Authenticator\n"
-		"Copyright (c) 2002-2011, Jouni Malinen <j@w1.fi> "
+		"Copyright (c) 2002-2012, Jouni Malinen <j@w1.fi> "
 		"and contributors\n");
 }
 

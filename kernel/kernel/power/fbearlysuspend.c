@@ -1,7 +1,6 @@
 /* kernel/power/fbearlysuspend.c
  *
  * Copyright (C) 2005-2008 Google, Inc.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -28,15 +27,6 @@ static enum {
 	FB_STATE_DRAWING_OK,
 } fb_state;
 
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-extern struct workqueue_struct *display_late_resume_wq;
-static struct work_struct start_drawing_late_resume_work;
-
-static void start_drawing_late_resume_work_func(struct work_struct *work);
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
-
 /* tell userspace to stop drawing, wait for it to stop */
 static void stop_drawing_early_suspend(struct early_suspend *h)
 {
@@ -56,35 +46,15 @@ static void stop_drawing_early_suspend(struct early_suspend *h)
 			   "userspace to stop drawing\n");
 }
 
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-static void start_drawing_late_resume_work_func(struct work_struct *work)
-{
-	unsigned long irq_flags;
-
-	spin_lock_irqsave(&fb_state_lock, irq_flags);
-	fb_state = FB_STATE_DRAWING_OK;
-	spin_unlock_irqrestore(&fb_state_lock, irq_flags);
-	wake_up(&fb_state_wq);
-}
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
-
 /* tell userspace to start drawing */
 static void start_drawing_late_resume(struct early_suspend *h)
 {
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-	queue_work(display_late_resume_wq, &start_drawing_late_resume_work);
-#else
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&fb_state_lock, irq_flags);
 	fb_state = FB_STATE_DRAWING_OK;
 	spin_unlock_irqrestore(&fb_state_lock, irq_flags);
 	wake_up(&fb_state_wq);
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
 }
 
 static struct early_suspend stop_drawing_early_suspend_desc = {
@@ -167,12 +137,6 @@ static int __init android_power_init(void)
 		pr_err("android_power_init: sysfs_create_group failed\n");
 		return ret;
 	}
-
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
-#ifdef CONFIG_FIH_FB_MSM_DISPLAY_WORK_QUEUE
-	INIT_WORK(&start_drawing_late_resume_work, start_drawing_late_resume_work_func);
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
 
 	register_early_suspend(&stop_drawing_early_suspend_desc);
 	return 0;

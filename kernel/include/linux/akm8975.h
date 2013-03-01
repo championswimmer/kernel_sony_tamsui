@@ -1,15 +1,12 @@
 /*
  * Definitions for akm8975 compass chip.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 #ifndef AKM8975_H
 #define AKM8975_H
 
 #include <linux/ioctl.h>
-#include <linux/fih_hw_info.h>	/* FIH-SW1-PERIPHERAL-FG-MSENSOR-00+ */
 
 #define AKM8975_I2C_NAME "akm8975"
-#define GPIO_COMPASS_INT (((fih_get_product_id() == Project_MES) && (fih_get_product_phase() < Phase_DP)) ? 114:39)	/* FIH-SW1-PERIPHERAL-FG-MSENSOR-00+ */
 
 #define SENSOR_DATA_SIZE	8
 #define YPR_DATA_SIZE		12
@@ -87,7 +84,6 @@ Defines a read-only address of the fuse ROM of the AK8975.*/
 struct akm8975_platform_data {
 	char layout;
 	int gpio_DRDY;
-	int (*gpio_init)(void);	/* FIH-SW1-PERIPHERAL-FG-MSENSOR-00+ */
 };
 
 #endif

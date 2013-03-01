@@ -3334,6 +3334,7 @@ int main(int argc, char *argv[])
 
 	if (interactive)
 		printf("%s\n\n%s\n\n", wpa_cli_version, wpa_cli_license);
+
 	if (eloop_init())
 		return -1;
 

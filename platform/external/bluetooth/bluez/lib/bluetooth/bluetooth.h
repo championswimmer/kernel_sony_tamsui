@@ -86,6 +86,21 @@ struct bt_power {
 #define BT_AMP_POLICY_PREFER_BR_EDR		1
 #define BT_AMP_POLICY_PREFER_AMP		2
 
+#define BT_LE_PARAMS	100
+struct bt_le_params {
+	uint8_t  prohibit_remote_chg;
+	uint8_t  filter_policy;
+	uint16_t scan_interval;
+	uint16_t scan_window;
+	uint16_t interval_min;
+	uint16_t interval_max;
+	uint16_t latency;
+	uint16_t supervision_timeout;
+	uint16_t min_ce_len;
+	uint16_t max_ce_len;
+	uint16_t conn_timeout;
+};
+
 /* Connection and socket states */
 enum {
 	BT_CONNECTED = 1, /* Equal to TCP_ESTABLISHED to make net code happy */

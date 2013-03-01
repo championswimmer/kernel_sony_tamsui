@@ -53,6 +53,7 @@ PaintTileOperation::~PaintTileOperation()
         ImageTexture* image = static_cast<ImageTexture*>(m_surface);
         ImagesManager::instance()->releaseImage(image->imageCRC());
     }
+     //TPSW1_SoMC_2nd_Patches_Begin  
     // +{ ASD-NET-JC-TAP.2554-01
     /*
     else {
@@ -60,6 +61,7 @@ PaintTileOperation::~PaintTileOperation()
     }
     */
     // ASD-NET-JC-TAP.2554-01 }+
+    //TPSW1_SoMC_2nd_Patches_End 
 }
 
 bool PaintTileOperation::operator==(const QueuedOperation* operation)

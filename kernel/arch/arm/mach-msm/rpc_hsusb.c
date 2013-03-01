@@ -1,5 +1,5 @@
 /* linux/arch/arm/mach-msm/rpc_hsusb.c
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved. 
+ *
  * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
  *
  * All source code in this file is licensed under the following license except
@@ -634,18 +634,15 @@ EXPORT_SYMBOL(hsusb_chg_init);
 
 void hsusb_chg_vbus_draw(unsigned mA)
 {
-    /* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+[ */
-    #ifndef CONFIG_FIH_FTM
+	//[Arima Edison] add a log ++	
+	printk(KERN_EMERG "%s : (%u)",__func__,mA);
+	//[Arima Edison] add a log --
 	msm_chg_usb_i_is_available(mA);
-    #endif
-    /* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+] */
 }
 EXPORT_SYMBOL(hsusb_chg_vbus_draw);
 
 void hsusb_chg_connected(enum chg_type chgtype)
 {
-    /* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+[ */
-    #ifndef CONFIG_FIH_FTM
 	char *chg_types[] = {"STD DOWNSTREAM PORT",
 			"CARKIT",
 			"DEDICATED CHARGER",
@@ -660,8 +657,6 @@ void hsusb_chg_connected(enum chg_type chgtype)
 	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
 
 	msm_chg_usb_charger_connected(chgtype);
-    #endif
-    /* FIH-SW3-KERNEL-PK-Battery_Gauge_Porting-00+] */
 }
 EXPORT_SYMBOL(hsusb_chg_connected);
 #endif

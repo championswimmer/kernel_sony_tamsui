@@ -1,5 +1,4 @@
 /* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,20 +13,18 @@
 #include <linux/interrupt.h>
 #include <mach/msm_iomap.h>
 #include <mach/msm_bus.h>
-#include <mach/socinfo.h>
-#include <linux/delay.h>/*MTD-MM-CL-GpuHang_PATCH-01+ */
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
 #include "kgsl_device.h"
 #include "kgsl_trace.h"
-#include "a2xx_reg.h"/*MTD-MM-CL-GpuHang_PATCH-01+ */
 
 #define KGSL_PWRFLAGS_POWER_ON 0
 #define KGSL_PWRFLAGS_CLK_ON   1
 #define KGSL_PWRFLAGS_AXI_ON   2
 #define KGSL_PWRFLAGS_IRQ_ON   3
 
+#define GPU_SWFI_LATENCY	3
 #define UPDATE_BUSY_VAL		1000000
 #define UPDATE_BUSY		50
 
@@ -342,32 +339,9 @@ void kgsl_pwrctrl_clk(struct kgsl_device *device, int state,
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	int i = 0;
-/*MTD-MM-CL-GpuHang_PATCH-01+{ */
-	static unsigned int orig_REG_CP_DEBUG = 0;
-	static unsigned int orig_REG_RBBM_PM_OVERRIDE1 = 0;
-	static unsigned int orig_REG_RBBM_PM_OVERRIDE2 = 0;
-/*MTD-MM-CL-GpuHang_PATCH-01+} */
 	if (state == KGSL_PWRFLAGS_OFF) {
 		if (test_and_clear_bit(KGSL_PWRFLAGS_CLK_ON,
 			&pwr->power_flags)) {
-/*MTD-MM-CL-GpuHang_PATCH-01+{ */
-			/* Backup */
-			device->ftbl->regread(device, REG_CP_DEBUG, &orig_REG_CP_DEBUG);
-			device->ftbl->regread(device, REG_RBBM_PM_OVERRIDE1, &orig_REG_RBBM_PM_OVERRIDE1);
-			device->ftbl->regread(device, REG_RBBM_PM_OVERRIDE2, &orig_REG_RBBM_PM_OVERRIDE2);
-
-			/* Disable overrides */
-			device->ftbl->regwrite(device, REG_CP_DEBUG, orig_REG_CP_DEBUG | (1 << 27));
-			device->ftbl->regwrite(device, REG_RBBM_PM_OVERRIDE1, orig_REG_RBBM_PM_OVERRIDE1 | 0xfffffffe);
-			device->ftbl->regwrite(device, REG_RBBM_PM_OVERRIDE2, orig_REG_RBBM_PM_OVERRIDE2 | 0xffffffff);
-			/* FIH-SW2-MM-KW-Use_hr_msleep-00+{ */
-			#ifdef CONFIG_FIH_HR_MSLEEP
-			hr_msleep(1);
-			#else
-			msleep(1);
-			#endif
-			/* FIH-SW2-MM-KW-Use_hr_msleep-00-} */
-/*MTD-MM-CL-GpuHang_PATCH-01+} */
 			trace_kgsl_clk(device, state);
 			for (i = KGSL_MAX_CLKS - 1; i > 0; i--)
 				if (pwr->grp_clks[i])
@@ -395,23 +369,6 @@ void kgsl_pwrctrl_clk(struct kgsl_device *device, int state,
 				if (pwr->grp_clks[i])
 					clk_enable(pwr->grp_clks[i]);
 			kgsl_pwrctrl_busy_time(device, false);
-/*MTD-MM-CL-GpuHang_PATCH-01+{ */
-			/* if backup available, overrides have been disabled. Wait for sometime & use restore overrides */
-			if(0 != orig_REG_CP_DEBUG) {
-				/* FIH-SW2-MM-KW-Use_hr_msleep-00+{ */
-				#ifdef CONFIG_FIH_HR_MSLEEP
-				hr_msleep(2);
-				#else
-				msleep(2);
-				#endif
-				/* FIH-SW2-MM-KW-Use_hr_msleep-00-} */
-				device->ftbl->regwrite(device, REG_CP_DEBUG, orig_REG_CP_DEBUG);
-				device->ftbl->regwrite(device, REG_RBBM_PM_OVERRIDE1, orig_REG_RBBM_PM_OVERRIDE1);
-				device->ftbl->regwrite(device, REG_RBBM_PM_OVERRIDE2, orig_REG_RBBM_PM_OVERRIDE2);
-			}
-			KGSL_DRV_ERR(device, "overrides 0x%08x 0x%08x 0x%08x\n", orig_REG_CP_DEBUG,
-			orig_REG_RBBM_PM_OVERRIDE1, orig_REG_RBBM_PM_OVERRIDE2);
-/*MTD-MM-CL-GpuHang_PATCH-01+} */
 		}
 	}
 }
@@ -749,7 +706,7 @@ _nap(struct kgsl_device *device)
 		}
 		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
 		kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_OFF, KGSL_STATE_NAP);
-		kgsl_pwrctrl_set_state(device, device->requested_state);
+		kgsl_pwrctrl_set_state(device, KGSL_STATE_NAP);
 		if (device->idle_wakelock.name)
 			wake_unlock(&device->idle_wakelock);
 	case KGSL_STATE_NAP:
@@ -782,8 +739,6 @@ _sleep(struct kgsl_device *device)
 			kgsl_pwrctrl_request_state(device, KGSL_STATE_NONE);
 			return -EBUSY;
 		}
-		device->ftbl->suspend_context(device);
-		device->ftbl->stop(device);	
 		/* fall through */
 	case KGSL_STATE_NAP:
 		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
@@ -795,8 +750,9 @@ _sleep(struct kgsl_device *device)
 		_sleep_accounting(device);
 		kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_OFF, KGSL_STATE_SLEEP);
 		kgsl_pwrctrl_set_state(device, KGSL_STATE_SLEEP);
-		if (device->idle_wakelock.name)
-			wake_unlock(&device->idle_wakelock);
+		wake_unlock(&device->idle_wakelock);
+		pm_qos_update_request(&device->pm_qos_req_dma,
+					PM_QOS_DEFAULT_VALUE);
 		break;
 	case KGSL_STATE_SLEEP:
 	case KGSL_STATE_SLUMBER:
@@ -833,6 +789,8 @@ _slumber(struct kgsl_device *device)
 		kgsl_pwrctrl_set_state(device, KGSL_STATE_SLUMBER);
 		if (device->idle_wakelock.name)
 			wake_unlock(&device->idle_wakelock);
+		pm_qos_update_request(&device->pm_qos_req_dma,
+						PM_QOS_DEFAULT_VALUE);
 		break;
 	case KGSL_STATE_SLUMBER:
 		break;
@@ -901,9 +859,10 @@ void kgsl_pwrctrl_wake(struct kgsl_device *device)
 		/* Re-enable HW access */
 		mod_timer(&device->idle_timer,
 				jiffies + device->pwrctrl.interval_timeout);
-
-		if (device->idle_wakelock.name)
-			wake_lock(&device->idle_wakelock);
+		wake_lock(&device->idle_wakelock);
+		if (device->pwrctrl.restore_slumber == false)
+			pm_qos_update_request(&device->pm_qos_req_dma,
+						GPU_SWFI_LATENCY);
 	case KGSL_STATE_ACTIVE:
 		break;
 	default:

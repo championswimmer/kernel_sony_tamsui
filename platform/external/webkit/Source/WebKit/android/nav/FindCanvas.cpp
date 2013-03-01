@@ -558,7 +558,10 @@ void FindOnPage::storeCurrentMatchLocation() {
 
 // Put a cap on the number of matches to draw.  If the current page has more
 // matches than this, only draw the focused match.
-#define MAX_NUMBER_OF_MATCHES_TO_DRAW 101
+/*ilkchang 20121031 ATS00153901 increase the number of matches to draw begin*/
+//#define MAX_NUMBER_OF_MATCHES_TO_DRAW 101
+#define MAX_NUMBER_OF_MATCHES_TO_DRAW 301
+/*ilkchang 20121031 ATS00153901 increase the number of matches to draw end*/
 
 void FindOnPage::draw(SkCanvas* canvas, LayerAndroid* layer, IntRect* inval) {
     if (!m_lastBounds.isEmpty()) {

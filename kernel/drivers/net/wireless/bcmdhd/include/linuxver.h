@@ -3,7 +3,6 @@
  * Pave over some 2.2 versus 2.4 versus 2.6 kernel differences.
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -483,11 +482,7 @@ typedef struct {
 #define DBG_THR(x)
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
-#define SMP_RD_BARRIER_DEPENDS(x) smp_read_barrier_depends(x)
-#else
 #define SMP_RD_BARRIER_DEPENDS(x) smp_rmb(x)
-#endif
 
 
 #define PROC_START(thread_func, owner, tsk_ctl, flags) \

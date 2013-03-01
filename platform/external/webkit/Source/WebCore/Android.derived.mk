@@ -148,6 +148,13 @@ style_sheets := $(LOCAL_PATH)/css/html.css $(LOCAL_PATH)/css/quirks.css $(LOCAL_
 ifeq ($(ENABLE_SVG), true)
 style_sheets := $(style_sheets) $(LOCAL_PATH)/css/svg.css
 endif
+
+# Arima Rockyang added 20120608 - WML support
+ifeq ($(ENABLE_WML),true)
+style_sheets := $(style_sheets) $(LOCAL_PATH)/css/wml.css
+endif
+# Arima Rockyang added end
+
 GEN := $(intermediates)/css/UserAgentStyleSheets.h
 make_css_file_arrays := $(LOCAL_PATH)/css/make-css-file-arrays.pl
 $(GEN): PRIVATE_CUSTOM_TOOL = $< $@ $(basename $@).cpp $(filter %.css,$^)

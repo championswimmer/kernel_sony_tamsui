@@ -1270,6 +1270,48 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
         node/NodeProxy.cpp
 endif
 
+# Arima Rockyang added 20120608 - WML support
+ifeq ($(ENABLE_WML),true)
+LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
+    wml/WMLAccessElement.cpp \
+    wml/WMLAElement.cpp \
+    wml/WMLAnchorElement.cpp \
+    wml/WMLBRElement.cpp \
+    wml/WMLCardElement.cpp \
+    wml/WMLDocument.cpp \
+    wml/WMLDoElement.cpp \
+    wml/WMLElement.cpp \
+    wml/WMLErrorHandling.cpp \
+    wml/WMLEventHandlingElement.cpp \
+    wml/WMLFieldSetElement.cpp \
+    wml/WMLFormControlElement.cpp \
+    wml/WMLGoElement.cpp \
+    wml/WMLImageElement.cpp \
+    wml/WMLImageLoader.cpp \
+    wml/WMLInputElement.cpp \
+    wml/WMLInsertedLegendElement.cpp \
+    wml/WMLIntrinsicEvent.cpp \
+    wml/WMLIntrinsicEventHandler.cpp \
+    wml/WMLMetaElement.cpp \
+    wml/WMLNoopElement.cpp \
+    wml/WMLOnEventElement.cpp \
+    wml/WMLOptGroupElement.cpp \
+    wml/WMLOptionElement.cpp \
+    wml/WMLPageState.cpp \
+    wml/WMLPElement.cpp \
+    wml/WMLPostfieldElement.cpp \
+    wml/WMLPrevElement.cpp \
+    wml/WMLRefreshElement.cpp \
+    wml/WMLSelectElement.cpp \
+    wml/WMLSetvarElement.cpp \
+    wml/WMLTableElement.cpp \
+    wml/WMLTaskElement.cpp \
+    wml/WMLTemplateElement.cpp \
+    wml/WMLTimerElement.cpp \
+    wml/WMLVariables.cpp
+endif
+# Arima Rockyang added end
+
 ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)
   LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=2
 else

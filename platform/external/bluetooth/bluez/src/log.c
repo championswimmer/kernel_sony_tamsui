@@ -33,6 +33,13 @@
 
 #include "log.h"
 
+//+ murphy 2012.07.02  Enable BlueZ logs in android logcat
+#include <utils/Log.h>
+
+#define LOG_TAG "BlueZ"
+#define BLUEZ_LOG_ENABLE  1  // 1: Enable, 0: Disable
+//- murphy 2012.07.02
+
 void info(const char *format, ...)
 {
 	va_list ap;
@@ -40,6 +47,12 @@ void info(const char *format, ...)
 	va_start(ap, format);
 
 	vsyslog(LOG_INFO, format, ap);
+
+  //+ murphy 2012.07.02
+  #if BLUEZ_LOG_ENABLE
+  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, ap);
+  #endif
+  //- murphy 2012.07.02
 
 	va_end(ap);
 }
@@ -52,6 +65,12 @@ void error(const char *format, ...)
 
 	vsyslog(LOG_ERR, format, ap);
 
+  //+ murphy 2012.07.02
+  #if BLUEZ_LOG_ENABLE
+  __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, ap);
+  #endif
+  //- murphy 2012.07.02
+
 	va_end(ap);
 }
 
@@ -62,6 +81,12 @@ void btd_debug(const char *format, ...)
 	va_start(ap, format);
 
 	vsyslog(LOG_DEBUG, format, ap);
+
+  //+ murphy 2012.07.02
+  #if BLUEZ_LOG_ENABLE
+  __android_log_vprint(ANDROID_LOG_DEBUG, LOG_TAG, format, ap);
+  #endif
+  //- murphy 2012.07.02
 
 	va_end(ap);
 }

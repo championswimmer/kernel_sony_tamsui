@@ -1,7 +1,6 @@
 /*
  *  linux/init/main.c
  *
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
  *  GK 2/5/95  -  Changed to support mounting root fs via NFS
@@ -75,10 +74,6 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
-
-/* FIH-SW3-KERNEL-EL-get_last_alog_buffer_virt_addr-00+[ */
-#include <linux/fih_sw_info.h>
-/* FIH-SW3-KERNEL-EL-get_last_alog_buffer_virt_addr-00+] */
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
@@ -784,30 +779,8 @@ static noinline int init_post(void)
 	      "See Linux Documentation/init.txt for guidance.");
 }
 
-/* FIH-SW3-KERNEL-EL-get_last_alog_buffer_virt_addr-00+ */
-void * get_alog_buffer_virt_addr(void);
-
-/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01+[ */
-void * get_timestamp_buffer_virt_addr(void);
-/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01-[ */
-
 static int __init kernel_init(void * unused)
 {
-	
-	/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01+[ */
-	char Timebuf[15] = "000000000000000";
-	void *crash_timestamp_buffer_virt_addr = 0;
-	/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01-[ */
-
-	/* FIH-SW3-KERNEL-EL-get_last_alog_buffer_virt_addr-00+[ */
-	get_alog_buffer_virt_addr();
-	/* FIH-SW3-KERNEL-EL-get_last_alog_buffer_virt_addr-00+] */
-
-	/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01+[ */
-	crash_timestamp_buffer_virt_addr = get_timestamp_buffer_virt_addr();
-	memcpy(crash_timestamp_buffer_virt_addr, Timebuf, sizeof(Timebuf));
-	/* FIH-SW3-KERNEL-TH-TimestampOnRAMDump-01-[ */
-	
 	/*
 	 * Wait until kthreadd is all set-up.
 	 */

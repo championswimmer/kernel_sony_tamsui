@@ -1,7 +1,5 @@
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -63,23 +61,12 @@ static struct platform_driver mipi_dsi_driver = {
 };
 
 struct device dsi_dev;
-/* FIH-SW-MM-VH-DISPLAY-11*[ */
-static int isMIPIDSIInit = 0;
+
 static int mipi_dsi_off(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msm_fb_data_type *mfd;
 	struct msm_panel_info *pinfo;
-/* FIH-SW3-MM-NC-LCM-00 */
-	printk(KERN_ALERT "[DISPLAY] Enter %s\n", __func__);
-
-/* FIH-SW-MM-VH-DISPLAY-12*[ */
-#ifdef CONFIG_FIH_SW_DISPLAY_DSI_BKL_EN
-	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_bkl_en)
-		mipi_dsi_pdata->dsi_bkl_en(0);
-		
-#endif
-/* FIH-SW-MM-VH-DISPLAY-12*] */
 
 	mfd = platform_get_drvdata(pdev);
 	pinfo = &mfd->panel_info;
@@ -115,7 +102,7 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	 */
 	mipi_dsi_op_mode_config(DSI_CMD_MODE);
 
-	if((mfd->panel_info.type == MIPI_CMD_PANEL) && (isMIPIDSIInit !=0 )) {
+	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
 		if (pinfo->lcd.vsync_enable) {
 			if (pinfo->lcd.hw_vsync_mode && vsync_gpio >= 0) {
 				if (MDP_REV_303 != mdp_rev)
@@ -153,9 +140,8 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	else
 		up(&mfd->dma->mutex);
 
-	pr_debug("%s:\n", __func__);
+	pr_debug("%s-:\n", __func__);
 
-	isMIPIDSIInit = 0;
 	return ret;
 }
 
@@ -172,10 +158,6 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	u32 ystride, bpp, data;
 	u32 dummy_xres, dummy_yres;
 	int target_type = 0;
-/* FIH-SW-MM-VH-DISPLAY-09+ */
-	u32 tmp;
-/* FIH-SW3-MM-NC-LCM-00 */
-	printk(KERN_ALERT "[DISPLAY] Enter %s\n", __func__);
 
 	mfd = platform_get_drvdata(pdev);
 	fbi = mfd->fbi;
@@ -274,23 +256,14 @@ static int mipi_dsi_on(struct platform_device *pdev)
 
 	mipi_dsi_host_init(mipi);
 
-	/* FIH-SW-MM-VH-DISPLAY-09*[ */
 	if (mipi->force_clk_lane_hs) {
+		u32 tmp;
+
 		tmp = MIPI_INP(MIPI_DSI_BASE + 0xA8);
 		tmp |= (1<<28);
 		MIPI_OUTP(MIPI_DSI_BASE + 0xA8, tmp);
 		wmb();
 	}
-
-	tmp = MIPI_INP(MIPI_DSI_BASE + 0xF4);
-	tmp |= 0x0000FF00;
-	MIPI_OUTP(MIPI_DSI_BASE + 0xF4, tmp);
-	/* FIH-SW-MM-VH-DISPLAY-09*] */
-
-    /* FIH-SW-MM-VH-DISPLAY-07+[ */
-	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_client_reset)
-		mipi_dsi_pdata->dsi_client_reset(0);
-    /* FIH-SW-MM-VH-DISPLAY-07+] */
 
 	if (mdp_rev >= MDP_REV_41)
 		mutex_lock(&mfd->dma->ov_mutex);
@@ -298,9 +271,6 @@ static int mipi_dsi_on(struct platform_device *pdev)
 		down(&mfd->dma->mutex);
 
 	ret = panel_next_on(pdev);
-
-	if (ret == -EPERM)
-		goto err;
 
 	mipi_dsi_op_mode_config(mipi->mode);
 
@@ -347,17 +317,11 @@ static int mipi_dsi_on(struct platform_device *pdev)
 					}
 				}
 			}
-			mipi_dsi_set_tear_on(mfd);
+			mipi_dsi_set_tear_on(mfd); 
+			/* Tracy moify-20120829 Disable Tearing function for white screen issue, only turn on TE when entry camera preview */
+			gpio_tlmm_config(GPIO_CFG(97, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),GPIO_CFG_DISABLE);
 		}
 	}
-
-
-/* FIH-SW-MM-VH-DISPLAY-12*[ */
-#ifdef CONFIG_FIH_SW_DISPLAY_DSI_BKL_EN
-	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_bkl_en)
-		mipi_dsi_pdata->dsi_bkl_en(1);
-#endif
-/* FIH-SW-MM-VH-DISPLAY-12*] */
 
 #ifdef CONFIG_MSM_BUS_SCALING
 	mdp_bus_scale_update_request(2);
@@ -365,23 +329,16 @@ static int mipi_dsi_on(struct platform_device *pdev)
 
 	mdp4_overlay_dsi_state_set(ST_DSI_RESUME);
 
-	isMIPIDSIInit = 1;
-
-err:
 	if (mdp_rev >= MDP_REV_41)
 		mutex_unlock(&mfd->dma->ov_mutex);
 	else
 		up(&mfd->dma->mutex);
 
-	/* FIH-SW-MM-VH-DISPLAY-16+ */
-	if ((mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save) && (ret == -EPERM))
-		mipi_dsi_pdata->dsi_power_save(0);
-
 	pr_debug("%s-:\n", __func__);
 
 	return ret;
 }
-/* FIH-SW-MM-VH-DISPLAY-11*] */
+
 
 static int mipi_dsi_resource_initialized;
 
@@ -459,18 +416,16 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		if (mipi_dsi_pdata) {
 			vsync_gpio = mipi_dsi_pdata->vsync_gpio;
 			pr_debug("%s: vsync_gpio=%d\n", __func__, vsync_gpio);
-			/* FIH-SW-MM-VH-DISPLAY-07*[ */
-			/*
+
 			if (mdp_rev == MDP_REV_303 &&
 				mipi_dsi_pdata->dsi_client_reset) {
-				if (mipi_dsi_pdata->dsi_client_reset(0))
+				if (mipi_dsi_pdata->dsi_client_reset())
 					pr_err("%s: DSI Client Reset failed!\n",
 						__func__);
 				else
 					pr_debug("%s: DSI Client Reset success\n",
 						__func__);
-			}*/
-			/* FIH-SW-MM-VH-DISPLAY-07*] */
+			}
 		}
 
 		mipi_dsi_resource_initialized = 1;
@@ -548,8 +503,6 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 	else
 		mfd->fb_imgType = MDP_RGB_565;
 
-	/* FIH-SW-MM-VH-DISPLAY-08+ */
-	printk("[DISPLAY] mfd->fb_imgType = %d\r\n", mfd->fb_imgType);
 	fbi = mfd->fbi;
 	fbi->var.pixclock = mfd->panel_info.clk_rate;
 	fbi->var.left_margin = mfd->panel_info.lcdc.h_back_porch;

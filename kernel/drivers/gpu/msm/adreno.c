@@ -1,5 +1,4 @@
 /* Copyright (c) 2002,2007-2012, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -115,6 +114,7 @@ static struct adreno_device device_3d0 = {
 	.pfp_fw = NULL,
 	.pm4_fw = NULL,
 	.wait_timeout = 10000, /* in milliseconds */
+	.ib_check_level = 0,
 };
 
 
@@ -274,25 +274,23 @@ static void adreno_setstate(struct kgsl_device *device,
 	int sizedwords = 0;
 	unsigned int mh_mmu_invalidate = 0x00000003; /*invalidate all and tc */
 
-	/* FIH-SW2-MM-KW-Google_patch-00+{ */
-	/*
-	 * Fix target freeze issue by adding TLB flush for each submit
-	 * on A20X based targets.
-	*/
-	/* if (adreno_is_a20x(adreno_dev)) */
-		flags |= KGSL_MMUFLAGS_TLBFLUSH;
-	/* FIH-SW2-MM-KW-Google_patch-00-} */
-	/*
-	 * If possible, then set the state via the command stream to avoid
-	 * a CPU idle.  Otherwise, use the default setstate which uses register
-	 * writes For CFF dump we must idle and use the registers so that it is
-	 * easier to filter out the mmu accesses from the dump
-	 */
-	if (!kgsl_cff_dump_enable && adreno_dev->drawctxt_active) {
-		if (flags & KGSL_MMUFLAGS_PTUPDATE) {
-			/* wait for graphics pipe to be idle */
-			*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
-			*cmds++ = 0x00000000;
+        /*
+         * Fix target freeze issue by adding TLB flush for each submit
+         * on A20X based targets.
+         */
+        if (adreno_is_a20x(adreno_dev))
+                flags |= KGSL_MMUFLAGS_TLBFLUSH;
+        /*
+         * If possible, then set the state via the command stream to avoid
+         * a CPU idle.  Otherwise, use the default setstate which uses register
+         * writes For CFF dump we must idle and use the registers so that it is
+         * easier to filter out the mmu accesses from the dump
+         */
+        if (!kgsl_cff_dump_enable && adreno_dev->drawctxt_active) {
+                if (flags & KGSL_MMUFLAGS_PTUPDATE) {
+                        /* wait for graphics pipe to be idle */
+                        *cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+                        *cmds++ = 0x00000000;
 
 			/* set page table base */
 			*cmds++ = cp_type0_packet(MH_MMU_PT_BASE, 1);
@@ -313,11 +311,8 @@ static void adreno_setstate(struct kgsl_device *device,
 			sizedwords += 2;
 		}
 
-		if (flags & KGSL_MMUFLAGS_PTUPDATE)
-			/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-			/* && adreno_is_a20x(adreno_dev)) */
-			/* FIH-SW2-MM-KW-Useless_codes-00-} */
-		{
+		if (flags & KGSL_MMUFLAGS_PTUPDATE &&
+			adreno_is_a20x(adreno_dev)) {
 			/* HW workaround: to resolve MMU page fault interrupts
 			* caused by the VGT.It prevents the CP PFP from filling
 			* the VGT DMA request fifo too early,thereby ensuring
@@ -520,10 +515,8 @@ static int adreno_start(struct kgsl_device *device, unsigned int init_ram)
 			adreno_dev->chip_id);
 		goto error_clk_off;
 	}
-	/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-	/* if (adreno_is_a20x(adreno_dev)) */
-	/* FIH-SW2-MM-KW-Useless_codes-00-} */
-	{
+
+	if (adreno_is_a20x(adreno_dev)) {
 		/*
 		 * the MH_CLNT_INTF_CTRL_CONFIG registers aren't present
 		 * on older gpus
@@ -544,70 +537,40 @@ static int adreno_start(struct kgsl_device *device, unsigned int init_ram)
 	adreno_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0xffffffff);
 
 	/* Only reset CP block if all blocks have previously been reset */
-	/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-	#if 0
 	if (!(device->flags & KGSL_FLAGS_SOFT_RESET) ||
 		!adreno_is_a22x(adreno_dev)) {
 		adreno_regwrite(device, REG_RBBM_SOFT_RESET, 0xFFFFFFFF);
 		device->flags |= KGSL_FLAGS_SOFT_RESET;
 	} else
 		adreno_regwrite(device, REG_RBBM_SOFT_RESET, 0x00000001);
-	#else
-		adreno_regwrite(device, REG_RBBM_SOFT_RESET, 0xFFFFFFFF);
-		device->flags |= KGSL_FLAGS_SOFT_RESET;
-	#endif
-	/* FIH-SW2-MM-KW-Useless_codes-00-} */
 
 	/* The core is in an indeterminate state until the reset completes
 	 * after 30ms.
 	 */
-	/* FIH-SW2-MM-KW-Use_hr_msleep-00+{ */
-	#ifdef CONFIG_FIH_HR_MSLEEP
-	hr_msleep(30);
-	#else
 	msleep(30);
-	#endif
-	/* FIH-SW2-MM-KW-Use_hr_msleep-00-} */
+
 	adreno_regwrite(device, REG_RBBM_SOFT_RESET, 0x00000000);
-	/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-	#if 0
-	/* FIH-SW2-MM-KW-Google_patch-00+{ */
-	if (adreno_is_a200(adreno_dev))
-		adreno_regwrite(device, REG_RBBM_CNTL, 0x0000FFFF);
-	else
-		adreno_regwrite(device, REG_RBBM_CNTL, 0x00004442);
-	/* FIH-SW2-MM-KW-Google_patch-00-} */
+
+	adreno_regwrite(device, REG_RBBM_CNTL, 0x00004442);
+
 	if (adreno_is_a225(adreno_dev)) {
 		/* Enable large instruction store for A225 */
 		adreno_regwrite(device, REG_SQ_FLOW_CONTROL, 0x18000000);
 	}
-	#else
-		adreno_regwrite(device, REG_RBBM_CNTL, 0x0000FFFF);
-	#endif
-	/* FIH-SW2-MM-KW-Useless_codes-00-} */
+
 	adreno_regwrite(device, REG_SQ_VS_PROGRAM, 0x00000000);
 	adreno_regwrite(device, REG_SQ_PS_PROGRAM, 0x00000000);
-	/*MTD-MM-CL-GpuHang_PATCH-00*[ */
-	/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-	#if 0
+
 	if (cpu_is_msm8960() || cpu_is_msm8930())
 		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE1, 0x200);
 	else
-		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE1,0xFDC001E0);
+		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE1, 0);
 
-    if (adreno_is_a22x(adreno_dev))
-		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0x80);
-	else if (adreno_is_a200(adreno_dev))
-		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0x38);
-
-	else
+	if (!adreno_is_a22x(adreno_dev))
 		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0);
-	#else
-		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE1, 0xFDC001E0);
-		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0x38);
-	#endif
-	/* FIH-SW2-MM-KW-Useless_codes-00-} */
-	/*MTD-MM-CL-GpuHang_PATCH-00*] */
+	else
+		adreno_regwrite(device, REG_RBBM_PM_OVERRIDE2, 0x80);
+
 	kgsl_sharedmem_set(&device->memstore, 0, 0, device->memstore.size);
 
 	kgsl_sharedmem_writel(&device->memstore,
@@ -621,11 +584,10 @@ static int adreno_start(struct kgsl_device *device, unsigned int init_ram)
 	adreno_regwrite(device, REG_RBBM_INT_CNTL, 0);
 	adreno_regwrite(device, REG_CP_INT_CNTL, 0);
 	adreno_regwrite(device, REG_SQ_INT_CNTL, 0);
-	/* FIH-SW2-MM-KW-Useless_codes-00+{ */
-	/* if (adreno_is_a22x(adreno_dev))
+
+	if (adreno_is_a22x(adreno_dev))
 		adreno_dev->gmemspace.sizebytes = SZ_512K;
-	else */
-	/* FIH-SW2-MM-KW-Useless_codes-00-} */
+	else
 		adreno_dev->gmemspace.sizebytes = SZ_256K;
 	adreno_gmeminit(adreno_dev);
 

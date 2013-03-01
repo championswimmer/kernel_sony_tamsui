@@ -1,8 +1,6 @@
 
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -35,11 +33,6 @@
 #include <mach/gpio.h>
 #include <mach/clk.h>
 #include <mach/dma.h>
-/* FIH-SW-MM-VH-DISPLAY-00+[ */
-#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-#include <linux/wakelock.h>
-#endif
-/* FIH-SW-MM-VH-DISPLAY-00+] */
 
 #include "msm_fb.h"
 #include "mipi_dsi.h"
@@ -56,12 +49,6 @@ static int dsi_mdp_busy;
 
 static struct list_head pre_kickoff_list;
 static struct list_head post_kickoff_list;
-
-/* FIH-SW-MM-VH-DISPLAY-00+[ */
-#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-static struct wake_lock idle_lock;
-#endif
-/* FIH-SW-MM-VH-DISPLAY-00+] */
 
 enum {
 	STAT_DSI_START,
@@ -98,8 +85,6 @@ void mipi_dsi_mdp_stat_inc(int which)
 
 void mipi_dsi_init(void)
 {
-/* FIH-SW3-MM-NC-LCM-00 */
-	printk(KERN_ALERT "[DISPLAY] Enter %s\n", __func__);
 	init_completion(&dsi_dma_comp);
 	init_completion(&dsi_mdp_comp);
 	mipi_dsi_buf_alloc(&dsi_tx_buf, DSI_BUF_SIZE);
@@ -108,11 +93,6 @@ void mipi_dsi_init(void)
 
 	INIT_LIST_HEAD(&pre_kickoff_list);
 	INIT_LIST_HEAD(&post_kickoff_list);
-	/* FIH-SW-MM-VH-DISPLAY-00+[ */
-	#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-	wake_lock_init(&idle_lock, WAKE_LOCK_TCXO, "mipi_dsi_host");
-	#endif
-	/* FIH-SW-MM-VH-DISPLAY-00+] */
 }
 
 void mipi_dsi_enable_irq(void)
@@ -800,9 +780,11 @@ void mipi_dsi_host_init(struct mipi_panel_info *pinfo)
 {
 	uint32 dsi_ctrl, intr_ctrl;
 	uint32 data;
-/* FIH-SW3-MM-NC-LCM-00 */
-	printk(KERN_ALERT "[DISPLAY] Enter %s\n", __func__);
 
+	if (mdp_rev > MDP_REV_41 || mdp_rev == MDP_REV_303)
+		pinfo->rgb_swap = DSI_RGB_SWAP_RGB;
+	else
+		pinfo->rgb_swap = DSI_RGB_SWAP_BGR;
 
 	if (pinfo->mode == DSI_VIDEO_MODE) {
 		data = 0;
@@ -822,11 +804,6 @@ void mipi_dsi_host_init(struct mipi_panel_info *pinfo)
 		data |= ((pinfo->dst_format & 0x03) << 4); /* 2 bits */
 		data |= (pinfo->vc & 0x03);
 		MIPI_OUTP(MIPI_DSI_BASE + 0x000c, data);
-
-		if (mdp_rev > MDP_REV_41 || mdp_rev == MDP_REV_303)
-			pinfo->rgb_swap = DSI_RGB_SWAP_RGB;
-		else
-			pinfo->rgb_swap = DSI_RGB_SWAP_BGR;
 
 		data = 0;
 		data |= ((pinfo->rgb_swap & 0x07) << 12);
@@ -1025,12 +1002,7 @@ void mipi_dsi_mdp_busy_wait(struct msm_fb_data_type *mfd)
 		/* wait until DMA finishes the current job */
 		pr_debug("%s: pending pid=%d\n",
 				__func__, current->pid);
-/* FIH-SW-MM-VH-DISPLAY-48*[ */
-		if(!wait_for_completion_timeout(&dsi_mdp_comp, 20*HZ))	{
-			printk(KERN_INFO "[DISPLAY] %s: Wait for dsi_mdp_comp timeout\n", __func__);
-			complete(&dsi_mdp_comp);
-		}
-/* FIH-SW-MM-VH-DISPLAY-48*] */
+		wait_for_completion(&dsi_mdp_comp);
 	}
 	pr_debug("%s: done pid=%d\n",
 				__func__, current->pid);
@@ -1073,25 +1045,27 @@ void mipi_dsi_cmd_bta_sw_trigger(void)
 
 	pr_debug("%s: BTA done, cnt=%d\n", __func__, cnt);
 }
-
 static char set_tear_on[2] = {0x35, 0x00};
-static struct dsi_cmd_desc dsi_tear_on_cmd = {
-	DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(set_tear_on), set_tear_on};
-
+static struct dsi_cmd_desc dsi_tear_on_cmd []= {
+{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(set_tear_on), set_tear_on},
+};
 static char set_tear_off[2] = {0x34, 0x00};
 static struct dsi_cmd_desc dsi_tear_off_cmd = {
-	DTYPE_DCS_WRITE, 1, 0, 0, 0, sizeof(set_tear_off), set_tear_off};
+	DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(set_tear_off), set_tear_off};
 
 void mipi_dsi_set_tear_on(struct msm_fb_data_type *mfd)
 {
 	mipi_dsi_buf_init(&dsi_tx_buf);
-	mipi_dsi_cmds_tx(mfd, &dsi_tx_buf, &dsi_tear_on_cmd, 1);
+	mipi_dsi_cmds_tx(mfd, &dsi_tx_buf, dsi_tear_on_cmd, ARRAY_SIZE(dsi_tear_on_cmd));
+
 }
 
 void mipi_dsi_set_tear_off(struct msm_fb_data_type *mfd)
 {
+
 	mipi_dsi_buf_init(&dsi_tx_buf);
 	mipi_dsi_cmds_tx(mfd, &dsi_tx_buf, &dsi_tear_off_cmd, 1);
+	
 }
 
 int mipi_dsi_cmd_reg_tx(uint32 data)
@@ -1134,9 +1108,6 @@ int mipi_dsi_cmds_tx(struct msm_fb_data_type *mfd,
 	uint32 dsi_ctrl, ctrl;
 	int i, video_mode;
 	unsigned long flag;
-	int RetryCount = 0;  /* FIH-SW3-MM-NC-LCM-03 */
-	/* FIH-SW-MM-VH-DISPLAY-00+ */
-	int ret = cnt;
 
 	/* turn on cmd mode
 	* for video mode, do not send cmds more than
@@ -1173,34 +1144,9 @@ int mipi_dsi_cmds_tx(struct msm_fb_data_type *mfd,
 	for (i = 0; i < cnt; i++) {
 		mipi_dsi_buf_init(tp);
 		mipi_dsi_cmd_dma_add(tp, cm);
-/* FIH-SW3-MM-NC-LCM-03-[+ */
-		/* Add retry when timeout while sending mipi command */
-		RetryCount = 0;
-		while (RetryCount < 50) {
-			if (mipi_dsi_cmd_dma_tx(tp) >= 0) {
-				if (RetryCount > 0)
-					printk(KERN_ALERT "[DISPLAY] %s: mipi command Retry <%d>\n",
-							__func__, RetryCount);
-				break;
-			}
-			RetryCount ++;
-		}
-		if (RetryCount == 50) {
-			printk(KERN_ERR "[DISPLAY] %s: break mipi dsi tx command buffer\n",
-					__func__);
-			/* FIH-SW-MM-VH-DISPLAY-00+ */
-			ret = -EPERM;
-			break;
-		}
-/* FIH-SW3-MM-NC-LCM-03-]- */
-/* FIH-SW3-MM-NC-DEC_TIME-00-[+ */
+		mipi_dsi_cmd_dma_tx(tp);
 		if (cm->wait)
-#ifdef CONFIG_FIH_HR_MSLEEP
-			hr_msleep(cm->wait);
-#else
 			msleep(cm->wait);
-#endif
-/* FIH-SW3-MM-NC-DEC_TIME-00-]- */
 		cm++;
 	}
 
@@ -1213,8 +1159,7 @@ int mipi_dsi_cmds_tx(struct msm_fb_data_type *mfd,
 	if (video_mode)
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0000, dsi_ctrl); /* restore */
 
-/* FIH-SW-MM-VH-DISPLAY-00* */
-	return ret;
+	return cnt;
 }
 
 /* MIPI_DSI_MRPS, Maximum Return Packet Size */
@@ -1293,24 +1238,14 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 		max_pktsize[0] = pkt_size;
 		mipi_dsi_buf_init(tp);
 		mipi_dsi_cmd_dma_add(tp, pkt_size_cmd);
-		/* FIH-SW-MM-VH-DISPLAY-01*[ */
-		if (mipi_dsi_cmd_dma_tx(tp) < 0) {
-			printk(KERN_ERR "[DISPLAY] %s: mipi dsi cmd tx fail\n",__func__);
-			return -EPERM;
-		}
-		/* FIH-SW-MM-VH-DISPLAY-01*] */
+		mipi_dsi_cmd_dma_tx(tp);
 	}
 
 	mipi_dsi_buf_init(tp);
 	mipi_dsi_cmd_dma_add(tp, cmds);
 
 	/* transmit read comamnd to client */
-	/* FIH-SW-MM-VH-DISPLAY-01*[ */
-	if (mipi_dsi_cmd_dma_tx(tp) < 0) {
-		printk(KERN_ERR "[DISPLAY] %s: mipi_dsi_cmd_dma_tx fail\n",__func__);
-		return -EPERM;
-	}
-	/* FIH-SW-MM-VH-DISPLAY-01*] */
+	mipi_dsi_cmd_dma_tx(tp);
 	/*
 	 * once cmd_dma_done interrupt received,
 	 * return data from client is ready and stored
@@ -1373,7 +1308,6 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 {
 	int len;
-	int ret = 0;  /* FIH-SW3-MM-NC-LCM-00 */
 
 #ifdef DSI_HOST_DEBUG
 	int i;
@@ -1387,12 +1321,6 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 
 	pr_debug("\n");
 #endif
-
-	/* FIH-SW-MM-VH-DISPLAY-00+[ */
-	#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-	wake_lock(&idle_lock);
-	#endif
-	/* FIH-SW-MM-VH-DISPLAY-00+] */
 
 	len = tp->len;
 	len += 3;
@@ -1410,39 +1338,17 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 	MIPI_OUTP(MIPI_DSI_BASE + 0x08c, 0x01);	/* trigger */
 	wmb();
 
-/* FIH-SW3-MM-NC-LCM-00-[+ */
-/*	wait_for_completion(&dsi_dma_comp); */
-	if (!wait_for_completion_timeout(&dsi_dma_comp, 10)) {
-		printk(KERN_INFO "[DISPLAY] %s: Send DSI command timeout\n", __func__);
-/* FIH-SW-MM-VH-DISPLAY-48+[ */
-		complete(&dsi_dma_comp);
-/* FIH-SW-MM-VH-DISPLAY-48+] */
-		ret = -1;
-	}
-/* FIH-SW3-MM-NC-LCM-00-]- */
+	wait_for_completion(&dsi_dma_comp);
 
 	dma_unmap_single(&dsi_dev, tp->dmap, len, DMA_TO_DEVICE);
 	tp->dmap = 0;
-	/* FIH-SW-MM-VH-DISPLAY-00+[ */
-	#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-	wake_unlock(&idle_lock);
-	#endif
-	/* FIH-SW-MM-VH-DISPLAY-00+] */
-/* FIH-SW3-MM-NC-LCM-00-[+ */
-/*	return tp->len; */
-	return (ret == 0) ? tp->len : ret;
-/* FIH-SW3-MM-NC-LCM-00-]- */
+	return tp->len;
 }
 
 int mipi_dsi_cmd_dma_rx(struct dsi_buf *rp, int rlen)
 {
 	uint32 *lp, data;
 	int i, off, cnt;
-	/* FIH-SW-MM-VH-DISPLAY-00+[ */
-	#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-	wake_lock(&idle_lock);
-	#endif
-	/* FIH-SW-MM-VH-DISPLAY-00+] */
 
 	lp = (uint32 *)rp->data;
 	cnt = rlen;
@@ -1463,11 +1369,6 @@ int mipi_dsi_cmd_dma_rx(struct dsi_buf *rp, int rlen)
 		rp->len += sizeof(*lp);
 	}
 
-	/* FIH-SW-MM-VH-DISPLAY-00+[ */
-	#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-	wake_unlock(&idle_lock);
-	#endif
-	/* FIH-SW-MM-VH-DISPLAY-00+] */
 	return rlen;
 }
 
@@ -1543,9 +1444,6 @@ void mipi_dsi_status(void)
 
 void mipi_dsi_error(void)
 {
-    /* FIH-SW-MM-VH-DISPLAY-01+ */
-	printk(KERN_ERR "[DISPLAY] %s", __func__);
-    
 	/* DSI_ERR_INT_MASK0 */
 	mipi_dsi_ack_err_status();	/* mask0, 0x01f */
 	mipi_dsi_timeout_status();	/* mask0, 0x0e0 */

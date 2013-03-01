@@ -60,8 +60,10 @@ extern struct platform_device msm8960_device_qup_spi_gsbi1;
 extern struct platform_device msm8960_gemini_device;
 extern struct platform_device msm8960_device_csiphy0;
 extern struct platform_device msm8960_device_csiphy1;
+extern struct platform_device msm8960_device_csiphy2;
 extern struct platform_device msm8960_device_csid0;
 extern struct platform_device msm8960_device_csid1;
+extern struct platform_device msm8960_device_csid2;
 extern struct platform_device msm8960_device_ispif;
 extern struct platform_device msm8960_device_vfe;
 extern struct platform_device msm8960_device_vpe;
@@ -267,6 +269,16 @@ extern struct platform_device msm_etb_device;
 extern struct platform_device msm_tpiu_device;
 extern struct platform_device msm_funnel_device;
 extern struct platform_device msm_etm_device;
+//<<SKIES 2011/10/19, button-backlight
+extern struct platform_device button_led_pdev;
+//>>SKIES 2011/10/19
+
+//Edison add for RGB LED ++
+extern struct platform_device red_led_pdev;
+extern struct platform_device green_led_pdev;
+extern struct platform_device blue_led_pdev;
+//Edison add for RGB LED --
+
 #endif
 
 extern struct platform_device msm8960_cpu_idle_device;

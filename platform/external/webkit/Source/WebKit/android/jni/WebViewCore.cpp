@@ -45,7 +45,6 @@
 #include "CSSValueKeywords.h"
 #include "DatabaseTracker.h"
 #include "Document.h"
-#include "DocumentMarkerController.h" // ASD-NET-JC-MES4560-01
 #include "DOMWindow.h"
 #include "DOMSelection.h"
 #include "Element.h"
@@ -395,11 +394,6 @@ WebViewCore::WebViewCore(JNIEnv* env, jobject javaWebViewCore, WebCore::Frame* m
     , m_check_domtree_version(true)
     , m_groupForVisitedLinks(0)
     , m_isPaused(false)
-    // +{ ASD-NET-JC-MES4560-01
-    , m_matchCount(0)
-    , m_activeMatchIndex(0)
-    , m_activeMatch(0)
-    // ASD-NET-JC-MES4560-01 }+
     , m_cacheMode(0)
     , m_shouldPaintCaret(true)
     , m_pluginInvalTimer(this, &WebViewCore::pluginInvalTimerFired)
@@ -471,7 +465,6 @@ WebViewCore::WebViewCore(JNIEnv* env, jobject javaWebViewCore, WebCore::Frame* m
 #endif
     m_javaGlue->m_setWebTextViewAutoFillable = GetJMethod(env, clazz, "setWebTextViewAutoFillable", "(ILjava/lang/String;)V");
     m_javaGlue->m_selectAt = GetJMethod(env, clazz, "selectAt", "(II)V");
-
     env->DeleteLocalRef(clazz);
 
     env->SetIntField(javaWebViewCore, gWebViewCoreFields.m_nativeClass, (jint)this);
@@ -789,8 +782,6 @@ void WebViewCore::recordPictureSet(PictureSet* content)
     m_domtree_version = latestVersion;
     DBG_NAV_LOG("call updateFrameCache");
     updateFrameCache();
-    // +{ ASD-NET-JC-TAP.7331, MES-4560, JLO.3615-01
-    /*
     if (m_findIsUp) {
         LOG_ASSERT(m_javaGlue->m_obj, "A Java widget was not associated with this view bridge!");
         JNIEnv* env = JSC::Bindings::getJNIEnv();
@@ -800,8 +791,6 @@ void WebViewCore::recordPictureSet(PictureSet* content)
             checkException(env);
         }
     }
-    */
-    // ASD-NET-JC-TAP.7331, MES-4560, JLO.3615-01 }+
 }
 
 // note: updateCursorBounds is called directly by the WebView thread
@@ -3958,14 +3947,14 @@ void WebViewCore::setWebRequestContextUserAgent()
     if (m_webRequestContext)
         m_webRequestContext->setUserAgent(WebFrame::getWebFrame(m_mainFrame)->userAgentForURL(0)); // URL not used
 }
-
+// BU1SW1_SoMC_SS_Patches ....... begin
 void WebViewCore::setWebRequestContextUserAgentProfile()
 {
     if (m_webRequestContext)
         m_webRequestContext->setUserAgentProfile(
                 WebFrame::getWebFrame(m_mainFrame)->userAgentProfile());
 }
-
+// BU1SW1_SoMC_SS_Patches ....... end
 void WebViewCore::setWebRequestContextCacheMode(int cacheMode)
 {
     m_cacheMode = cacheMode;
@@ -3982,7 +3971,9 @@ WebRequestContext* WebViewCore::webRequestContext()
         Settings* settings = mainFrame()->settings();
         m_webRequestContext = new WebRequestContext(settings && settings->privateBrowsingEnabled());
         setWebRequestContextUserAgent();
+     // BU1SW1_SoMC_SS_Patches ....... begin
         setWebRequestContextUserAgentProfile();
+     // BU1SW1_SoMC_SS_Patches ....... end 
         setWebRequestContextCacheMode(m_cacheMode);
     }
     return m_webRequestContext.get();
@@ -4772,113 +4763,6 @@ static void ScrollRenderLayer(JNIEnv* env, jobject obj, jint layer, jobject jRec
     GET_NATIVE_VIEW(env, obj)->scrollRenderLayer(layer, rect);
 }
 
-// +{ ASD-NET-JC-MES4560-01
-void WebViewCore::resetFindOnPage()
-{
-    m_searchText.truncate(0);
-    m_matchCount = 0;
-    m_activeMatchIndex = 0;
-    m_activeMatch = 0;
-}
-
-int WebViewCore::findTextOnPage(const WTF::String &text)
-{
-    resetFindOnPage(); // reset even if parameters are bad
-
-    WebCore::Frame* frame = m_mainFrame;
-    if (!frame)
-        return 0;
-
-    m_searchText = text;
-    FindOptions findOptions = WebCore::CaseInsensitive;
-
-    do {
-        frame->document()->markers()->removeMarkers(DocumentMarker::TextMatch);
-        m_matchCount += frame->editor()->countMatchesForText(text, findOptions,
-            0, true);
-        frame->editor()->setMarkedTextMatchesAreHighlighted(true);
-        frame = frame->tree()->traverseNextWithWrap(false);
-    } while (frame);
-    m_activeMatchIndex = m_matchCount - 1; // prime first findNext
-    return m_matchCount;
-}
-
-int WebViewCore::findNextOnPage(bool forward)
-{
-    if (!m_mainFrame)
-        return -1;
-    if (!m_matchCount)
-        return -1;
-
-    EditorClientAndroid* client = static_cast<EditorClientAndroid*>(
-        m_mainFrame->editor()->client());
-    client->setUiGeneratedSelectionChange(true);
-
-    // Clear previous active match.
-    if (m_activeMatch) {
-        m_mainFrame->document()->markers()->setMarkersActive(
-            m_activeMatch.get(), false);
-    }
-
-    FindOptions findOptions = WebCore::CaseInsensitive
-        | WebCore::StartInSelection | WebCore::WrapAround;
-    if (!forward)
-        findOptions |= WebCore::Backwards;
-
-    // Start from the previous active match.
-    if (m_activeMatch) {
-        m_mainFrame->selection()->setSelection(m_activeMatch.get());
-    }
-
-    bool found = m_mainFrame->editor()->findString(m_searchText, findOptions);
-    if (found) {
-        VisibleSelection selection(m_mainFrame->selection()->selection());
-        if (selection.isNone() || selection.start() == selection.end()) {
-            // Temporary workaround for findString() refusing to select text
-            // marked "-webkit-user-select: none".
-            m_activeMatchIndex = 0;
-            m_activeMatch = 0;
-        } else {
-            // Mark current match "active".
-            if (forward) {
-                ++m_activeMatchIndex;
-                if (m_activeMatchIndex == m_matchCount)
-                    m_activeMatchIndex = 0;
-            } else {
-                if (m_activeMatchIndex == 0)
-                    m_activeMatchIndex = m_matchCount;
-                --m_activeMatchIndex;
-            }
-            m_activeMatch = selection.firstRange();
-            m_mainFrame->document()->markers()->setMarkersActive(
-                m_activeMatch.get(), true);
-            m_mainFrame->selection()->revealSelection(
-                ScrollAlignment::alignCenterIfNeeded, true);
-        }
-    }
-
-    // Clear selection so it doesn't display.
-    m_mainFrame->selection()->clear();
-    client->setUiGeneratedSelectionChange(false);
-    return m_activeMatchIndex;
-}
-
-static int FindAll(JNIEnv* env, jobject obj, jint nativeClass,
-        jstring text)
-{
-    WebViewCore* viewImpl = reinterpret_cast<WebViewCore*>(nativeClass);
-    WTF::String wtfText = jstringToWtfString(env, text);
-    return viewImpl->findTextOnPage(wtfText);
-}
-
-static int FindNext(JNIEnv* env, jobject obj, jint nativeClass,
-        jboolean forward)
-{
-    WebViewCore* viewImpl = reinterpret_cast<WebViewCore*>(nativeClass);
-    return viewImpl->findNextOnPage(forward);
-}
-// ASD-NET-JC-MES4560-01 }+
-
 // ----------------------------------------------------------------------------
 
 /*
@@ -5001,12 +4885,6 @@ static JNINativeMethod gJavaWebViewCoreMethods[] = {
         (void*) ScrollRenderLayer },
     { "nativeCloseIdleConnections", "()V",
         (void*) CloseIdleConnections },
-    // +{ ASD-NET-JC-MES4560-01
-    { "nativeFindAll", "(ILjava/lang/String;)I",
-        (void*) FindAll },
-    { "nativeFindNext", "(IZ)I",
-        (void*) FindNext },
-    // ASD-NET-JC-MES4560-01 }+
 };
 
 int registerWebViewCore(JNIEnv* env)

@@ -41,6 +41,7 @@
 
 #include "../src/dbus-common.h"
 #include "../src/adapter.h"
+#include "../src/device.h"
 
 #include "log.h"
 #include "error.h"
@@ -53,6 +54,7 @@
 
 #define NETWORK_SERVER_INTERFACE "org.bluez.NetworkServer"
 #define SETUP_TIMEOUT		1
+#define AUTH_TIMEOUT		10
 #define BNEP_EXT_CONTROL 0
 
 typedef struct _svc_uuid {
@@ -99,6 +101,8 @@ struct network_adapter {
 	GIOChannel	*io;		/* Bnep socket */
 	struct network_session *setup;	/* Setup in progress */
 	GSList		*servers;	/* Server register to adapter */
+	guint		authorization_timer;	/*timer to handle
+						authoriztion*/
 };
 
 /* Main server structure */
@@ -534,6 +538,11 @@ static void setup_destroy(void *user_data)
 	na->setup = NULL;
 
 	session_free(setup);
+
+	if (na->authorization_timer) {
+		g_source_remove(na->authorization_timer);
+		na->authorization_timer = 0;
+	}
 }
 
 static void parse_extension_data(int sk, void *ext)
@@ -699,6 +708,49 @@ reject:
 	setup_destroy(na);
 }
 
+static gboolean authorization_handler(gpointer user_data)
+{
+	struct network_adapter *na = user_data;
+	struct btd_adapter *adapter = NULL;
+	struct btd_device *dev = NULL;
+	bdaddr_t src;
+	char peer_addr[18];
+	int perr;
+
+	DBG("");
+
+	if(!na->setup)
+		return FALSE;
+
+	adapter = na->adapter;
+
+	ba2str(&na->setup->dst, peer_addr);
+	dev = adapter_find_device(adapter, peer_addr);
+	if (!dev) {
+		goto drop;
+	}
+	/*return TRUE while device is authenticating so
+	that authorization_handler will be called again*/
+	if (device_is_authenticating(dev))
+		return TRUE;
+
+	na->authorization_timer = 0;
+
+	adapter_get_address(adapter, &src);
+	perr = btd_request_authorization(&src, &na->setup->dst, BNEP_SVC_UUID,
+					auth_cb, na);
+	if (perr < 0) {
+		error("Refusing connect from %s: %s (%d)", peer_addr,
+				strerror(-perr), -perr);
+		goto drop;
+	}
+	return FALSE;
+drop:
+	g_io_channel_shutdown(na->setup->io, TRUE, NULL);
+	setup_destroy(na);
+	return FALSE;
+}
+
 static void confirm_event(GIOChannel *chan, gpointer user_data)
 {
 	struct network_adapter *na = user_data;
@@ -740,15 +792,9 @@ static void confirm_event(GIOChannel *chan, gpointer user_data)
 	bacpy(&na->setup->dst, &dst);
 	na->setup->io = g_io_channel_ref(chan);
 
-	perr = btd_request_authorization(&src, &dst, BNEP_SVC_UUID,
-					auth_cb, na);
-	if (perr < 0) {
-		error("Refusing connect from %s: %s (%d)", address,
-				strerror(-perr), -perr);
-		setup_destroy(na);
-		goto drop;
-	}
-
+	na->authorization_timer = g_timeout_add_seconds(AUTH_TIMEOUT,
+				authorization_handler,
+				na);
 	return;
 
 drop:
@@ -971,6 +1017,7 @@ static struct network_adapter *create_adapter(struct btd_adapter *adapter)
 
 	na = g_new0(struct network_adapter, 1);
 	na->adapter = btd_adapter_ref(adapter);
+	na->authorization_timer = 0;
 
 	adapter_get_address(adapter, &src);
 

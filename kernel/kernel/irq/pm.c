@@ -2,7 +2,6 @@
  * linux/kernel/irq/pm.c
  *
  * Copyright (C) 2009 Rafael J. Wysocki <rjw@sisk.pl>, Novell Inc.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This file contains power management functions related to interrupts.
  */
@@ -70,28 +69,7 @@ int check_wakeup_irqs(void)
 	int irq;
 
 	for_each_irq_desc(irq, desc) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-  		if (irqd_is_wakeup_set(&desc->irq_data)) {
-            pr_info("IRQ %d %s set wake, status(%x)\n",
-					irq,
-					desc->action && desc->action->name ?
-					desc->action->name : "",
-                    desc->status_use_accessors
-                    );
-			if (desc->istate & IRQS_PENDING) {
-				pr_info("Wakeup IRQ %d %s pending, status(%x), suspend aborted\n",
-					irq,
-					desc->action && desc->action->name ?
-					desc->action->name : "",
-                    desc->status_use_accessors
-                    );
-				return -EBUSY;
-			}
-			continue;
-		}
-#else
-    	if (irqd_is_wakeup_set(&desc->irq_data)) {
+		if (irqd_is_wakeup_set(&desc->irq_data)) {
 			if (desc->istate & IRQS_PENDING) {
 				pr_info("Wakeup IRQ %d %s pending, suspend aborted\n",
 					irq,
@@ -101,8 +79,6 @@ int check_wakeup_irqs(void)
 			}
 			continue;
 		}
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 		/*
 		 * Check the non wakeup interrupts whether they need
 		 * to be masked before finally going into suspend

@@ -1,16 +1,9 @@
 /*
  * WPA Supplicant - command line interface for wpa_supplicant daemon
  * Copyright (c) 2004-2011, Jouni Malinen <j@w1.fi>
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "includes.h"
@@ -34,32 +27,15 @@
 
 static const char *wpa_cli_version =
 "wpa_cli v" VERSION_STR "\n"
-"Copyright (c) 2004-2011, Jouni Malinen <j@w1.fi> and contributors";
+"Copyright (c) 2004-2012, Jouni Malinen <j@w1.fi> and contributors";
 
 
 static const char *wpa_cli_license =
-"This program is free software. You can distribute it and/or modify it\n"
-"under the terms of the GNU General Public License version 2.\n"
-"\n"
-"Alternatively, this software may be distributed under the terms of the\n"
-"BSD license. See README and COPYING for more details.\n";
+"This software may be distributed under the terms of the BSD license.\n"
+"See README for more details.\n";
 
 static const char *wpa_cli_full_license =
-"This program is free software; you can redistribute it and/or modify\n"
-"it under the terms of the GNU General Public License version 2 as\n"
-"published by the Free Software Foundation.\n"
-"\n"
-"This program is distributed in the hope that it will be useful,\n"
-"but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
-"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
-"GNU General Public License for more details.\n"
-"\n"
-"You should have received a copy of the GNU General Public License\n"
-"along with this program; if not, write to the Free Software\n"
-"Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA\n"
-"\n"
-"Alternatively, this software may be distributed under the terms of the\n"
-"BSD license.\n"
+"This software may be distributed under the terms of the BSD license.\n"
 "\n"
 "Redistribution and use in source and binary forms, with or without\n"
 "modification, are permitted provided that the following conditions are\n"
@@ -452,33 +428,14 @@ static int wpa_ctrl_command(struct wpa_ctrl *ctrl, char *cmd)
 	return _wpa_ctrl_command(ctrl, cmd, 1);
 }
 
-#ifdef ANDROID
-#ifdef SEAMLESS_ROAMING
-static int
-wpa_cli_cmd_seamless_roaming(struct wpa_ctrl *ctrl, int argc, char *argv[])
-{
-	char cmd[32];
-	int res;
-
-	if (argc != 1) {
-		printf("Invalid command: needs one argument\n");
-		return -1;
-	}
-
-	res = os_snprintf(cmd, sizeof(cmd), "SEAMLESS_ROAMING %s", argv[0]);
-	if (res < 0 || (size_t) res >= sizeof(cmd) - 1) {
-		printf("Invalid command\n");
-		return -1;
-	}
-	return wpa_ctrl_command(ctrl, cmd);
-}
-#endif
-#endif
 
 static int wpa_cli_cmd_status(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
-	int verbose = argc > 0 && os_strcmp(argv[0], "verbose") == 0;
-	return wpa_ctrl_command(ctrl, verbose ? "STATUS-VERBOSE" : "STATUS");
+	if (argc > 0 && os_strcmp(argv[0], "verbose") == 0)
+		return wpa_ctrl_command(ctrl, "STATUS-VERBOSE");
+	if (argc > 0 && os_strcmp(argv[0], "wps") == 0)
+		return wpa_ctrl_command(ctrl, "STATUS-WPS");
+	return wpa_ctrl_command(ctrl, "STATUS");
 }
 
 
@@ -1507,7 +1464,12 @@ static int wpa_cli_cmd_enable_network(struct wpa_ctrl *ctrl, int argc,
 		return -1;
 	}
 
-	res = os_snprintf(cmd, sizeof(cmd), "ENABLE_NETWORK %s", argv[0]);
+	if (argc > 1)
+		res = os_snprintf(cmd, sizeof(cmd), "ENABLE_NETWORK %s %s",
+				  argv[0], argv[1]);
+	else
+		res = os_snprintf(cmd, sizeof(cmd), "ENABLE_NETWORK %s",
+				  argv[0]);
 	if (res < 0 || (size_t) res >= sizeof(cmd))
 		return -1;
 	cmd[sizeof(cmd) - 1] = '\0';
@@ -1634,6 +1596,61 @@ static int wpa_cli_cmd_get_network(struct wpa_ctrl *ctrl, int argc,
 			  argv[0], argv[1]);
 	if (res < 0 || (size_t) res >= sizeof(cmd) - 1) {
 		printf("Too long GET_NETWORK command.\n");
+		return -1;
+	}
+	return wpa_ctrl_command(ctrl, cmd);
+}
+
+
+static int wpa_cli_cmd_list_creds(struct wpa_ctrl *ctrl, int argc,
+				  char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "LIST_CREDS");
+}
+
+
+static int wpa_cli_cmd_add_cred(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "ADD_CRED");
+}
+
+
+static int wpa_cli_cmd_remove_cred(struct wpa_ctrl *ctrl, int argc,
+				   char *argv[])
+{
+	char cmd[32];
+	int res;
+
+	if (argc < 1) {
+		printf("Invalid REMOVE_CRED command: needs one argument "
+		       "(cred id)\n");
+		return -1;
+	}
+
+	res = os_snprintf(cmd, sizeof(cmd), "REMOVE_CRED %s", argv[0]);
+	if (res < 0 || (size_t) res >= sizeof(cmd))
+		return -1;
+	cmd[sizeof(cmd) - 1] = '\0';
+
+	return wpa_ctrl_command(ctrl, cmd);
+}
+
+
+static int wpa_cli_cmd_set_cred(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	char cmd[256];
+	int res;
+
+	if (argc != 3) {
+		printf("Invalid SET_CRED command: needs three arguments\n"
+		       "(cred id, variable name, and value)\n");
+		return -1;
+	}
+
+	res = os_snprintf(cmd, sizeof(cmd), "SET_CRED %s %s %s",
+			  argv[0], argv[1], argv[2]);
+	if (res < 0 || (size_t) res >= sizeof(cmd) - 1) {
+		printf("Too long SET_CRED command.\n");
 		return -1;
 	}
 	return wpa_ctrl_command(ctrl, cmd);
@@ -1899,6 +1916,42 @@ static int wpa_cli_cmd_all_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
 
 	return -1;
 }
+
+
+static int wpa_cli_cmd_deauthenticate(struct wpa_ctrl *ctrl, int argc,
+				      char *argv[])
+{
+	char buf[64];
+	if (argc < 1) {
+		printf("Invalid 'deauthenticate' command - exactly one "
+		       "argument, STA address, is required.\n");
+		return -1;
+	}
+	if (argc > 1)
+		os_snprintf(buf, sizeof(buf), "DEAUTHENTICATE %s %s",
+			    argv[0], argv[1]);
+	else
+		os_snprintf(buf, sizeof(buf), "DEAUTHENTICATE %s", argv[0]);
+	return wpa_ctrl_command(ctrl, buf);
+}
+
+
+static int wpa_cli_cmd_disassociate(struct wpa_ctrl *ctrl, int argc,
+				    char *argv[])
+{
+	char buf[64];
+	if (argc < 1) {
+		printf("Invalid 'disassociate' command - exactly one "
+		       "argument, STA address, is required.\n");
+		return -1;
+	}
+	if (argc > 1)
+		os_snprintf(buf, sizeof(buf), "DISASSOCIATE %s %s",
+			    argv[0], argv[1]);
+	else
+		os_snprintf(buf, sizeof(buf), "DISASSOCIATE %s", argv[0]);
+	return wpa_ctrl_command(ctrl, buf);
+}
 #endif /* CONFIG_AP */
 
 
@@ -1950,7 +2003,10 @@ static int wpa_cli_cmd_p2p_find(struct wpa_ctrl *ctrl, int argc, char *argv[])
 	if (argc == 0)
 		return wpa_ctrl_command(ctrl, "P2P_FIND");
 
-	if (argc > 1)
+	if (argc > 2)
+		res = os_snprintf(cmd, sizeof(cmd), "P2P_FIND %s %s %s",
+				  argv[0], argv[1], argv[2]);
+	else if (argc > 1)
 		res = os_snprintf(cmd, sizeof(cmd), "P2P_FIND %s %s",
 				  argv[0], argv[1]);
 	else
@@ -2097,15 +2153,19 @@ static int wpa_cli_cmd_p2p_prov_disc(struct wpa_ctrl *ctrl, int argc,
 	char cmd[128];
 	int res;
 
-	if (argc != 2) {
-		printf("Invalid P2P_PROV_DISC command: needs two arguments "
-		       "(address and config method\n"
-		       "(display, keypad, or pbc)\n");
+	if (argc != 2 && argc != 3) {
+		printf("Invalid P2P_PROV_DISC command: needs at least "
+		       "two arguments, address and config method\n"
+		       "(display, keypad, or pbc) and an optional join\n");
 		return -1;
 	}
 
-	res = os_snprintf(cmd, sizeof(cmd), "P2P_PROV_DISC %s %s",
-			  argv[0], argv[1]);
+	if (argc == 3)
+		res = os_snprintf(cmd, sizeof(cmd), "P2P_PROV_DISC %s %s %s",
+				  argv[0], argv[1], argv[2]);
+	else
+		res = os_snprintf(cmd, sizeof(cmd), "P2P_PROV_DISC %s %s",
+				  argv[0], argv[1]);
 	if (res < 0 || (size_t) res >= sizeof(cmd))
 		return -1;
 	cmd[sizeof(cmd) - 1] = '\0';
@@ -2522,27 +2582,6 @@ static int wpa_cli_cmd_p2p_ext_listen(struct wpa_ctrl *ctrl, int argc,
 #endif /* CONFIG_P2P */
 
 
-#ifdef CONFIG_WFD
-static int wpa_cli_cmd_wfd_set(struct wpa_ctrl *ctrl, int argc, char *argv[])
-{
-	char cmd[100];
-	int res;
-
-	if (argc != 2) {
-		printf("Invalid WFD_SET command: needs two arguments (field, "
-		       "value)\n");
-		return -1;
-	}
-
-	res = os_snprintf(cmd, sizeof(cmd), "WFD_SET %s %s", argv[0], argv[1]);
-	if (res < 0 || (size_t) res >= sizeof(cmd))
-		return -1;
-	cmd[sizeof(cmd) - 1] = '\0';
-	return wpa_ctrl_command(ctrl, cmd);
-}
-#endif
-
-
 #ifdef CONFIG_INTERWORKING
 static int wpa_cli_cmd_fetch_anqp(struct wpa_ctrl *ctrl, int argc,
 				  char *argv[])
@@ -2747,13 +2786,6 @@ struct wpa_cli_cmd {
 };
 
 static struct wpa_cli_cmd wpa_cli_commands[] = {
-#ifdef ANDROID
-#ifdef SEAMLESS_ROAMING
-	{ "seamless_roaming", wpa_cli_cmd_seamless_roaming,
-	  cli_cmd_flag_none,
-	  "<0/1> = disable/enable seamless roaming function" },
-#endif
-#endif
 	{ "status", wpa_cli_cmd_status,
 	  cli_cmd_flag_none,
 	  "[verbose] = get current WPA/EAPOL/EAP status" },
@@ -2863,6 +2895,18 @@ static struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "get_network", wpa_cli_cmd_get_network,
 	  cli_cmd_flag_none,
 	  "<network id> <variable> = get network variables" },
+	{ "list_creds", wpa_cli_cmd_list_creds,
+	  cli_cmd_flag_none,
+	  "= list configured credentials" },
+	{ "add_cred", wpa_cli_cmd_add_cred,
+	  cli_cmd_flag_none,
+	  "= add a credential" },
+	{ "remove_cred", wpa_cli_cmd_remove_cred,
+	  cli_cmd_flag_none,
+	  "<cred id> = remove a credential" },
+	{ "set_cred", wpa_cli_cmd_set_cred,
+	  cli_cmd_flag_sensitive,
+	  "<cred id> <variable> <value> = set credential variables" },
 	{ "save_config", wpa_cli_cmd_save_config,
 	  cli_cmd_flag_none,
 	  "= save the current configuration" },
@@ -2975,6 +3019,12 @@ static struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "all_sta", wpa_cli_cmd_all_sta,
 	  cli_cmd_flag_none,
 	  "= get information about all associated stations (AP)" },
+	{ "deauthenticate", wpa_cli_cmd_deauthenticate,
+	  cli_cmd_flag_none,
+	  "<addr> = deauthenticate a station" },
+	{ "disassociate", wpa_cli_cmd_disassociate,
+	  cli_cmd_flag_none,
+	  "<addr> = disassociate a station" },
 #endif /* CONFIG_AP */
 	{ "suspend", wpa_cli_cmd_suspend, cli_cmd_flag_none,
 	  "= notification of suspend/hibernate" },
@@ -3054,10 +3104,7 @@ static struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "p2p_ext_listen", wpa_cli_cmd_p2p_ext_listen, cli_cmd_flag_none,
 	  "[<period> <interval>] = set extended listen timing" },
 #endif /* CONFIG_P2P */
-#ifdef CONFIG_WFD
-	{ "wfd_set", wpa_cli_cmd_wfd_set, cli_cmd_flag_none,
-	  "<field> <value> = set a WFD parameter" },
-#endif
+
 #ifdef CONFIG_INTERWORKING
 	{ "fetch_anqp", wpa_cli_cmd_fetch_anqp, cli_cmd_flag_none,
 	  "= fetch ANQP information for all APs" },
@@ -3361,6 +3408,10 @@ static void wpa_cli_action_process(const char *msg)
 	} else if (str_match(pos, WPS_EVENT_SUCCESS)) {
 		wpa_cli_exec(action_file, ctrl_ifname, pos);
 	} else if (str_match(pos, WPS_EVENT_FAIL)) {
+		wpa_cli_exec(action_file, ctrl_ifname, pos);
+	} else if (str_match(pos, AP_STA_CONNECTED)) {
+		wpa_cli_exec(action_file, ctrl_ifname, pos);
+	} else if (str_match(pos, AP_STA_DISCONNECTED)) {
 		wpa_cli_exec(action_file, ctrl_ifname, pos);
 	} else if (str_match(pos, WPA_EVENT_TERMINATING)) {
 		printf("wpa_supplicant is terminating - stop monitoring\n");

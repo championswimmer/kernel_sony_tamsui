@@ -29,12 +29,6 @@
 
 #include <asm/ioctls.h>
 
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
-#include "mach/alog_ram_console.h" 
-#endif
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
-
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
  *
@@ -296,12 +290,6 @@ static void do_write_log(struct logger_log *log, const void *buf, size_t count)
 
 }
 
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-static struct logger_log log_main;
-static struct logger_log log_events;
-static struct logger_log log_radio;
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
-
 /*
  * do_write_log_user - writes 'len' bytes from the user-space buffer 'buf' to
  * the log 'log'
@@ -341,15 +329,6 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	struct logger_entry header;
 	struct timespec now;
 	ssize_t ret = 0;
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
-	LogType log_type = LOG_TYPE_NUM;
-	int overrun=0;
-	char *tag;
-	int need_print;
-	char sTag[6]; //MTD-KERNEL-BH-last_alog-01+
-#endif	
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
 
 	now = current_kernel_time();
 
@@ -373,64 +352,6 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	 */
 	fix_up_readers(log, sizeof(struct logger_entry) + header.len);
 
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
-
-	/* Kernel log may also put into android log buffer, but we don't
-	 * want to see them in last_alog, so we need to wipe it out.
-	 */
-	/* This API is heavily dependent on a user space assumption
-	 * that the full log entry comprising 3 vectors will be passed
-	 * to it in the format:
-	 * (from user space logger file -
-	 * system/core/liblog/logd_write.c):
-	 *    vec[0].iov_base  = (unsigned char *) &prio;
-	 *    vec[0].iov_len    = 1;
-	 *    vec[1].iov_base   = (void *) tag;
-	 *    vec[1].iov_len    = strlen(tag) + 1;
-	 *    vec[2].iov_base   = (void *) msg;
-	 *    vec[2].iov_len    = strlen(msg) + 1;
-	 * Note: vec in userspace is "iov" here.
-	 * Since this driver supplies a function for aio_write, there
-	 * is no aio queueing or retry done. Once we are here we
-	 * consume all of what is passed to us, with or without error.
-	 * That means that no partial vector sets should ever be passed
-	 * in.
-	 */
-	tag = (iov+1)->iov_base; /* tag name */
-	/* FIH-SW3-KERNEL-TH-add_last_alog-01+[ */
-	if (tag == NULL)
-		need_print = 1;
-	else
-	{
-	 	//MTD-KERNEL-BH-last_alog-01+[
-		if (copy_from_user(sTag, tag, 6))
-			need_print = 1;
-		else
-	 	//MTD-KERNEL-BH-last_alog-01+]
-			need_print = strcmp(sTag,"klogd");
-	}
-	/* FIH-SW3-KERNEL-TH-add_last_alog-01+] */
-	
-	if (need_print)
-	{
-		if (log == &log_main) 
-			log_type = LOG_TYPE_MAIN;
-		else if (log == &log_radio)
-			log_type = LOG_TYPE_RADIO;
-		else if (log == &log_events)
-			log_type = LOG_TYPE_EVENTS;
-		else
-			log_type = LOG_TYPE_SYSTEM;
-
-		overrun += alog_ram_console_write_log(log_type, NULL, (char *)&header, (int)sizeof(struct logger_entry)); //MTD-KERNEL-BH-last_alog-01*
-	
-	}
-#endif
-
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
-
-
 	do_write_log(log, &header, sizeof(struct logger_entry));
 
 	while (nr_segs-- > 0) {
@@ -442,14 +363,6 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 
 		/* write out this segment's payload */
 		nr = do_write_log_from_user(log, iov->iov_base, len);
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
-		if (need_print)
-		{
-			overrun += alog_ram_console_write_log(log_type, iov->iov_base, NULL, len); //MTD-KERNEL-BH-last_alog-01*
-		}
-#endif
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
 		if (unlikely(nr < 0)) {
 			log->w_off = orig;
 			mutex_unlock(&log->mutex);
@@ -459,13 +372,6 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		iov++;
 		ret += nr;
 	}
-
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
-	if (overrun && need_print)
-		alog_ram_console_sync_time(log_type, SYNC_AFTER);
-#endif
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
 
 	mutex_unlock(&log->mutex);
 
@@ -649,8 +555,8 @@ static struct logger_log VAR = { \
 	.size = SIZE, \
 };
 
-DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 256*1024) /* FIH-SW3-KERNEL-TH-add_last_alog-00+ */
-DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 64*1024) /* FIH-SW3-KERNEL-TH-add_last_alog-00+ */
+DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 256*1024)
+DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
 DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 256*1024)
 DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 256*1024)
 

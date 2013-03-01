@@ -3,14 +3,8 @@
  * Copyright (c) 2003-2009, Jouni Malinen <j@w1.fi>
  * Copyright (c) 2009, Atheros Communications
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #ifndef AP_H
@@ -37,6 +31,10 @@ int ap_ctrl_iface_sta(struct wpa_supplicant *wpa_s, const char *txtaddr,
 		      char *buf, size_t buflen);
 int ap_ctrl_iface_sta_next(struct wpa_supplicant *wpa_s, const char *txtaddr,
 			   char *buf, size_t buflen);
+int ap_ctrl_iface_sta_deauthenticate(struct wpa_supplicant *wpa_s,
+				     const char *txtaddr);
+int ap_ctrl_iface_sta_disassociate(struct wpa_supplicant *wpa_s,
+				   const char *txtaddr);
 int ap_ctrl_iface_wpa_get_status(struct wpa_supplicant *wpa_s, char *buf,
 				 size_t buflen, int verbose);
 void ap_tx_status(void *ctx, const u8 *addr,

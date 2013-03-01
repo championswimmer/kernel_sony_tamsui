@@ -4,7 +4,6 @@
  * Copyright (C) 2008 Google, Inc.
  * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  * Author: Mike Lockwood <lockwood@android.com>
- * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -62,7 +61,7 @@
 #include "u_ctrl_hsic.c"
 #include "u_data_hsic.c"
 #include "f_serial.c"
-//#include "f_acm.c"//MTD-CONN-EH-PCCOMPANION-01-
+#include "f_acm.c"
 #include "f_adb.c"
 #include "f_ccid.c"
 #include "f_mtp.c"
@@ -198,7 +197,6 @@ static void android_work(struct work_struct *data)
 		uevent_envp = dev->connected ? connected : disconnected;
 		next_state = dev->connected ? USB_CONNECTED : USB_DISCONNECTED;
 	}
-
 	dev->sw_connected = dev->connected;
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
@@ -512,7 +510,6 @@ static struct android_usb_function serial_function = {
 	.attributes	= serial_function_attributes,
 };
 
-#if 0//MTD-CONN-EH-PCCOMPANION-01-{
 /* ACM */
 static char acm_transports[32];	/*enabled ACM ports - "tty[,sdio]"*/
 static ssize_t acm_transports_store(
@@ -584,7 +581,6 @@ static struct android_usb_function acm_function = {
 	.bind_config	= acm_function_bind_config,
 	.attributes	= acm_function_attributes,
 };
-#endif//MTD-CONN-EH-PCCOMPANION-01-}
 
 /* ADB */
 static int adb_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
@@ -883,7 +879,6 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	struct mass_storage_function_config *config;
 	struct fsg_common *common;
 	int err;
-	int i, nluns;//MTD-CONN-EH-PCCOMPANION-01+
 
 	config = kzalloc(sizeof(struct mass_storage_function_config),
 								GFP_KERNEL);
@@ -891,40 +886,7 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		return -ENOMEM;
 
 	config->fsg.nluns = 1;
-	//MTD-CONN-EH-PCCOMPANION-01*{
-	#if 0
 	config->fsg.luns[0].removable = 1;
-	#else
-        if (config->fsg.nluns > FSG_MAX_LUNS)
-		config->fsg.nluns = FSG_MAX_LUNS;
-
-	config->fsg.cdrom_nluns = 1;
-	if (config->fsg.cdrom_nluns > FSG_MAX_LUNS - config->fsg.nluns)
-		config->fsg.cdrom_nluns = FSG_MAX_LUNS - config->fsg.nluns;
-
-	nluns = config->fsg.nluns + config->fsg.cdrom_nluns;
-	if (nluns <= 0) {
-		kfree(config);
-		return -EINVAL;
-	}
-	for (i = 0; i < nluns; i++) {
-		config->fsg.luns[i].removable = 1;
-		if (i < config->fsg.nluns) {
-			/* Mass storage lun */
-			config->fsg.luns[i].ro = 0;
-			config->fsg.luns[i].cdrom = 0;
-		} else {
-			/* CD-ROM lun */
-			config->fsg.luns[i].ro = 1;
-			config->fsg.luns[i].cdrom = 1;
-		}
-	}
-	config->fsg.can_stall = _android_dev->pdata->can_stall;
-
-	config->fsg.vendor_name = "SONY";//MTD-CONN-EH-WHQL-01+
-	config->fsg.product_name = "Mass storage";//MTD-CONN-EH-WHQL-01+
-	#endif
-        //MTD-CONN-EH-PCCOMPANION-01-}
 
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
@@ -956,19 +918,6 @@ static int mass_storage_function_bind_config(struct android_usb_function *f,
 						struct usb_configuration *c)
 {
 	struct mass_storage_function_config *config = f->config;
-        //MTD-CONN-EH-PCCOMPANION-01+{
-        int err;
-
-	config->common->storage_mode = STORAGE_MODE_MSC;
-	fsg_common_setup_luns(config->common);
-	sysfs_remove_link(&f->dev->kobj, "lun");
-
-	err = sysfs_create_link(&f->dev->kobj,
-				&config->common->luns[0].dev.kobj,
-				"lun");
-	if (err)
-		return err;
-        //MTD-CONN-EH-PCCOMPANION-01+}
 	return fsg_bind_config(c->cdev, c, config->common);
 }
 
@@ -987,18 +936,9 @@ static ssize_t mass_storage_inquiry_store(struct device *dev,
 	struct mass_storage_function_config *config = f->config;
 	if (size >= sizeof(config->common->inquiry_string))
 		return -EINVAL;
-        //MTD-CONN-EH-PCCOMPANION-01*{
-        #if 0
 	if (sscanf(buf, "%28s", config->common->inquiry_string) != 1)
 		return -EINVAL;
 	return size;
-        #else
-        return snprintf(config->common->inquiry_string,
-			sizeof(config->common->inquiry_string),
-			"%28s",
-			buf);
-	#endif	
-        //MTD-CONN-EH-PCCOMPANION-01*}
 }
 
 static DEVICE_ATTR(inquiry_string, S_IRUGO | S_IWUSR,
@@ -1018,73 +958,6 @@ static struct android_usb_function mass_storage_function = {
 	.attributes	= mass_storage_function_attributes,
 };
 
-//MTD-CONN-EH-PCCOMPANION-01+{
-static int cdrom_function_init(struct android_usb_function *f,
-				struct usb_composite_dev *cdev)
-{
-	printk(KERN_INFO "USB:cdrom_function_init");
-	f->config = mass_storage_function.config;
-	return 0;
-}
-
-static int cdrom_function_bind_config(struct android_usb_function *f,
-					struct usb_configuration *c)
-{
-	struct mass_storage_function_config *config = f->config;
-	int err;
-
-	printk(KERN_INFO "USB:cdrom_function_bind_config");
-	config->common->storage_mode = STORAGE_MODE_CDROM;
-	fsg_common_setup_luns(config->common);
-
-	sysfs_remove_link(&mass_storage_function.dev->kobj, "lun");
-	err = sysfs_create_link(&mass_storage_function.dev->kobj,
-				&config->common->luns[0].dev.kobj,
-				"lun");
-	if (err)
-		return err;
-
-	return fsg_bind_config(c->cdev, c, config->common);
-}
-
-static ssize_t cdrom_inquiry_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct android_usb_function *f = dev_get_drvdata(dev);
-	struct mass_storage_function_config *config = f->config;
-	return snprintf(buf, PAGE_SIZE, "%s\n",
-			config->common->cdrom_inquiry_string);
-}
-
-static ssize_t cdrom_inquiry_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct android_usb_function *f = dev_get_drvdata(dev);
-	struct mass_storage_function_config *config = f->config;
-	if (size >= sizeof(config->common->cdrom_inquiry_string))
-		return -EINVAL;
-	return snprintf(config->common->cdrom_inquiry_string,
-			sizeof(config->common->inquiry_string),
-			"%28s",
-			buf);
-}
-
-static DEVICE_ATTR(cdrom_inquiry_string, S_IRUGO | S_IWUSR,
-					cdrom_inquiry_show,
-					cdrom_inquiry_store);
-
-static struct device_attribute *cdrom_function_attributes[] = {
-	&dev_attr_cdrom_inquiry_string,
-	NULL
-};
-
-static struct android_usb_function cdrom_function = {
-	.name		= "cdrom",
-	.init		= cdrom_function_init,
-	.bind_config	= cdrom_function_bind_config,
-	.attributes	= cdrom_function_attributes,
-};
-//MTD-CONN-EH-PCCOMPANION-01+}
 
 static int accessory_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
@@ -1128,12 +1001,11 @@ static struct android_usb_function *supported_functions[] = {
 	&serial_function,
 	&adb_function,
 	&ccid_function,
-//	&acm_function,  //MTD-CONN-EH-PCCOMPANION-01-
+	&acm_function,
 	&mtp_function,
 	&ptp_function,
 	&rndis_function,
 	&mass_storage_function,
-	&cdrom_function,//MTD-CONN-EH-PCCOMPANION-01+
 	&accessory_function,
 	NULL
 };
@@ -1240,6 +1112,12 @@ static int android_enable_function(struct android_dev *dev, char *name)
 	struct android_usb_function **functions = dev->functions;
 	struct android_usb_function *f;
 	while ((f = *functions++)) {
+		// << FerryWu, 2012/08/05, support PC Companion
+		if (!strcmp(name, "cdrom") && !strcmp(f->name, "mass_storage")) {
+			list_add_tail(&f->enabled_list, &dev->enabled_functions);
+			return 0;
+		}
+		// >> FerryWu, 2012/08/05, support PC Companion
 		if (!strcmp(name, f->name)) {
 			list_add_tail(&f->enabled_list, &dev->enabled_functions);
 			return 0;
@@ -1330,6 +1208,9 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	struct android_dev *dev = dev_get_drvdata(pdev);
 	struct usb_composite_dev *cdev = dev->cdev;
 	int enabled = 0;
+	// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+	int id = 0;
+	// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 
 	sscanf(buff, "%d", &enabled);
 	if (enabled && !dev->enabled) {
@@ -1340,6 +1221,32 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		cdev->desc.bDeviceClass = device_desc.bDeviceClass;
 		cdev->desc.bDeviceSubClass = device_desc.bDeviceSubClass;
 		cdev->desc.bDeviceProtocol = device_desc.bDeviceProtocol;
+		// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+		if (strings_dev[STRING_MANUFACTURER_IDX].id == 0) {
+			id = usb_string_id(cdev);
+			if (id >= 0) {
+				strings_dev[STRING_MANUFACTURER_IDX].id = id;
+				device_desc.iManufacturer = id;
+				cdev->desc.iManufacturer = id;
+			}
+		}
+		if (strings_dev[STRING_PRODUCT_IDX].id == 0) {
+			id = usb_string_id(cdev);
+			if (id >= 0) {
+				strings_dev[STRING_PRODUCT_IDX].id = id;
+				device_desc.iProduct = id;
+				cdev->desc.iProduct = id;
+			}
+		}
+		if (strings_dev[STRING_SERIAL_IDX].id == 0) {
+			id = usb_string_id(cdev);
+			if (id >= 0) {
+				strings_dev[STRING_SERIAL_IDX].id = id;
+				device_desc.iSerialNumber = id;
+				cdev->desc.iSerialNumber = id;
+			}
+		}
+		// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 		if (usb_add_config(cdev, &android_config_driver,
 							android_bind_config))
 			return size;
@@ -1349,6 +1256,12 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	} else if (!enabled && dev->enabled) {
 		usb_gadget_disconnect(cdev->gadget);
 		usb_remove_config(cdev, &android_config_driver);
+		// << FerryWu, 2012/08/06, Fix strings table of USB descriptor
+		strings_dev[STRING_MANUFACTURER_IDX].id = 0;
+		strings_dev[STRING_PRODUCT_IDX].id = 0;
+		strings_dev[STRING_SERIAL_IDX].id = 0;
+		cdev->next_string_id = 0;
+		// >> FerryWu, 2012/08/06, Fix strings table of USB descriptor
 		dev->enabled = false;
 	} else {
 		pr_err("android_usb: already %s\n",
@@ -1473,27 +1386,12 @@ static void android_unbind_config(struct usb_configuration *c)
 
 	android_unbind_enabled_functions(dev, c);
 }
-/*FIH-SW3-CONN-MW-USBREADPID-01+[*/
- #ifndef CONFIG_FIH_FTM
-#include "../../../arch/arm/mach-msm/include/mach/rpc_nv.h"
-#endif
- /*FIH-SW3-CONN-MW-USBREADPID-01+]*/
+
 static int android_bind(struct usb_composite_dev *cdev)
 {
 	struct android_dev *dev = _android_dev;
 	struct usb_gadget	*gadget = cdev->gadget;
-/*FIH-SW3-CONN-MW-USBREADPID-01*[*/
- #ifndef CONFIG_FIH_FTM	
 	int			gcnum, id, ret;
-       unsigned char product_id[40];
-       char serial_number[40];
-
-       int len = 0;
-       char *src;
-       char *k_serial;
-#endif
-/*FIH-SW3-CONN-MW-USBREADPID-01*]*/	
-
 
 	usb_gadget_disconnect(gadget);
 
@@ -1520,49 +1418,8 @@ static int android_bind(struct usb_composite_dev *cdev)
 	strlcpy(manufacturer_string, "Android",
 		sizeof(manufacturer_string) - 1);
 	strlcpy(product_string, "Android", sizeof(product_string) - 1);
-/*FIH-SW3-CONN-MW-USBREADPID-01*[*/
-	//strlcpy(serial_string, "0123456789ABCDEF", sizeof(serial_string) - 1);
- #ifndef CONFIG_FIH_FTM	
-     if(rpc_nv_read_product_id(product_id) == 0){
-        memcpy(serial_number, product_id, sizeof(serial_number));
-        len = strlen(serial_number);
-        if(len > 0) {
-            src = serial_number;
-            //eliminate space char from string start index
-            while(isspace(*src)) {
-                src++;
-            }
-	    k_serial = (char*)kzalloc(16, GFP_KERNEL);
-            if (!k_serial)
-		return -ENOMEM; 
-		
-            strlcpy(k_serial, src, 16);
-            src = k_serial;
-            //end of non alpha and number character
-            while(isalnum(*src)) {
-                src++;
-            }
-            *src = '\0';
-            if(strlen(k_serial)){
-		 strlcpy(serial_string, k_serial, 16);
-            }
-        }
-		else
-		{   
-		    printk(KERN_INFO"%s: len <=0 !!! \n", __func__);
-			strlcpy(serial_string, "MSM7x27A", sizeof(serial_string) - 1);
-		}	
-      }
-	   else
-	   	{
-	   	    printk(KERN_INFO"%s: len rpc_nv_read_product_id(product_id) != 0 !!! \n", __func__);
-			strlcpy(serial_string, "MSM7x27A", sizeof(serial_string) - 1);
-    }
+	strlcpy(serial_string, "0123456789ABCDEF", sizeof(serial_string) - 1);
 
-    printk(KERN_INFO"%s: usb serial number (%s)\n", __func__, serial_string);
-
-#endif
-/*FIH-SW3-CONN-MW-USBREADPID-01*]*/	
 	id = usb_string_id(cdev);
 	if (id < 0)
 		return id;
@@ -1607,6 +1464,66 @@ static struct usb_composite_driver android_usb_driver = {
 	.unbind		= android_usb_unbind,
 };
 
+// << FerryWu, 2012/09/20, fix WINXP standard MTP driver not working issue
+static int ms_os_desc_setup(struct usb_composite_dev *cdev, const struct usb_ctrlrequest *ctrl)
+{
+	int	value = -EOPNOTSUPP;
+	u16	w_index = le16_to_cpu(ctrl->wIndex);
+	u16	w_value = le16_to_cpu(ctrl->wValue);
+	u16	w_length = le16_to_cpu(ctrl->wLength);
+
+	pr_debug("ms_os_desc_setup "
+			"%02x.%02x v%04x i%04x l%u\n",
+			ctrl->bRequestType, ctrl->bRequest,
+			w_value, w_index, w_length);
+
+	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
+		/* Handle Microsoft OS descriptor */
+		pr_debug("vendor request: %d index: %d value: %d length: %d vid %04X pid %04X\n",
+			ctrl->bRequest, w_index, w_value, w_length, cdev->desc.idVendor, cdev->desc.idProduct);
+
+		if (ctrl->bRequest == 1
+				&& (ctrl->bRequestType & USB_DIR_IN)
+				&& (w_index == 4 || w_index == 5)) {
+			if (cdev->desc.idVendor == 0x0FCE) {
+				/* SoMC */
+				if ((cdev->desc.idProduct & 0xF000) == 0x0000) {
+					/* MTP Only */
+					value = (w_length < sizeof(mtp_ext_config_desc) ?
+						w_length : sizeof(mtp_ext_config_desc));
+					memcpy(cdev->req->buf, &mtp_ext_config_desc, value);
+				} else if (((cdev->desc.idProduct & 0xF000) == 0x4000) ||
+					   ((cdev->desc.idProduct & 0xF000) == 0x5000)) {
+					/* MTP + CDROM or MTP + ADB */
+					if ((cdev->desc.idProduct & 0x0FFF) == 0x0146) {
+						/* eng mode */
+						value = (w_length < sizeof(mtp_adb_eng_ext_config_desc) ?
+							w_length : sizeof(mtp_adb_eng_ext_config_desc));
+						memcpy(cdev->req->buf, &mtp_adb_eng_ext_config_desc, value);
+					} else {
+						/* userdebug mode or user mode */
+						value = (w_length < sizeof(mtp_adb_ext_config_desc) ?
+							w_length : sizeof(mtp_adb_ext_config_desc));
+						memcpy(cdev->req->buf, &mtp_adb_ext_config_desc, value);
+					}
+				}
+			}
+		}
+	}
+
+	/* respond with data transfer or status phase? */
+	if (value >= 0) {
+		int rc;
+		cdev->req->zero = value < w_length;
+		cdev->req->length = value;
+		rc = usb_ep_queue(cdev->gadget->ep0, cdev->req, GFP_ATOMIC);
+		if (rc < 0)
+			pr_err("%s setup response queue error\n", __func__);
+	}
+	return value;
+}
+// >> FerryWu, 2012/09/20, fix WINXP standard MTP driver not working issue
+
 static int
 android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 {
@@ -1622,13 +1539,20 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	req->length = 0;
 	gadget->ep0->driver_data = cdev;
 
-	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
-		if (f->ctrlrequest) {
-			value = f->ctrlrequest(f, cdev, c);
-			if (value >= 0)
-				break;
+	// << FerryWu, 2012/09/20, fix WINXP standard MTP driver not working issue
+	value = ms_os_desc_setup(cdev, c);
+
+	if (value < 0)
+	{
+		list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
+			if (f->ctrlrequest) {
+				value = f->ctrlrequest(f, cdev, c);
+				if (value >= 0)
+					break;
+			}
 		}
 	}
+	// >> FerryWu, 2012/09/20, fix WINXP standard MTP driver not working issue
 
 	/* Special case the accessory function.
 	 * It needs to handle control requests before it is enabled.
@@ -1642,7 +1566,6 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!dev->connected) {
 		dev->connected = 1;
-		printk(KERN_INFO"usb:%s:  set dev->connected = 1\n", __func__);
 		schedule_work(&dev->work);
 	}
 	else if (c->bRequest == USB_REQ_SET_CONFIGURATION && cdev->config) {
@@ -1659,13 +1582,10 @@ static void android_disconnect(struct usb_gadget *gadget)
 	struct usb_composite_dev *cdev = get_gadget_data(gadget);
 	unsigned long flags;
 
-	printk(KERN_INFO"usb:%s\n", __func__);//MTD-CONN-EH-LOG-02+
-
 	composite_disconnect(gadget);
 
 	spin_lock_irqsave(&cdev->lock, flags);
 	dev->connected = 0;
-	printk(KERN_INFO"usb:%s:  set dev->connected=0\n", __func__);//MTD-CONN-EH-LOG-02+
 	schedule_work(&dev->work);
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }

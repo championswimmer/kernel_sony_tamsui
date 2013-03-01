@@ -743,6 +743,10 @@ int pmic_gpio_direction_input(unsigned gpio);
 int pmic_gpio_direction_output(unsigned gpio);
 int pmic_gpio_set_value(unsigned gpio, int value);
 int pmic_gpio_get_value(unsigned gpio);
+//Edison add ++
+int pmic_gpio_config_digital_output(uint gpio, uint out_buffer_config, uint voltage_source, 
+uint source, uint out_buffer_strength, uint out_inversion);
+//Edision add --
 int pmic_gpio_get_direction(unsigned gpio);
 int pmic_gpio_config(struct pm8xxx_gpio_rpc_cfg *);
 #endif

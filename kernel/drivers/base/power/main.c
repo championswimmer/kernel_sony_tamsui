@@ -3,7 +3,6 @@
  *
  * Copyright (c) 2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This file is released under the GPLv2
  *
@@ -548,12 +547,6 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 			goto End;
 		} else if (dev->class->resume) {
 			pm_dev_dbg(dev, state, "legacy class ");
-
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-            print_symbol("[PM]class resume: %s\n", (unsigned long)dev->class->resume);
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 			error = legacy_resume(dev, dev->class->resume);
 			goto End;
 		}
@@ -742,7 +735,15 @@ void dpm_complete(pm_message_t state)
 void dpm_resume_end(pm_message_t state)
 {
 	dpm_resume(state);
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "dpm_resume done !\n");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 	dpm_complete(state);
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "dpm_complete done !\n");
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 }
 EXPORT_SYMBOL_GPL(dpm_resume_end);
 
@@ -921,12 +922,6 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 			goto End;
 		} else if (dev->class->suspend) {
 			pm_dev_dbg(dev, state, "legacy class ");
-
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-            print_symbol("[PM]class suspend: %s\n", (unsigned long)dev->class->suspend);
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 			error = legacy_suspend(dev, state, dev->class->suspend);
 			goto End;
 		}
@@ -993,6 +988,11 @@ int dpm_suspend(pm_message_t state)
 	ktime_t starttime = ktime_get();
 	int error = 0;
 
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE "%s : state = %d \n",__func__,state.event);
+	//[Arima Edison] add log to capture black screen issue 20121019--
+	
 	might_sleep();
 
 	mutex_lock(&dpm_list_mtx);
@@ -1084,6 +1084,11 @@ static int device_prepare(struct device *dev, pm_message_t state)
 int dpm_prepare(pm_message_t state)
 {
 	int error = 0;
+
+	//[Arima Edison] add log to capture black screen issue 20121019++
+	if(console_printk[4]>0)
+		printk(KERN_NOTICE"%s : state = %d \n",__func__,state.event);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	might_sleep();
 

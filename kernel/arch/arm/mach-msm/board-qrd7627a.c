@@ -703,8 +703,9 @@ static struct platform_device android_pmem_device = {
 static u32 msm_calculate_batt_capacity(u32 current_voltage);
 
 static struct msm_psy_batt_pdata msm_psy_batt_data = {
-	.voltage_min_design     = 2800,
-	.voltage_max_design     = 4300,
+	.voltage_min_design     = 3200,
+	.voltage_max_design     = 4200,
+	.voltage_fail_safe      = 3340,
 	.avail_chg_sources      = AC_CHG | USB_CHG ,
 	.batt_technology        = POWER_SUPPLY_TECHNOLOGY_LION,
 	.calculate_capacity     = &msm_calculate_batt_capacity,
@@ -715,7 +716,12 @@ static u32 msm_calculate_batt_capacity(u32 current_voltage)
 	u32 low_voltage	 = msm_psy_batt_data.voltage_min_design;
 	u32 high_voltage = msm_psy_batt_data.voltage_max_design;
 
-	return (current_voltage - low_voltage) * 100
+	if (current_voltage <= low_voltage)
+		return 0;
+	else if (current_voltage >= high_voltage)
+		return 100;
+	else
+		return (current_voltage - low_voltage) * 100
 			/ (high_voltage - low_voltage);
 }
 
@@ -747,7 +753,6 @@ static struct platform_device *qrd1_devices[] __initdata = {
 	&msm_bt_power_device,
 #endif
 	&mipi_dsi_truly_panel_device,
-	&msm_wlan_ar6000_pm_device,
 	&asoc_msm_pcm,
 	&asoc_msm_dai0,
 	&asoc_msm_dai1,
@@ -1036,6 +1041,12 @@ static void __init msm7627a_init_regulators(void)
 				__func__, rc);
 }
 
+static int __init msm_qrd_init_ar6000pm(void)
+{
+       msm_wlan_ar6000_pm_device.dev.platform_data = &ar600x_wlan_power;
+       return platform_device_register(&msm_wlan_ar6000_pm_device);
+}
+
 #define UART1DM_RX_GPIO		45
 static void __init msm_qrd1_init(void)
 {
@@ -1056,6 +1067,8 @@ static void __init msm_qrd1_init(void)
 		&msm_gadget_pdata;
 	platform_add_devices(qrd1_devices,
 			ARRAY_SIZE(qrd1_devices));
+	/* Ensure ar6000pm device is registered before MMC/SDC */
+	msm_qrd_init_ar6000pm();
 	msm7627a_init_mmc();
 
 #ifdef CONFIG_USB_EHCI_MSM_72K

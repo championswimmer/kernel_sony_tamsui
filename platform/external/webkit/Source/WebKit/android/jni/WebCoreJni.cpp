@@ -79,6 +79,83 @@ jstring wtfStringToJstring(JNIEnv* env, const WTF::String& str, bool validOnZero
 
 
 #if USE(CHROME_NETWORK_STACK)
+
+// Arima Rockyang added 20120703
+size_t convertUTFBytes(char* byte, const char* src) {
+    bool is_converted = false;
+    size_t length = 0;
+    
+    while (*src != '\0') {
+        switch (*src >> 4) {
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x04:
+        case 0x05:
+        case 0x06:
+        case 0x07:
+            // Bit pattern 0xxx. No need for any extra bytes.
+            *byte = *src;
+            break;
+        case 0x08:
+        case 0x09:
+        case 0x0a:
+        case 0x0b:
+        case 0x0f:
+            /*
+             * Bit pattern 10xx or 1111, which are illegal start bytes.
+             * Note: 1111 is valid for normal UTF-8, but not the
+             * modified UTF-8 used here.
+             */
+            *byte = 0xc0 | (*src >> 6);
+            byte++; length++;
+            *byte = 0x80 | (*src & 0x3f);
+            is_converted = true;
+            break;
+        case 0x0c:  // Bit pattern 110x, so there is one additional byte.
+        case 0x0d:  // Bit pattern 110x, so there is one additional byte.
+            if ( is_converted == false ) {
+                if ( (*(src + 1) & 0xc0) == 0x80 ) {
+                    *byte = *src;
+                    src++; byte++; length++;
+                    *byte = *src;
+                    break;
+                }
+            }
+                
+            *byte = 0xc0 | (*src >> 6);
+            byte++; length++;
+            *byte = 0x80 | (*src & 0x3f);
+            is_converted = true;            
+            break;
+        case 0x0e:  // Bit pattern 1110, so there are two additional bytes.
+            if ( is_converted == false ) {
+                if ( (*(src + 1) & 0xc0) == 0x80 && (*(src + 2) & 0xc0) == 0x80 ) {
+                    *byte = *src;
+                    src++; byte++; length++;
+                    *byte = *src;
+                    src++; byte++; length++;
+                    *byte = *src;
+                    break;
+                }
+            }
+                
+            *byte = 0xc0 | (*src >> 6);
+            byte++; length++;
+            *byte = 0x80 | (*src & 0x3f);
+            is_converted = true;
+            break;
+        }
+        src++;
+        byte++;
+        length++;
+    }
+
+    return length;
+}
+// Arima Rockyang added end
+
 string16 jstringToString16(JNIEnv* env, jstring jstr)
 {
     if (!jstr || !env)
@@ -109,6 +186,23 @@ std::string jstringToStdString(JNIEnv* env, jstring jstr)
 
 jstring stdStringToJstring(JNIEnv* env, const std::string& str, bool validOnZeroLength)
 {
+    // Arima Rockyang added 20120703
+    size_t bytes_length = str.length() * 2 + 1;
+    char *bytes = new char[bytes_length];
+    if ( bytes ) {
+        size_t new_bytes_length = 0;
+        for ( size_t i = 0; i < bytes_length; i++ ) {
+            bytes[i] = 0;
+        }
+        
+        new_bytes_length = convertUTFBytes(bytes, str.c_str());
+
+        jstring js = !str.empty() || validOnZeroLength ? env->NewStringUTF(bytes) : 0;
+        free(bytes);
+        return js;
+    }
+    // Arima Rockyang added end
+    
     return !str.empty() || validOnZeroLength ? env->NewStringUTF(str.c_str()) : 0;
 }
 

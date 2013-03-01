@@ -42,18 +42,22 @@ class WebRequestContext : public net::URLRequestContext {
 public:
     // URLRequestContext overrides.
     virtual const std::string& GetUserAgent(const GURL&) const;
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
     virtual const std::string& GetUserAgentProfile() const;
 #endif
+// BU1SW1_SoMC_SS_Patches ....... end    
     virtual const std::string& accept_language() const;
 
     WebRequestContext(bool isPrivateBrowsing);
 
     // These methods are threadsafe.
     void setUserAgent(const WTF::String&);
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
     void setUserAgentProfile(const WTF::String&);
 #endif
+// BU1SW1_SoMC_SS_Patches ....... end    
     void setCacheMode(int);
     int getCacheMode();
     static void setAcceptLanguage(const WTF::String&);
@@ -67,10 +71,12 @@ private:
     int m_cacheMode;
     mutable WTF::Mutex m_userAgentMutex;
     bool m_isPrivateBrowsing;
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
     std::string m_userAgentProfile;
     mutable WTF::Mutex m_userAgentProfileMutex;
 #endif
+// BU1SW1_SoMC_SS_Patches ....... end
 };
 
 } // namespace android

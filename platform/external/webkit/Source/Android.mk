@@ -160,6 +160,14 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	$(base_intermediates)/WebCore/svg
 endif
 
+# Arima Rockyang added 20120608 - WML support
+ifeq ($(ENABLE_WML),true)
+LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
+    $(LOCAL_PATH)/WebCore/wml \
+    $(base_intermediates)/WebCore/wml
+endif
+# Arima Rockyang added end
+
 ifeq ($(JAVASCRIPT_ENGINE),v8)
 # Include WTF source file.
 d := JavaScriptCore

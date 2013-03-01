@@ -690,10 +690,11 @@ pass_info (const char *runprog, const char *bus_address, pid_t bus_pid,
            int binary_syntax,
            int argc, char **argv, int remaining_args)
 {
+  char *envvar = NULL;
+  char **args = NULL;
+
   if (runprog)
     {
-      char *envvar;
-      char **args;
       int i;
 
       envvar = malloc (strlen ("DBUS_SESSION_BUS_ADDRESS=") +
@@ -737,6 +738,12 @@ pass_info (const char *runprog, const char *bus_address, pid_t bus_pid,
   close (2);
   exit (0);
 oom:
+  if (envvar)
+    free (envvar);
+
+  if (args)
+    free (args);
+
   fprintf (stderr, "Out of memory!");
   exit (1);
 }
@@ -910,7 +917,11 @@ main (int argc, char **argv)
       fprintf (stderr, "Autolaunch requested, but X11 support not compiled in.\n"
 	       "Cannot continue.\n");
       exit (1);
-#else
+#else /* DBUS_BUILD_X11 */
+#ifndef DBUS_ENABLE_X11_AUTOLAUNCH
+      fprintf (stderr, "X11 autolaunch support disabled at compile time.\n");
+      exit (1);
+#else /* DBUS_ENABLE_X11_AUTOLAUNCH */
       char *address;
       pid_t pid;
       long wid;
@@ -947,11 +958,12 @@ main (int argc, char **argv)
 			   bourne_shell_syntax, binary_syntax, argc, argv, remaining_args);
 	  exit (0);
 	}
+#endif /* DBUS_ENABLE_X11_AUTOLAUNCH */
     }
-   else if (read_machine_uuid_if_needed())
+  else if (read_machine_uuid_if_needed())
     {
       x11_init();
-#endif
+#endif /* DBUS_BUILD_X11 */
     }
 
 
@@ -1170,7 +1182,7 @@ main (int argc, char **argv)
 
       close (bus_pid_to_launcher_pipe[READ_END]);
 
-#ifdef DBUS_BUILD_X11
+#ifdef DBUS_ENABLE_X11_AUTOLAUNCH
       if (xdisplay != NULL)
         {
           verbose("Saving x11 address\n");

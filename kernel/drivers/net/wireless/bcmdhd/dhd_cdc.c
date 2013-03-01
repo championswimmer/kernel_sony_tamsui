@@ -2,7 +2,6 @@
  * DHD Protocol Module for CDC and BDC.
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -2513,10 +2512,9 @@ dhd_prot_init(dhd_pub_t *dhd)
 	ret = dhd_wlfc_init(dhd);
 #endif
 
-#if defined(WL_CFG80211)
-	if (dhd_download_fw_on_driverload)
-#endif /* defined(WL_CFG80211) */
-		ret = dhd_preinit_ioctls(dhd);
+#if !defined(WL_CFG80211)
+	ret = dhd_preinit_ioctls(dhd);
+#endif /* WL_CFG80211 */
 
 	/* Always assumes wl for now */
 	dhd->iswl = TRUE;

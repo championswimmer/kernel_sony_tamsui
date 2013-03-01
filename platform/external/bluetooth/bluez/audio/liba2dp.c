@@ -5,7 +5,7 @@
  *  Copyright (C) 2006-2007  Nokia Corporation
  *  Copyright (C) 2004-2008  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2010-2012, Code Aurora Forum. All rights reserved.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
+ *
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include <netinet/in.h>
 #include <sys/poll.h>
@@ -128,9 +129,9 @@ struct bluetooth_data {
 	a2dp_state_t state;				/* Current A2DP state */
 	a2dp_command_t command;			/* Current command for a2dp_thread */
 	pthread_t thread;
-	pthread_t signalling_thread;//MTD-Conn-JC-BluezPatch-AudioChoppy+
- 	pthread_mutex_t mutex;
-	pthread_mutex_t mutex2;//MTD-Conn-JC-BluezPatch-AudioChoppy+
+	pthread_t signalling_thread;
+	pthread_mutex_t mutex;
+	pthread_mutex_t mutex2;
 	int started;
 	pthread_cond_t thread_start;
 	pthread_cond_t thread_wait;
@@ -827,17 +828,10 @@ static int audioservice_send(struct bluetooth_data *data,
 		err = -errno;
 		ERR("Error sending data to audio service: %s(%d)",
 			strerror(errno), errno);
-		//SW3-CONN-DL-TT466_ramdump--[
-		//if (err == -EPIPE)
-		//SW3-CONN-DL-TT466_ramdump--]
-		//SW3-CONN-DL-TT466_ramdump++[
 		if (err == -EPIPE || err == -ECONNRESET) {
 			data->server.fd = -1;
-		//SW3-CONN-DL-TT466_ramdump++]
 			bluetooth_close(data);
-		//SW3-CONN-DL-TT466_ramdump++[			
 		}
-		//SW3-CONN-DL-TT466_ramdump++]
 	}
 
 	return err;
@@ -857,17 +851,10 @@ static int audioservice_recv(struct bluetooth_data *data,
 		err = -errno;
 		ERR("Error receiving IPC data from bluetoothd: %s (%d)",
 						strerror(errno), errno);
-		//SW3-CONN-DL-TT466_ramdump--[
-		//if (err == -EPIPE)
-		//SW3-CONN-DL-TT466_ramdump--]
-		//SW3-CONN-DL-TT466_ramdump++[
 		if (err == -EPIPE || err == -ECONNRESET) {
 			data->server.fd = -1;
-		//SW3-CONN-DL-TT466_ramdump++]
 			bluetooth_close(data);
-		//SW3-CONN-DL-TT466_ramdump++[
 		}
-		//SW3-CONN-DL-TT466_ramdump++]
 	} else if ((size_t) ret < sizeof(bt_audio_msg_header_t)) {
 		ERR("Too short (%d bytes) IPC packet from bluetoothd", ret);
 		err = -EINVAL;
@@ -1058,33 +1045,27 @@ static void __set_command(struct bluetooth_data *data, a2dp_command_t command)
 static void set_command(struct bluetooth_data *data, a2dp_command_t command)
 {
 	pthread_mutex_lock(&data->mutex);
-pthread_mutex_lock(&data->mutex2);//MTD-Conn-JC-BluezPatch-AudioChoppy+
- 	__set_command(data, command);
-pthread_mutex_unlock(&data->mutex2);//MTD-Conn-JC-BluezPatch-AudioChoppy+
+	 pthread_mutex_lock(&data->mutex2);
+	__set_command(data, command);
+	pthread_mutex_unlock(&data->mutex2);
 	pthread_mutex_unlock(&data->mutex);
 }
-//MTD-Conn-JC-BluezPatch-AudioChoppy+[
-/* timeout is in milliseconds */
-//static int wait_for_start(struct bluetooth_data *data, int timeout)
-//{
+
 static void a2dp_sig_thread(void *d) {
 	struct bluetooth_data *data = d;
- 	a2dp_state_t state = data->state;
+	a2dp_state_t state = data->state;
 	int err = 0;
 	struct timeval tv;
 	struct timespec ts;
-	//int err = 0;
 
 #ifdef ENABLE_TIMING
 	uint64_t begin, end;
 	begin = get_microseconds();
 #endif
-
 	gettimeofday(&tv, (struct timezone *) NULL);
-	//ts.tv_sec = tv.tv_sec + (timeout / 1000);
-	//ts.tv_nsec = (tv.tv_usec + (timeout % 1000) * 1000L ) * 1000L;
 	ts.tv_sec = tv.tv_sec + (WRITE_TIMEOUT / 1000);
 	ts.tv_nsec = (tv.tv_usec + (WRITE_TIMEOUT % 1000) * 1000L ) * 1000L;
+
 	pthread_mutex_lock(&data->mutex);
 	while (state != A2DP_STATE_STARTED) {
 		if (state == A2DP_STATE_NONE)
@@ -1104,15 +1085,14 @@ again:
 			}
 			if (err == ETIMEDOUT) {
 				DBG(" Time out");
- 				break;
+				break;
 			}
 			goto again;
 		}
 
-		if (state == data->state){
-			DBG(" again");
+		if (state == data->state)
 			goto again;
-		}
+
 		state = data->state;
 
 		if (state == A2DP_STATE_NONE) {
@@ -1124,15 +1104,15 @@ again:
 
 #ifdef ENABLE_TIMING
 	end = get_microseconds();
-	//print_time("wait_for_start", begin, end);
 	print_time("signalling process took", begin, end);
 #endif
+
 	data->signalling_thread = 0;
 	DBG("error returned is %d", err);
 	/* pthread_cond_timedwait returns positive errors */
-	//return -err;
 	return;
 }
+
 static int check_for_start(struct bluetooth_data *data)
 {
 	int err = 0;
@@ -1140,7 +1120,6 @@ static int check_for_start(struct bluetooth_data *data)
 	a2dp_state_t state = data->state;
 	pthread_mutex_unlock(&data->mutex2);
 	if (state == A2DP_STATE_STARTED) {
-		DBG("A2DP_STATE_STARTED err %d",err);
 		return err;
 	} else if (data->signalling_thread == 0){
 		pthread_attr_t attr;
@@ -1153,15 +1132,15 @@ static int check_for_start(struct bluetooth_data *data)
 	DBG("Signalling is in progress");
 
 	return -EINPROGRESS;
-} 
-//MTD-Conn-JC-BluezPatch-AudioChoppy+]
+}
+
 static void a2dp_free(struct bluetooth_data *data)
 {
 	pthread_cond_destroy(&data->client_wait);
 	pthread_cond_destroy(&data->thread_wait);
 	pthread_cond_destroy(&data->thread_start);
 	pthread_mutex_destroy(&data->mutex);
-	pthread_mutex_destroy(&data->mutex2);//MTD-Conn-JC-BluezPatch-AudioChoppy+
+	pthread_mutex_destroy(&data->mutex2);
 	free(data);
 	return;
 }
@@ -1266,7 +1245,7 @@ int a2dp_init(int rate, int channels, a2dpData* dataPtr)
 	sbc_init(&data->sbc, 0);
 
 	pthread_mutex_init(&data->mutex, NULL);
-	pthread_mutex_init(&data->mutex2, NULL);//MTD-Conn-JC-BluezPatch-AudioChoppy+
+	pthread_mutex_init(&data->mutex2, NULL);
 	pthread_cond_init(&data->thread_start, NULL);
 	pthread_cond_init(&data->thread_wait, NULL);
 	pthread_cond_init(&data->client_wait, NULL);
@@ -1285,6 +1264,7 @@ int a2dp_init(int rate, int channels, a2dpData* dataPtr)
 		goto error;
 	}
 	data->signalling_thread = 0; // this thread is for signalling
+
 	/* Make sure the state machine is ready and waiting */
 	while (!data->started) {
 		pthread_cond_wait(&data->thread_start, &data->mutex);
@@ -1345,8 +1325,7 @@ int a2dp_write(a2dpData d, const void* buffer, int count)
 	begin = get_microseconds();
 #endif
 
-	//err = wait_for_start(data, WRITE_TIMEOUT);;
-	err = check_for_start(data);//MTD-Conn-JC-BluezPatch-AudioChoppy+
+	err = check_for_start(data);
 	if (err < 0)
 		return err;
 

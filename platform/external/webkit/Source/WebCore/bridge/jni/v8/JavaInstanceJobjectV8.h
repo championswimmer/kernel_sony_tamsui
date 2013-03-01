@@ -48,11 +48,8 @@ namespace Bindings {
 
 class JavaInstanceJobject : public JavaInstance {
 public:
-#if PLATFORM(ANDROID)
-    JavaInstanceJobject(jobject instance, bool requireAnnotation);
-#else
     JavaInstanceJobject(jobject instance);
-#endif
+
     // JavaInstance implementation
     virtual JavaClass* getClass() const;
     virtual JavaValue invokeMethod(const JavaMethod*, JavaValue* args);
@@ -65,9 +62,6 @@ public:
 protected:
     RefPtr<JobjectWrapper> m_instance;
     mutable OwnPtr<JavaClass> m_class;
-#if PLATFORM(ANDROID)
-    bool m_requireAnnotation;
-#endif    
 };
 
 } // namespace Bindings

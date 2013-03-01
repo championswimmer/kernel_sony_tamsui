@@ -2,7 +2,6 @@
  * This is the new netlink-based wireless configuration interface.
  *
  * Copyright 2006-2010	Johannes Berg <johannes@sipsolutions.net>
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #include <linux/if.h>
@@ -720,6 +719,10 @@ static int nl80211_send_wiphy(struct sk_buff *msg, u32 pid, u32 seq, int flags,
 	NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_ANTENNA_AVAIL_RX,
 		    dev->wiphy.available_antennas_rx);
 
+	if (dev->wiphy.flags & WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD)
+		NLA_PUT_U32(msg, NL80211_ATTR_PROBE_RESP_OFFLOAD,
+			dev->wiphy.probe_resp_offload);
+
 	if ((dev->wiphy.available_antennas_tx ||
 	     dev->wiphy.available_antennas_rx) && dev->ops->get_antenna) {
 		u32 tx_ant = 0, rx_ant = 0;
@@ -955,6 +958,10 @@ static int nl80211_send_wiphy(struct sk_buff *msg, u32 pid, u32 seq, int flags,
 
 	if (nl80211_put_iface_combinations(&dev->wiphy, msg))
 		goto nla_put_failure;
+
+	if (dev->wiphy.flags & WIPHY_FLAG_HAVE_AP_SME)
+		NLA_PUT_U32(msg, NL80211_ATTR_DEVICE_AP_SME,
+			dev->wiphy.ap_sme_capa);
 
 	return genlmsg_end(msg, hdr);
 
@@ -3972,9 +3979,7 @@ static bool nl80211_valid_auth_type(enum nl80211_auth_type auth_type)
 static bool nl80211_valid_wpa_versions(u32 wpa_versions)
 {
 	return !(wpa_versions & ~(NL80211_WPA_VERSION_1 |
-               NL80211_WPA_VERSION_2 |
-/*WAPI*/
-               NL80211_WAPI_VERSION_1 ));
+				  NL80211_WPA_VERSION_2));
 }
 
 static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)

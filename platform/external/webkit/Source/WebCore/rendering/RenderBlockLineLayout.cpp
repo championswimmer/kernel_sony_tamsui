@@ -891,6 +891,9 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, int& repaintLogica
                     // limit the content width (width excluding padding) to be
                     // (textWrapWidth - 2 * ANDROID_FCTS_MARGIN_PADDING)
                     int maxWidth = textWrapWidth - 2 * ANDROID_FCTS_MARGIN_PADDING + padding;
+                    //TPSW1_SoMC_SS_3rd_Patches_Begin
+                    setMarginLeft(ANDROID_FCTS_MARGIN_PADDING);// ASD-NET-JC-TAP.2314-01
+                    //TPSW1_SoMC_SS_3rd_Patches_End
                     setWidth(min(width(), maxWidth));
                     m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, maxWidth);
                     m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, maxWidth);

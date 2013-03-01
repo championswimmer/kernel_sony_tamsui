@@ -60,16 +60,6 @@
 #define MEM_SIZE	(16*1024*1024)
 #endif
 
-/*MTD-BSP-AC-MemoryLayout-03+[*/
-#ifdef CONFIG_FIH_SEMC_S1
-#define SYSTEM_MEMORY_REGION2_SIZE	0x0CD00000
-#define SYSTEM_MEMORY_REGION3_START	0x2D500000
-#define SYSTEM_MEMORY_REGION3_SIZE	0x00100000
-#define SYSTEM_MEMORY_REGION4_START	0x2FB00000
-#define SYSTEM_MEMORY_REGION4_SIZE	0x00500000
-#endif
-/*MTD-BSP-AC-MemoryLayout-03+]*/
-
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
 char fpe_type[8];
 
@@ -484,16 +474,7 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
 	 */
 	size -= start & ~PAGE_MASK;
 	bank->start = PAGE_ALIGN(start);
-    /*MTD-BSP-AC-MemoryLayout-01*[*/
-    #ifdef CONFIG_FIH_SEMC_S1
-    if(meminfo.nr_banks==1)
-        bank->size  = SYSTEM_MEMORY_REGION2_SIZE;
-    else
-        bank->size  = size & PAGE_MASK;
-    #else
-        bank->size  = size & PAGE_MASK;
-    #endif
-    /*MTD-BSP-AC-MemoryLayout-01*]*/
+	bank->size  = size & PAGE_MASK;
 
 	/*
 	 * Check whether this memory region has non-zero size or
@@ -503,23 +484,6 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
 		return -EINVAL;
 
 	meminfo.nr_banks++;
-    
-    /*MTD-BSP-AC-MemoryLayout-02+[*/
-    #ifdef CONFIG_FIH_SEMC_S1
-    if(meminfo.nr_banks==2)
-    {
-        bank = &meminfo.bank[meminfo.nr_banks];
-        bank->start = PAGE_ALIGN(SYSTEM_MEMORY_REGION3_START);
-        bank->size  = SYSTEM_MEMORY_REGION3_SIZE;
-        meminfo.nr_banks++;/*meminfo.nr_banks=3*/
-   
-        bank = &meminfo.bank[meminfo.nr_banks];
-        bank->start = PAGE_ALIGN(SYSTEM_MEMORY_REGION4_START);
-        bank->size  = SYSTEM_MEMORY_REGION4_SIZE;
-        meminfo.nr_banks++;/*meminfo.nr_banks=4*/
-    }    
-    #endif
-    /*MTD-BSP-AC-MemoryLayout-02+]*/
 	return 0;
 }
 
@@ -1035,7 +999,7 @@ static int c_show(struct seq_file *m, void *v)
 		   cpu_name, read_cpuid_id() & 15, elf_platform);
 
 #if defined(CONFIG_SMP)
-	for_each_online_cpu(i) {
+	for_each_present_cpu(i) {
 		/*
 		 * glibc reads /proc/cpuinfo to determine the number of
 		 * online processors, looking for lines beginning with

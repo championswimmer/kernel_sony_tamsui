@@ -4,7 +4,6 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2008-2011 Code Aurora Forum. All rights reserved.
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -50,7 +49,6 @@
 #include <mach/msm_migrate_pages.h>
 #endif
 
-#include <mach/socinfo.h>	/* Kernel-JC-suspendsetfreq-00+ */
 #include "smd_private.h"
 #include "smd_rpcrouter.h"
 #include "acpuclock.h"
@@ -64,21 +62,7 @@
 #include "spm.h"
 #include "sirc.h"
 #include "pm-boot.h"
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
-#include "mach/alog_ram_console.h"
-#endif 
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
 
-/* FIH-SW-KERNEL-HC-TCXO_SD_DURING_DISPLAY_ON-01+[ */
-#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-extern unsigned int fih_get_tcxo_sd_during_display_on(void);
-#endif
-/* FIH-SW-KERNEL-HC-TCXO_SD_DURING_DISPLAY_ON-01+] */
-/* Kernel-JC-suspendsetfreq-00+[ */
-/*#define CONFIG_SET_MAX_CPUFREQ_BEFORE_SUSPEND*//*Kernel-SC-cpuFreq-none-sync-01-*/
-/*#define CPUFREQ_BEFORE_SUSPEND 600000*/ /*Kernel-SC-suspendsetfreq-00-*/
-/* Kernel-JC-suspendsetfreq-00+] */
 /******************************************************************************
  * Debug Definitions
  *****************************************************************************/
@@ -660,30 +644,16 @@ void msm_pm_set_max_sleep_time(int64_t max_sleep_time_ns)
 		if (msm_pm_max_sleep_time == 0)
 			msm_pm_max_sleep_time = 1;
 	}
-    printk(KERN_INFO "%s(): Requested %lld ns Giving %u sclk ticks\n",__func__,
-		max_sleep_time_ns, msm_pm_max_sleep_time); /*FIH-SW3-KERNEL-JC-alarmdebug-00*/
+
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND, KERN_INFO,
 		"%s(): Requested %lld ns Giving %u sclk ticks\n", __func__,
 		max_sleep_time_ns, msm_pm_max_sleep_time);
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s(): Requested %lld ns Giving %u sclk ticks\n", __func__,
+		max_sleep_time_ns, msm_pm_max_sleep_time);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 	local_irq_restore(flags);
-/*Kernel-JC-suspendsetfreq-00+[ */
-/*Kernel-SC-cpuFreq-none-sync-01-[*/
-/*#ifdef CONFIG_SET_MAX_CPUFREQ_BEFORE_SUSPEND
-	{
-		int max_freq = 800000;
-
-		if (cpu_is_msm7x27aa()) {
-			max_freq = 1008000;
-		}
-		printk(KERN_INFO "%s(): ready to set %d clock rate\n", __func__ , max_freq);
-		if (acpuclk_set_rate(smp_processor_id(), max_freq, SETRATE_CPUFREQ) < 0) {
-			printk(KERN_ERR "%s(): failed to set %d clock rate\n", __func__, max_freq);
-		}
-	}
-
-#endif*/
-/*Kernel-SC-cpuFreq-none-sync-01-]*/
-/* Kernel-JC-suspendsetfreq-00+] */
 }
 EXPORT_SYMBOL(msm_pm_set_max_sleep_time);
 
@@ -1011,72 +981,6 @@ static int msm_pm_modem_busy(void)
 	return 0;
 }
 
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-void show_smem_sleep_info(void);
-
-static const char* str_reason[] =
-{
-    "SMD",
-    "INT",
-    "GPIO",
-    "TIMER",
-    "ALARM",
-    "RESET",
-    "OTHER",
-    "REMOTE",
-};
-
-static void show_wakeup_info(struct msm_pm_smem_t *demData)
-{
-	int i = 0;
-
-
-	show_smem_sleep_info();
-	printk(KERN_EMERG "[PM] sleep_time=0x%08X, limit_sleep=0x%08X, wakeup_reason=0x%08X, interrupts_pendding=0x%08X, en_mask=0x%08X.\n", 
-							demData->sleep_time, 
-							demData->resources_used, 
-							demData->wakeup_reason, 
-							demData->pending_irqs, 
-							demData->irq_mask		);
-
-	for (i = 0; i < ARRAY_SIZE(str_reason); i++)
-	{
-		if(demData->wakeup_reason & (1<<i))
-		{
-			if (i == 0)  /*SMD*/
-			{
-				if(!strcmp(demData->smd_port_name, "RPCCALL"))
-				{
-					printk(KERN_INFO "wakeup reason = %s, port = %s, prog = 0x%x, proc = 0x%x\n", 
-						str_reason[i],
-						demData->smd_port_name,
-						demData->rpc_prog,
-						demData->rpc_proc);
-					continue;
-				}
-				printk(KERN_INFO "wakeup reason = %s, port = %s\n", 
-					str_reason[i],
-					demData->smd_port_name);
-				continue;
-			}
-			//MDT-Kernel-BH-AddGpioWakeupInfo-00+[
-			if (i == 2)  /*GPIO*/
-			{
-				printk(KERN_INFO "wakeup reason = %s, pin = %d\n", str_reason[i],demData->reserved2);
-				continue;
-			}
-			//MDT-Kernel-BH-AddGpioWakeupInfo-00+]
-			printk(KERN_INFO "wakeup reason = %s\n", str_reason[i]);
-		}
-	}
-
-	if (demData->wakeup_reason&0x80000000) {
-		printk(KERN_INFO "wakeup reason = early exit\n");
-	}
-}
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 /*
  * Power collapse the Apps processor.  This function executes the handshake
  * protocol with Modem.
@@ -1098,20 +1002,20 @@ static int msm_pm_power_collapse
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 		KERN_INFO, "%s(): idle %d, delay %u, limit %u\n", __func__,
 		(int)from_idle, sleep_delay, sleep_limit);
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s(): idle %d, delay %u, limit %u\n", __func__,
+		(int)from_idle, sleep_delay, sleep_limit);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	if (!(smsm_get_state(SMSM_POWER_MASTER_DEM) & DEM_MASTER_SMSM_READY)) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: master not ready\n",	__func__);
-		}
-#else
 		MSM_PM_DPRINTK(
 			MSM_PM_DEBUG_SUSPEND | MSM_PM_DEBUG_POWER_COLLAPSE,
 			KERN_INFO, "%s(): master not ready\n", __func__);
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+		//[Arima Edison] add log to capture black screen issue 20121019++		
+		if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+			printk(KERN_NOTICE "%s(): master not ready\n", __func__);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		ret = -EBUSY;
 		goto power_collapse_bail;
 	}
@@ -1152,20 +1056,16 @@ static int msm_pm_power_collapse
 	}
 
 	if (ret == 1) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: msm_pm_poll_state detected Modem reset\n",	__func__);
-		}
-#else
 		MSM_PM_DPRINTK(
 			MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 			KERN_INFO,
 			"%s(): msm_pm_poll_state detected Modem reset\n",
 			__func__);
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+		//[Arima Edison] add log to capture black screen issue 20121019++		
+		if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+			printk(KERN_NOTICE "%s(): msm_pm_poll_state detected Modem reset\n",
+			__func__);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		goto power_collapse_early_exit;
 	}
 
@@ -1175,20 +1075,16 @@ static int msm_pm_power_collapse
 
 	ret = msm_irq_enter_sleep2(true, from_idle);
 	if (ret < 0) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: msm_irq_enter_sleep2 aborted, %d\n",	__func__, ret);
-		}
-#else
 		MSM_PM_DPRINTK(
 			MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 			KERN_INFO,
 			"%s(): msm_irq_enter_sleep2 aborted, %d\n", __func__,
 			ret);
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+		//[Arima Edison] add log to capture black screen issue 20121019++		
+		if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+			printk(KERN_NOTICE "%s(): msm_irq_enter_sleep2 aborted, %d\n", __func__,
+			ret);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		goto power_collapse_early_exit;
 	}
 
@@ -1196,26 +1092,11 @@ static int msm_pm_power_collapse
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): pre power down");
 
 	saved_acpuclk_rate = acpuclk_power_collapse();
-/* Kernel-JC-suspendsetfreq-00+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-	if (unlikely(!from_idle)) {
-		printk(KERN_ERR	"%s: change clock rate (old rate = %lu)\n", __func__, saved_acpuclk_rate);
-	} else
-#endif
-/* Kernel-JC-suspendsetfreq-00+] */
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
 		"%s(): change clock rate (old rate = %lu)\n", __func__,
 		saved_acpuclk_rate);
 
 	if (saved_acpuclk_rate == 0) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: saved_acpuclk_rate == 0 aborted\n",	__func__);
-		}
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 		msm_pm_config_hw_after_power_up();
 		goto power_collapse_early_exit;
 	}
@@ -1249,19 +1130,13 @@ static int msm_pm_power_collapse
 		local_fiq_enable();
 	}
 
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-	if (unlikely(!from_idle))
-	{
-		printk(KERN_INFO "msm_pm_collapse returned %d\n", collapsed);
-	}
-#else
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND | MSM_PM_DEBUG_POWER_COLLAPSE,
 		KERN_INFO,
 		"%s(): msm_pm_collapse returned %d\n", __func__, collapsed);
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
-
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s(): msm_pm_collapse returned %d\n", __func__, collapsed);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
 		"%s(): restore clock rate to %lu\n", __func__,
 		saved_acpuclk_rate);
@@ -1293,20 +1168,16 @@ static int msm_pm_power_collapse
 	}
 
 	if (ret == 1) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: msm_pm_poll_state detected Modem reset\n",	__func__);
-		}
-#else
 		MSM_PM_DPRINTK(
 			MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 			KERN_INFO,
 			"%s(): msm_pm_poll_state detected Modem reset\n",
 			__func__);
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+		//[Arima Edison] add log to capture black screen issue 20121019++	
+		if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+			printk(KERN_NOTICE "%s(): msm_pm_poll_state detected Modem reset\n",
+			__func__);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		goto power_collapse_early_exit;
 	}
 
@@ -1316,14 +1187,6 @@ static int msm_pm_power_collapse
 	} else {
 		BUG_ON(!(state_grps[0].value_read &
 			DEM_MASTER_SMSM_PWRC_EARLY_EXIT));
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: Sanity check fail\n",	__func__);
-		}
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
 		goto power_collapse_early_exit;
 	}
 
@@ -1350,20 +1213,16 @@ static int msm_pm_power_collapse
 	}
 
 	if (ret == 1) {
-/*FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-		if (unlikely(!from_idle))
-		{
-			printk(KERN_ERR	"%s: \n",	__func__);
-		}
-#else
 		MSM_PM_DPRINTK(
 			MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 			KERN_INFO,
 			"%s(): msm_pm_poll_state detected Modem reset\n",
 			__func__);
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/*FIH-SW3-KERNEL-JC-Porting-02+] */
+		//[Arima Edison] add log to capture black screen issue 20121019++	
+		if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+			printk(KERN_NOTICE "%s(): msm_pm_poll_state detected Modem reset\n",
+			__func__);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 		ret = -EAGAIN;
 		goto power_collapse_restore_gpio_bail;
 	}
@@ -1372,19 +1231,6 @@ static int msm_pm_power_collapse
 
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): WFPI RUN");
 	MSM_PM_DEBUG_PRINT_SLEEP_INFO();
-/* FIH-SW3-KERNEL-JC-Porting-02+[ */
-#ifdef CONFIG_FIH_MODEM_SUSPEND_LOG
-	if (unlikely(!from_idle))
-	{
-		show_wakeup_info(msm_pm_smem_data);
-	}
-    else if((MSM_PM_DEBUG_POWER_COLLAPSE) & msm_pm_debug_mask)
-    {
-        show_smem_sleep_info();
-    }
-#endif /* CONFIG_FIH_MODEM_SUSPEND_LOG */
-/* FIH-SW3-KERNEL-JC-Porting-02+] */
-
 
 	msm_irq_exit_sleep2(msm_pm_smem_data->irq_mask,
 		msm_pm_smem_data->wakeup_reason,
@@ -1433,6 +1279,11 @@ power_collapse_early_exit:
 			KERN_INFO,
 			"%s(): msm_pm_poll_state detected Modem reset\n",
 			__func__);
+		//[Arima Edison] add log to capture black screen issue 20121019++	
+		if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+			printk(KERN_NOTICE "%s(): msm_pm_poll_state detected Modem reset\n",
+			__func__);
+		//[Arima Edison] add log to capture black screen issue 20121019--	
 	}
 
 	/* DEM Master == RESET or PWRC_EARLY_EXIT */
@@ -1470,6 +1321,11 @@ static int msm_pm_power_collapse_standalone(void)
 
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 		KERN_INFO, "%s()\n", __func__);
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s()\n", __func__);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
+		
 
 	ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_POWER_COLLAPSE, false);
 	WARN_ON(ret);
@@ -1504,6 +1360,10 @@ static int msm_pm_power_collapse_standalone(void)
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND | MSM_PM_DEBUG_POWER_COLLAPSE,
 		KERN_INFO,
 		"%s(): msm_pm_collapse returned %d\n", __func__, collapsed);
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s(): msm_pm_collapse returned %d\n", __func__, collapsed);
+	//[Arima Edison] add log to capture black screen issue 20121019--
 
 	ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING, false);
 	WARN_ON(ret);
@@ -1589,7 +1449,7 @@ void arch_idle(void)
 
 	if (!atomic_read(&msm_pm_init_done))
 		return;
-  
+
 	latency_qos = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 	timer_expiration = msm_timer_enter_idle();
 
@@ -1617,10 +1477,6 @@ void arch_idle(void)
 		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN] = false;
 		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = false;
 		/* fall through */
-/* FIH-SW3-KERNEL-JC-Porting-02+[ */
-    case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN:
-        allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = false;
-/* FIH-SW3-KERNEL-JC-Porting-02+] */
 	case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SUSPEND:
 	case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
 		break;
@@ -1689,17 +1545,9 @@ void arch_idle(void)
 			timer_expiration, MSM_PM_SLEEP_TICK_LIMIT);
 		if (sleep_delay == 0) /* 0 would mean infinite time */
 			sleep_delay = 1;
-        /* FIH-SW3-KERNEL-JC-Porting-02+[ */
-		#ifdef CONFIG_FIH_SW_TCXO_SD_DURING_DISPLAY_ON
-		if (!allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] || 
-				((fih_get_tcxo_sd_during_display_on()==1) && has_wake_lock(WAKE_LOCK_TCXO)))
-		#else
+
 		if (!allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE])
-		#endif
-		{
 			sleep_limit = SLEEP_LIMIT_NO_TCXO_SHUTDOWN;
-		}
-		/* FIH-SW3-KERNEL-JC-Porting-02+] */
 
 #if defined(CONFIG_MSM_MEMORY_LOW_POWER_MODE_IDLE_ACTIVE)
 		sleep_limit |= SLEEP_RESOURCE_MEMORY_BIT1;
@@ -1803,6 +1651,10 @@ static int msm_pm_enter(suspend_state_t state)
 
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND, KERN_INFO,
 		"%s(): sleep limit %u\n", __func__, sleep_limit);
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s(): sleep limit %u\n", __func__, sleep_limit);
+	//[Arima Edison] add log to capture black screen issue 20121019--
 
 	for (i = 0; i < ARRAY_SIZE(allow); i++)
 		allow[i] = true;
@@ -1822,10 +1674,6 @@ static int msm_pm_enter(suspend_state_t state)
 		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN] = false;
 		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = false;
 		/* fall through */
-/* FIH-SW3-KERNEL-JC-Porting-02+[ */
-    case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN:
-		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = false;
-/* FIH-SW3-KERNEL-JC-Porting-02+] */
 	case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_SUSPEND:
 	case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
 		break;
@@ -1911,6 +1759,10 @@ static int msm_pm_enter(suspend_state_t state)
 
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND, KERN_INFO,
 		"%s(): return %d\n", __func__, ret);
+	//[Arima Edison] add log to capture black screen issue 20121019++	
+	if( (msm_pm_debug_mask==0) && (console_printk[4]>0) )
+		printk(KERN_NOTICE "%s(): return %d\n", __func__, ret);
+	//[Arima Edison] add log to capture black screen issue 20121019--	
 
 	return ret;
 }
@@ -1924,51 +1776,25 @@ static struct platform_suspend_ops msm_pm_ops = {
 /******************************************************************************
  * Restart Definitions
  *****************************************************************************/
-/* FIH-SW3-KERNEL-PK-CHARGING-25 +[*/ 
-extern void bq27520_battery_snooze_mode(bool SetSLP);
-/* FIH-SW3-KERNEL-PK-CHARGING-25 +]*/ 
-
 
 static uint32_t restart_reason = 0x776655AA;
 
 static void msm_pm_power_off(void)
 {
-	/* FIH-SW3-KERNEL-PK-CHARGING-25 +[*/ 
-	bq27520_battery_snooze_mode(false);
-	/* FIH-SW3-KERNEL-PK-CHARGING-25 +]*/ 
-
 	msm_rpcrouter_close();
 	msm_proc_comm(PCOM_POWER_DOWN, 0, 0);
 	for (;;)
 		;
 }
 
-/* FIH-SW3-KERNEL-TH-handle_reset-00*[ */
 static void msm_pm_restart(char str, const char *cmd)
 {
-	
-	uint32_t oem_cmd = SMEM_PROC_COMM_OEM_RESET_CHIP_EBOOT;
-	uint32_t smem_response = 0;
-
-    printk(KERN_ERR "msm_pm_restart with reason %08x\n", restart_reason);
-
-	/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG 
-	     alog_ram_console_sync_time(LOG_TYPE_ALL, SYNC_BEFORE);
-#endif  
-	/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
-
 	msm_rpcrouter_close();
-
-	msm_proc_comm_oem(PCOM_CUSTOMER_CMD1, &oem_cmd, &smem_response, &restart_reason);
-
 	msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
 
 	for (;;)
 		;
 }
-/* FIH-SW3-KERNEL-TH-handle_reset-00*] */
-
 
 static int msm_reboot_call
 	(struct notifier_block *this, unsigned long code, void *_cmd)
@@ -1984,14 +1810,6 @@ static int msm_reboot_call
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned code = simple_strtoul(cmd + 4, 0, 16) & 0xff;
 			restart_reason = 0x6f656d00 | code;
-/* FIH-SW3-KERNEL-TH-handle_reset-00+[ */
-		} else if (!strcmp(cmd, "panic")) {
-			restart_reason = 0x46544443;
-/* FIH-SW3-KERNEL-TH-handle_reset-00+] */
-/* FIH-SW3-KERNEL-EL-add_flag_for_SUT-00+[ */
-		} else if (!strcmp(cmd, "DL")) {
-			restart_reason = 0x27892782;
-/* FIH-SW3-KERNEL-EL-add_flag_for_SUT-00+] */
 		} else {
 			restart_reason = 0x77665501;
 		}

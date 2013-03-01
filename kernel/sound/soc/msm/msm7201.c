@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, you can find it at http://www.fsf.org.
  */
-/* Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved. */
+
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -140,8 +140,8 @@ int msm_snd_rpc_connect(void)
 	snd_ep = msm_rpc_connect_compatible(snd_rpc_ids.prog,
 				snd_rpc_ids.vers, 0);
 	if (IS_ERR(snd_ep)) {
-		printk(KERN_DEBUG "%s (compatible VERS = %ld is not suitable) \
-				 trying the other compatible VERS\n",
+		printk(KERN_DEBUG "%s failed (compatible VERS = %ld) \
+				 trying again with another API\n",
 				__func__, snd_rpc_ids.vers);
 		snd_ep =
 			msm_rpc_connect_compatible(snd_rpc_ids.prog,

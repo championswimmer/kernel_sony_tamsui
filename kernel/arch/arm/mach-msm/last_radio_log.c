@@ -52,7 +52,7 @@ static struct file_operations last_radio_log_fops = {
 	.llseek = default_llseek,
 };
 
-void msm_init_last_radio_log(struct module *owner)
+void msm_init_last_radio_log(struct module *owner, unsigned base)
 {
 	struct proc_dir_entry *entry;
 
@@ -61,13 +61,27 @@ void msm_init_last_radio_log(struct module *owner)
 		return;
 	}
 
-	radio_log_base = smem_item(SMEM_CLKREGIM_BSP, &radio_log_size);
+#if 0
+/*Skies-2012/06/01, get correct smem rigion++*/
+	//radio_log_base = smem_item(SMEM_CLKREGIM_BSP, &radio_log_size);
+	radio_log_base = smem_get_entry(SMEM_ERR_CRASH_LOG, &radio_log_size);
+/*Skies-2012/06/01, get correct smem rigion--*/
+	
 	if (!radio_log_base) {
 		pr_err("%s: could not retrieve SMEM_CLKREGIM_BSP\n", __func__);
 		return;
 	}
-
-	entry = create_proc_entry("last_radio_log", S_IFREG | S_IRUGO, NULL);
+#else
+	/*Skies-2012/07/18, Keep a copy of SMEM*/
+	radio_log_size = 0x4000;
+	radio_log_base = (void*)base;
+	pr_emerg("%s: radio_log_base = 0x%x\n", __func__, (unsigned)radio_log_base);
+	if (radio_log_base == NULL) {
+		printk(KERN_ERR "last_amsslog: failed to map memory\n");
+		return;
+	}
+#endif
+	entry = create_proc_entry("last_amsslog", S_IFREG | S_IRUGO, NULL);
 	if (!entry) {
 		pr_err("%s: could not create proc entry for radio log\n",
 				__func__);

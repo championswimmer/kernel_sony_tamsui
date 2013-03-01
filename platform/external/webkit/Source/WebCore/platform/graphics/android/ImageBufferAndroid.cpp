@@ -127,8 +127,18 @@ void ImageBuffer::copyRecordingToLayer( GraphicsContext* paintContext, const Int
 {
     SkPicture* canvasRecording = context()->platformContext()->getRecordingPicture();
     SkPicture dstPicture(*canvasRecording);
-    canvasLayer->setPicture(dstPicture);
-    canvasLayer->setRect(r);
+    IntSize size = r.size();
+    canvasLayer->setPicture(dstPicture, size);
+    clearRecording();
+}
+
+void ImageBuffer::resetRecordingToLayer( GraphicsContext* paintContext, const IntRect& r,
+                                         CanvasLayerAndroid* canvasLayer) const
+{
+    SkPicture* canvasRecording = new SkPicture();
+    SkPicture dstPicture(*canvasRecording);
+    IntSize size = r.size();
+    canvasLayer->setPicture(dstPicture, size);
     clearRecording();
 }
 

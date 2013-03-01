@@ -45,7 +45,10 @@ $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_OUT) $(KERNEL_CONFIG) $(KERNEL_HEADERS_I
 	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi-
 	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- modules
 	$(MAKE) -C kernel O=../$(KERNEL_OUT) INSTALL_MOD_PATH=../../$(KERNEL_MODULES_INSTALL) ARCH=arm CROSS_COMPILE=arm-eabi- modules_install
+	$(MAKE) -C compat-wireless  O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- KLIB=../$(KERNEL_OUT) KLIB_BUILD=../$(KERNEL_OUT)
 	$(mv-modules)
+	mv compat-wireless/net/wireless/cfg80211.ko $(KERNEL_MODULES_OUT)/
+	mv compat-wireless/drivers/net/wireless/ath/ath6kl/ath6kl_sdio.ko $(KERNEL_MODULES_OUT)/
 	$(clean-module-folder)
 
 $(KERNEL_HEADERS_INSTALL): $(KERNEL_OUT) $(KERNEL_CONFIG)
@@ -60,11 +63,5 @@ kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
 	env KCONFIG_NOTIMESTAMP=true \
 	     $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- savedefconfig
 	cp $(KERNEL_OUT)/defconfig kernel/arch/arm/configs/$(KERNEL_DEFCONFIG)
-#/* FIH-MTD-SI-JS-BuildEnv-00{ */
-fih_gen_kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
-	@echo "========================================={"
-	@echo "Genetate the .config only in $(KERNEL_OUT)"
-	@echo "$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- $(KERNEL_DEFCONFIG)"
-	@echo "=========================================}"
-#/* FIH-MTD-SI-JS-BuildEnv-00} */
+
 endif

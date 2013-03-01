@@ -2,14 +2,8 @@
  * wpa_supplicant / WPS integration
  * Copyright (c) 2008-2010, Jouni Malinen <j@w1.fi>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "includes.h"
@@ -77,8 +71,10 @@ int wpas_wps_eapol_cb(struct wpa_supplicant *wpa_s)
 	if (wpa_s->key_mgmt == WPA_KEY_MGMT_WPS && wpa_s->current_ssid &&
 	    !(wpa_s->current_ssid->key_mgmt & WPA_KEY_MGMT_WPS)) {
 		int disabled = wpa_s->current_ssid->disabled;
+		unsigned int freq = wpa_s->assoc_freq;
 		wpa_printf(MSG_DEBUG, "WPS: Network configuration replaced - "
-			   "try to associate with the received credential");
+			   "try to associate with the received credential "
+			   "(freq=%u)", freq);
 		wpa_supplicant_deauthenticate(wpa_s,
 					      WLAN_REASON_DEAUTH_LEAVING);
 		if (disabled) {
@@ -87,7 +83,7 @@ int wpas_wps_eapol_cb(struct wpa_supplicant *wpa_s)
 			return 1;
 		}
 		wpa_s->after_wps = 5;
-		wpa_s->wps_freq = wpa_s->assoc_freq;
+		wpa_s->wps_freq = freq;
 		wpa_s->normal_scans = 0;
 		wpa_s->reassociate = 1;
 		wpa_supplicant_req_scan(wpa_s, 0, 0);
@@ -267,6 +263,7 @@ static int wpa_supplicant_wps_cred(void *ctx,
 		ssid->eap.eap_methods = NULL;
 		if (!ssid->p2p_group)
 			ssid->temporary = 0;
+		ssid->bssid_set = 0;
 	} else {
 		wpa_printf(MSG_DEBUG, "WPS: Create a new network based on the "
 			   "received credential");
@@ -664,6 +661,8 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 		wpa_supplicant_wps_event_er_set_sel_reg(wpa_s,
 							&data->set_sel_reg);
 		break;
+	case WPS_EV_AP_PIN_SUCCESS:
+		break;
 	}
 }
 
@@ -790,9 +789,23 @@ static struct wpa_ssid * wpas_wps_add_network(struct wpa_supplicant *wpa_s,
 
 
 static void wpas_wps_reassoc(struct wpa_supplicant *wpa_s,
-			     struct wpa_ssid *selected)
+			     struct wpa_ssid *selected, const u8 *bssid)
 {
 	struct wpa_ssid *ssid;
+	struct wpa_bss *bss;
+
+	wpa_s->known_wps_freq = 0;
+	if (bssid) {
+		bss = wpa_bss_get_bssid(wpa_s, bssid);
+		if (bss && bss->freq > 0) {
+			wpa_s->known_wps_freq = 1;
+			wpa_s->wps_freq = bss->freq;
+		}
+	}
+
+	if (wpa_s->current_ssid)
+		wpa_supplicant_deauthenticate(
+			wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 
 	/* Mark all other networks disabled and trigger reassociation */
 	ssid = wpa_s->conf->ssid;
@@ -849,7 +862,7 @@ int wpas_wps_start_pbc(struct wpa_supplicant *wpa_s, const u8 *bssid,
 		ssid->eap.fragment_size = wpa_s->wps_fragment_size;
 	eloop_register_timeout(WPS_PBC_WALK_TIME, 0, wpas_wps_timeout,
 			       wpa_s, NULL);
-	wpas_wps_reassoc(wpa_s, ssid);
+	wpas_wps_reassoc(wpa_s, ssid, bssid);
 	return 0;
 }
 
@@ -892,7 +905,7 @@ int wpas_wps_start_pin(struct wpa_supplicant *wpa_s, const u8 *bssid,
 		ssid->eap.fragment_size = wpa_s->wps_fragment_size;
 	eloop_register_timeout(WPS_PBC_WALK_TIME, 0, wpas_wps_timeout,
 			       wpa_s, NULL);
-	wpas_wps_reassoc(wpa_s, ssid);
+	wpas_wps_reassoc(wpa_s, ssid, bssid);
 	return rpin;
 }
 
@@ -907,7 +920,8 @@ int wpas_wps_cancel(struct wpa_supplicant *wpa_s)
 	}
 #endif /* CONFIG_AP */
 
-	if (wpa_s->wpa_state == WPA_SCANNING) {
+	if (wpa_s->wpa_state == WPA_SCANNING ||
+	    wpa_s->wpa_state == WPA_DISCONNECTED) {
 		wpa_printf(MSG_DEBUG, "WPS: Cancel operation - cancel scan");
 		wpa_supplicant_cancel_scan(wpa_s);
 		wpas_clear_wps(wpa_s);
@@ -1012,7 +1026,7 @@ int wpas_wps_start_reg(struct wpa_supplicant *wpa_s, const u8 *bssid,
 		ssid->eap.fragment_size = wpa_s->wps_fragment_size;
 	eloop_register_timeout(WPS_PBC_WALK_TIME, 0, wpas_wps_timeout,
 			       wpa_s, NULL);
-	wpas_wps_reassoc(wpa_s, ssid);
+	wpas_wps_reassoc(wpa_s, ssid, bssid);
 	return 0;
 }
 
@@ -1101,8 +1115,10 @@ static void wpas_wps_set_uuid(struct wpa_supplicant *wpa_s,
 		while (first && first->next)
 			first = first->next;
 		if (first && first != wpa_s) {
-			os_memcpy(wps->uuid, wpa_s->global->ifaces->wps->uuid,
-				  WPS_UUID_LEN);
+			if (wps != wpa_s->global->ifaces->wps)
+				os_memcpy(wps->uuid,
+					  wpa_s->global->ifaces->wps->uuid,
+					  WPS_UUID_LEN);
 			wpa_hexdump(MSG_DEBUG, "WPS: UUID from the first "
 				    "interface", wps->uuid, WPS_UUID_LEN);
 		} else {

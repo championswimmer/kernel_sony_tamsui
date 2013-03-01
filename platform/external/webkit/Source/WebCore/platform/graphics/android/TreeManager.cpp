@@ -1,7 +1,6 @@
 /*
  * Copyright 2011, The Android Open Source Project
- * Copyright (C) 2012 Sony Mobile Communications AB.
-
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:

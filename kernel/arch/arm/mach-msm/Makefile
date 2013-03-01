@@ -11,8 +11,7 @@ obj-$(CONFIG_KEXEC) += msm_kexec.o
 obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o
 ifndef CONFIG_ARCH_MSM8X60
 	obj-$(CONFIG_MSM_PROC_COMM) += clock-pcom.o
-    obj-$(CONFIG_MSM_PROC_COMM) += mpp.o
-#FIH-SW3-KERNEL-JC-regulator-01-	obj-$(CONFIG_MSM_PROC_COMM) += vreg.o mpp.o
+	obj-$(CONFIG_MSM_PROC_COMM) += vreg.o mpp.o
 	ifdef CONFIG_MSM_PROC_COMM
 ifndef CONFIG_ARCH_FSM9XXX
 		obj-$(CONFIG_REGULATOR) += footswitch-pcom.o
@@ -83,7 +82,10 @@ obj-$(CONFIG_MSM_SDIO_AL) += sdio_al_dloader.o
 obj-$(CONFIG_MSM_SDIO_DMUX) += sdio_dmux.o
 obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
 obj-$(CONFIG_MSM_SMD_LOGGING) += smem_log.o
-obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o remote_spinlock.o
+# Skies-2012/06/01, Save AMSS log to /proc/last_radio_log [add last_radio_log.o]
+obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o remote_spinlock.o last_radio_log.o
+# SoMC patch - Super Stamina Mode
+obj-$(CONFIG_SONY_SSM) += sony_ssm.o
 obj-y += socinfo.o
 ifndef CONFIG_ARCH_MSM9615
 ifndef CONFIG_ARCH_APQ8064
@@ -200,6 +202,7 @@ obj-$(CONFIG_ARCH_FSM9XXX) += dfe-fsm9xxx.o rfic-fsm9xxx.o
 obj-$(CONFIG_ARCH_FSM9XXX) += restart-fsm9xxx.o xo-fsm9xxx.o
 
 obj-$(CONFIG_MSM_WATCHDOG) += msm_watchdog.o
+obj-$(CONFIG_MSM_WATCHDOG) += msm_watchdog_asm.o
 obj-$(CONFIG_MACH_MSM8X60_RUMI3) += board-msm8x60.o
 obj-$(CONFIG_MACH_MSM8X60_SIM) += board-msm8x60.o
 obj-$(CONFIG_MACH_MSM8X60_SURF) += board-msm8x60.o
@@ -214,25 +217,11 @@ obj-$(CONFIG_TROUT_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_ARCH_MSM7X27) += clock-pcom-lookup.o
 obj-$(CONFIG_MACH_MSM7X27_SURF) += board-msm7x27.o devices-msm7x27.o
 obj-$(CONFIG_MACH_MSM7X27_FFA) += board-msm7x27.o devices-msm7x27.o
-
-#MTD-SI-JS-Project board and device C file separate
-#obj-$(CONFIG_ARCH_MSM7X27A) += clock-pcom-lookup.o devices-msm7x27a.o
-obj-$(CONFIG_ARCH_MSM7X27A) += clock-pcom-lookup.o
-#MTD-SI-JS-Project board and device C file separate
-#obj-$(CONFIG_MACH_MSM7X27A_RUMI3) += board-msm7x27a.o
-#obj-$(CONFIG_MACH_MSM7X27A_SURF) += board-msm7x27a.o
-#obj-$(CONFIG_MACH_MSM7X27A_FFA) += board-msm7x27a.o
-obj-$(CONFIG_FIH_MACH_TAMSUI_MES) += board-tamsui-mesona.o devices-tamsui-mesona.o
-obj-$(CONFIG_FIH_MACH_TAMSUI_TAP) += board-tamsui-tapioca.o devices-tamsui-tapioca.o
-#MTD-SI-JS-Project board and device C file separate
-#MTD-BSP-VT-HWID-01+[
-obj-$(CONFIG_FIH_MACH_TAMSUI_JLO) += board-tamsui-jlo.o devices-tamsui-jlo.o
-#MTD-BSP-VT-HWID-01+]
-obj-$(CONFIG_MACH_MSM7627A_QRD1) += board-qrd7627a.o
-#obj-$(CONFIG_MACH_MSM7X27A_RUMI3) += board-msm7x27a.o board-msm7627a-storage.o board-msm7627a-bt.o
-#obj-$(CONFIG_MACH_MSM7X27A_SURF) += board-msm7x27a.o board-msm7627a-storage.o board-msm7627a-bt.o
-#obj-$(CONFIG_MACH_MSM7X27A_FFA) += board-msm7x27a.o board-msm7627a-storage.o board-msm7627a-bt.o
-#obj-$(CONFIG_MACH_MSM7627A_QRD1) += board-qrd7627a.o board-msm7627a-storage.o board-msm7627a-bt.o
+obj-$(CONFIG_ARCH_MSM7X27A) += clock-pcom-lookup.o devices-msm7x27a.o
+obj-$(CONFIG_MACH_MSM7X27A_RUMI3) += board-msm7x27a.o board-msm7627a-storage.o board-msm7627a-bt.o board-msm7627a-camera.o board-msm7627a-wlan.o
+obj-$(CONFIG_MACH_MSM7X27A_SURF) += board-msm7x27a.o board-msm7627a-storage.o board-msm7627a-bt.o board-msm7627a-camera.o board-msm7627a-wlan.o
+obj-$(CONFIG_MACH_MSM7X27A_FFA) += board-msm7x27a.o board-msm7627a-storage.o board-msm7627a-bt.o board-msm7627a-camera.o board-msm7627a-wlan.o
+obj-$(CONFIG_MACH_MSM7627A_QRD1) += board-qrd7627a.o board-msm7627a-storage.o board-msm7627a-bt.o board-msm7627a-camera.o board-msm7627a-wlan.o
 obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o memory_topology.o
 obj-$(CONFIG_ARCH_MSM7X30) += clock-local.o clock-7x30.o acpuclock-7x30.o
 obj-$(CONFIG_MACH_MSM7X25_SURF) += board-msm7x27.o devices-msm7x25.o
@@ -329,20 +318,6 @@ obj-$(CONFIG_ARCH_MSM7X27A) += board-msm7x27a-regulator.o
 endif
 
 obj-$(CONFIG_ARCH_MSM8960) += mdm2.o mdm_common.o
-
-#MTD-BSP-REXER-INFO-00+[
-obj-y +=fih_proc_fs.o
-#MTD-BSP-REXER-INFO-00+]
-
-# FIH-SW3-KERNEL-TH-porting_dbgcfgtool-00+
-obj-y += dbgcfgtool.o
-# FIH-SW3-KERNEL-TH-add_last_alog-00+
-obj-$(CONFIG_FEATURE_FIH_SW3_LAST_ALOG) += alog_ram_console.o
-# MTD-SW3-KERNEL-MP-RPC_Read_NV-00+
-obj-y += rpc_nv.o
-
-obj-y += board-sisi-wifi.o
-
 obj-$(CONFIG_MSM_RTB) += msm_rtb.o
 obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o

@@ -217,20 +217,22 @@ static struct msm_adsp_ops vfe_7x_sync = {
 	.event = vfe_7x_ops,
 };
 
-/*MTD-MM-SL-FixPreviewCurrent-00*{ */
 static int vfe_7x_enable(struct camera_enable_cmd *enable)
 {
 	int rc = -EFAULT;
+	static int cnt;
 
 	if (!strcmp(enable->name, "QCAMTASK"))
 		rc = msm_adsp_enable(qcam_mod);
-	else if (!strcmp(enable->name, "VFETASK")){
+	else if (!strcmp(enable->name, "VFETASK"))
 		rc = msm_adsp_enable(vfe_mod);
+
+	if (!cnt) {
 		msm_camio_set_perf_lvl(S_INIT);
+		cnt++;
 	}
 	return rc;
 }
-/*MTD-MM-SL-FixPreviewCurrent-00*} */
 
 static int vfe_7x_disable(struct camera_enable_cmd *enable,
 		struct platform_device *dev __attribute__((unused)))

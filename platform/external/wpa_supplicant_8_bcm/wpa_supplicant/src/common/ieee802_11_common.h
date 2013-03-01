@@ -1,7 +1,6 @@
 /*
  * IEEE 802.11 Common routines
  * Copyright (c) 2002-2009, Jouni Malinen <j@w1.fi>
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

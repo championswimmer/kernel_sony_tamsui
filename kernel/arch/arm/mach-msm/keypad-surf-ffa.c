@@ -55,6 +55,11 @@ static unsigned int keypad_col_gpios_8k_ffa[] = {38, 39, 40, 41, 42};
 
 static const unsigned short keypad_keymap_surf[ARRAY_SIZE(keypad_col_gpios) *
 					  ARRAY_SIZE(keypad_row_gpios)] = {
+//<<FerryWu,2011/09/10,BU1,Keypad config for WhartonLiteA
+#if 1
+	[KEYMAP_INDEX(0, 0)] = KEY_VOLUMEUP,
+	[KEYMAP_INDEX(0, 1)] = KEY_VOLUMEDOWN,
+#else
 	[KEYMAP_INDEX(0, 0)] = KEY_5,
 	[KEYMAP_INDEX(0, 1)] = KEY_9,
 	[KEYMAP_INDEX(0, 2)] = 229,            /* SOFT1 */
@@ -98,10 +103,16 @@ static const unsigned short keypad_keymap_surf[ARRAY_SIZE(keypad_col_gpios) *
 	[KEYMAP_INDEX(6, 3)] = KEY_F2,
 	[KEYMAP_INDEX(6, 4)] = KEY_F1
 #endif
+#endif
 };
 
 static const unsigned short keypad_keymap_ffa[ARRAY_SIZE(keypad_col_gpios) *
 					      ARRAY_SIZE(keypad_row_gpios)] = {
+//<<FerryWu,2011/09/10,BU1,Keypad config for WhartonLiteA
+#if 1
+	[KEYMAP_INDEX(0, 0)] = KEY_VOLUMEUP,
+	[KEYMAP_INDEX(0, 1)] = KEY_VOLUMEDOWN,
+#else
 	/*[KEYMAP_INDEX(0, 0)] = ,*/
 	/*[KEYMAP_INDEX(0, 1)] = ,*/
 	[KEYMAP_INDEX(0, 2)] = KEY_1,
@@ -137,6 +148,7 @@ static const unsigned short keypad_keymap_ffa[ARRAY_SIZE(keypad_col_gpios) *
 	[KEYMAP_INDEX(5, 2)] = 230, /*SOFT2*/ /* 2 */
 	[KEYMAP_INDEX(5, 3)] = KEY_MENU,      /* 1 */
 	[KEYMAP_INDEX(5, 4)] = KEY_7,
+#endif
 };
 
 #define QSD8x50_FFA_KEYMAP_SIZE (ARRAY_SIZE(keypad_col_gpios_8k_ffa) * \

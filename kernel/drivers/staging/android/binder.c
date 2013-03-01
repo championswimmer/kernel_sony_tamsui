@@ -129,11 +129,10 @@ module_param_call(stop_on_user_error, binder_set_stop_on_user_error,
 
 #define binder_user_error(x...) \
 	do { \
+		if (binder_debug_mask & BINDER_DEBUG_USER_ERROR) \
 			printk(KERN_INFO x); \
-		if (binder_stop_on_user_error) { \
-            printk(KERN_INFO "binder_stop_on_user_error = %d", binder_stop_on_user_error); \
+		if (binder_stop_on_user_error) \
 			binder_stop_on_user_error = 2; \
-        } \
 	} while (0)
 
 enum binder_stat_types {
@@ -2690,13 +2689,8 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	ret = wait_event_interruptible(binder_user_error_wait,
 						binder_stop_on_user_error < 2);
-
-    //MTD_CONN_EC_TAP-05833-01*[
-	if (ret) {
-        printk(KERN_INFO "%s: wait_event_interruptible receives signal\n", __func__);
+	if (ret)
 		return ret;
-    }
-    //MTD_CONN_EC_TAP-05833-01*]
 
 	mutex_lock(&binder_lock);
 	thread = binder_get_thread(proc);

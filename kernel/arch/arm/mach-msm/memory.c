@@ -2,7 +2,6 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -45,7 +44,7 @@ char strongly_ordered_mem[PAGE_SIZE*2-4];
 
 void map_page_strongly_ordered(void)
 {
-#if defined(CONFIG_ARCH_MSM7X27) || defined(CONFIG_ARCH_MSM7X27A)/*MTD-MM-CL-GpuHang_PATCH-00* */
+#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
 	long unsigned int phys;
 	struct map_desc map;
 
@@ -68,7 +67,7 @@ EXPORT_SYMBOL(map_page_strongly_ordered);
 
 void write_to_strongly_ordered_memory(void)
 {
-#if defined(CONFIG_ARCH_MSM7X27) || defined(CONFIG_ARCH_MSM7X27A)/*MTD-MM-CL-GpuHang_PATCH-00* */
+#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
 	if (!strongly_ordered_page) {
 		if (!in_interrupt())
 			map_page_strongly_ordered();
@@ -84,67 +83,29 @@ void write_to_strongly_ordered_memory(void)
 }
 EXPORT_SYMBOL(write_to_strongly_ordered_memory);
 
-void flush_axi_bus_buffer(void)
-{
-#if defined(CONFIG_ARCH_MSM7X27) || defined(CONFIG_ARCH_MSM7X27A)/*MTD-MM-CL-GpuHang_PATCH-00* */
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-				    : : "r" (0) : "memory");
-	write_to_strongly_ordered_memory();
-#endif
-}
-
-#define CACHE_LINE_SIZE 32
-
-/* These cache related routines make the assumption that the associated
- * physical memory is contiguous. They will operate on all (L1
- * and L2 if present) caches.
+/* These cache related routines make the assumption (if outer cache is
+ * available) that the associated physical memory is contiguous.
+ * They will operate on all (L1 and L2 if present) caches.
  */
 void clean_and_invalidate_caches(unsigned long vstart,
 	unsigned long length, unsigned long pstart)
 {
-	unsigned long vaddr;
-
-	for (vaddr = vstart; vaddr < vstart + length; vaddr += CACHE_LINE_SIZE)
-		asm ("mcr p15, 0, %0, c7, c14, 1" : : "r" (vaddr));
-#ifdef CONFIG_OUTER_CACHE
+	dmac_flush_range((void *)vstart, (void *) (vstart + length));
 	outer_flush_range(pstart, pstart + length);
-#endif
-	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
-	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
-
-	flush_axi_bus_buffer();
 }
 
 void clean_caches(unsigned long vstart,
 	unsigned long length, unsigned long pstart)
 {
-	unsigned long vaddr;
-
-	for (vaddr = vstart; vaddr < vstart + length; vaddr += CACHE_LINE_SIZE)
-		asm ("mcr p15, 0, %0, c7, c10, 1" : : "r" (vaddr));
-#ifdef CONFIG_OUTER_CACHE
+	dmac_clean_range((void *)vstart, (void *) (vstart + length));
 	outer_clean_range(pstart, pstart + length);
-#endif
-	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
-	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
-
-	flush_axi_bus_buffer();
 }
 
 void invalidate_caches(unsigned long vstart,
 	unsigned long length, unsigned long pstart)
 {
-	unsigned long vaddr;
-
-	for (vaddr = vstart; vaddr < vstart + length; vaddr += CACHE_LINE_SIZE)
-		asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (vaddr));
-#ifdef CONFIG_OUTER_CACHE
+	dmac_inv_range((void *)vstart, (void *) (vstart + length));
 	outer_inv_range(pstart, pstart + length);
-#endif
-	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
-	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
-
-	flush_axi_bus_buffer();
 }
 
 void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment)
@@ -274,11 +235,6 @@ static void __init adjust_reserve_sizes(void)
 
 	mt = &reserve_info->memtype_reserve_table[0];
 	for (i = 0; i < MEMTYPE_MAX; i++, mt++) {
-		//MTD-SW3-KERNEL-MP-Fix_ioremap-00+[
-		if (i == MEMTYPE_EBI1_FIH) {
-			continue;
-		}
-		//MTD-SW3-KERNEL-MP-Fix_ioremap-00+]
 		if (mt->flags & MEMTYPE_FLAGS_1M_ALIGN)
 			mt->size = (mt->size + SECTION_SIZE - 1) & SECTION_MASK;
 		if (mt->size > mt->limit) {
@@ -299,14 +255,8 @@ static void __init reserve_memory_for_mempools(void)
 
 	mt = &reserve_info->memtype_reserve_table[0];
 	for (memtype = 0; memtype < MEMTYPE_MAX; memtype++, mt++) {
-		//MTD-SW3-KERNEL-MP-Fix_ioremap-00*[
 		if (mt->flags & MEMTYPE_FLAGS_FIXED || !mt->size)
-		{
-			ret = memblock_remove(mt->start, mt->size);
-			BUG_ON(ret);
 			continue;
-		}
-		//MTD-SW3-KERNEL-MP-Fix_ioremap-00*[
 
 		/* We know we will find memory bank(s) of the proper size
 		 * as we have limited the size of the memory pool for
@@ -342,7 +292,8 @@ static void __init reserve_memory_for_mempools(void)
 	}
 }
 
-unsigned long __init reserve_memory_for_fmem(unsigned long fmem_size)
+unsigned long __init reserve_memory_for_fmem(unsigned long fmem_size, 
+						unsigned long align)
 {
 	struct membank *mb;
 	int ret;
@@ -352,12 +303,9 @@ unsigned long __init reserve_memory_for_fmem(unsigned long fmem_size)
 		return 0;
 
 	mb = &meminfo.bank[meminfo.nr_banks - 1];
-	/*
-	 * Placing fmem at the top of memory causes multimedia issues.
-	 * Instead, place it 1 page below the top of memory to prevent
-	 * the issues from occurring.
-	 */
-	fmem_phys = mb->start + (mb->size - fmem_size) - PAGE_SIZE;
+	
+	fmem_phys = mb->start + (mb->size - fmem_size);
+	fmem_phys = ALIGN(fmem_phys-align+1, align);
 	ret = memblock_remove(fmem_phys, fmem_size);
 	BUG_ON(ret);
 

@@ -1,5 +1,4 @@
 /* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -57,6 +56,9 @@ int g_v4l2_opencnt;
 static int camera_node;
 static enum msm_camera_type camera_type[MSM_MAX_CAMERA_SENSORS];
 static uint32_t sensor_mount_angle[MSM_MAX_CAMERA_SENSORS];
+/*++ PeterShih - 20120417 for camera HW version ++*/
+static uint32_t sensor_hw_version[MSM_MAX_CAMERA_SENSORS];
+/*-- PeterShih - 20120417 for camera HW version --*/
 
 struct ion_client *client_for_ion;
 
@@ -1025,11 +1027,9 @@ static int msm_control(struct msm_control_device *ctrl_pmsm,
 		goto end;
 	}
 	msm_queue_drain(&ctrl_pmsm->ctrl_q, list_control);
-       //MTD-SW3-MM-UW-camframe timeout-01+{
 	qcmd_resp = __msm_control(sync,
 				  &ctrl_pmsm->ctrl_q,
-				  qcmd, msecs_to_jiffies(10000));//FIH-SW-MM-MC-ImplementSensorReSetForMt9v115-00*
-       //MTD-SW3-MM-UW-camframe timeout-01-}
+				  qcmd, msecs_to_jiffies(10000));
 
 	/* ownership of qcmd will be transfered to event queue */
 	qcmd = NULL;
@@ -2032,6 +2032,9 @@ static int msm_get_camera_info(void __user *arg)
 		info.has_3d_support[i] = 0;
 		info.is_internal_cam[i] = 0;
 		info.s_mount_angle[i] = sensor_mount_angle[i];
+/*++ PeterShih - 20120417 for camera HW version ++*/
+		info.hw_version[i] = sensor_hw_version[i];
+/*-- PeterShih - 20120417 for camera HW version --*/
 		switch (camera_type[i]) {
 		case FRONT_CAMERA_2D:
 			info.is_internal_cam[i] = 1;
@@ -4119,6 +4122,9 @@ int msm_camera_drv_start(struct platform_device *dev,
 
 	camera_type[camera_node] = sync->sctrl.s_camera_type;
 	sensor_mount_angle[camera_node] = sync->sctrl.s_mount_angle;
+/*++ PeterShih - 20120417 for camera HW version ++*/
+	sensor_hw_version[camera_node] = sync->sctrl.hw_version;
+/*-- PeterShih - 20120417 for camera HW version --*/
 	camera_node++;
 
 	list_add(&sync->list, &msm_sensors);

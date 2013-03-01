@@ -2,7 +2,6 @@
   * @brief This file contains functions for wapi_config
  *
  *  Copyright (C) 2001-2008, Iwncomm Ltd.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 

@@ -1,8 +1,5 @@
 /*
  * Copyright 2007, The Android Open Source Project
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
- * Portions created by Sony Ericsson are Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
- * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,11 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*
-* This file has been modified by SonyEricsson.
-* 2011-08-10:
-*     Unreferenced the navPictureUI in the destructor
-*/
+
 #define LOG_TAG "webviewglue"
 
 #include "config.h"
@@ -68,6 +61,7 @@
 #include "WebRequestContext.h"
 #include "WebViewCore.h"
 #include "android_graphics.h"
+#include "HTMLCanvasElement.h"
 
 #ifdef GET_NATIVE_VIEW
 #undef GET_NATIVE_VIEW
@@ -471,6 +465,7 @@ bool drawGL(WebCore::IntRect& viewRect, WebCore::IntRect* invalRect,
         WebCore::IntRect& webViewRect, int titleBarHeight,
         WebCore::IntRect& clip, float scale, int extras)
 {
+    HTMLCanvasElement::setGLEnabled(true);
 #if USE(ACCELERATED_COMPOSITING)
     if (!m_baseLayer || inFullScreenMode())
         return false;
@@ -550,6 +545,7 @@ bool drawGL(WebCore::IntRect& viewRect, WebCore::IntRect* invalRect,
 
 PictureSet* draw(SkCanvas* canvas, SkColor bgColor, int extras, bool split)
 {
+    HTMLCanvasElement::setGLEnabled(false);
     PictureSet* ret = 0;
     if (!m_baseLayer) {
         canvas->drawColor(bgColor);
@@ -2115,6 +2111,7 @@ static jobject nativeFocusCandidateNodeBounds(JNIEnv *env, jobject obj)
 {
     const CachedFrame* frame;
     const CachedNode* node = getFocusCandidate(env, obj, &frame);
+     //TPSW1_SoMC_2nd_Patches_Begin  
     // +{ ASD-NET-JC-TAP.734-01
     WebCore::IntRect bounds = node ? node->bounds(frame)
         : WebCore::IntRect(0, 0, 0, 0);
@@ -2123,6 +2120,7 @@ static jobject nativeFocusCandidateNodeBounds(JNIEnv *env, jobject obj)
         : WebCore::IntRect(0, 0, 0, 0);
     */
     // ASD-NET-JC-TAP.734-01 }+
+     //TPSW1_SoMC_2nd_Patches_End  
     // Inset the rect by 1 unit, so that the focus candidate's border can still
     // be seen behind it.
     return createJavaRect(env, bounds.x(), bounds.y(),

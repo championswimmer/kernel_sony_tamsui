@@ -3,7 +3,7 @@
  *  BlueZ - Bluetooth protocol stack for Linux
  *
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
+ *
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -1452,12 +1452,16 @@ static gboolean gst_avdtp_sink_start(GstBaseSink *basesink)
 		err = errno;
 		GST_ERROR_OBJECT(self, "Cannot open connection to bt "
 			"audio service: %s %d", strerror(err), err);
-//MTD_CONN_DL_Tapioca_ICS-00997-[
+ //TPSW1_SoMC_2nd_Patches_Begin
+
+//Tamsui3_CONN_DL_Tapioca_ICS-00997-[
 //		goto failed;
-//MTD_CONN_DL_Tapioca_ICS-00997-]
-//MTD_CONN_DL_Tapioca_ICS-00997+[
+//Tamsui3_CONN_DL_Tapioca_ICS-00997-]
+//Tamsui3_CONN_DL_Tapioca_ICS-00997+[
 		return FALSE;
-//MTD_CONN_DL_Tapioca_ICS-00997+]
+//Tamsui3_CONN_DL_Tapioca_ICS-00997+]
+ //TPSW1_SoMC_2nd_Patches_End	
+
 	}
 
 	self->server = g_io_channel_unix_new(sk);

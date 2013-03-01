@@ -38,81 +38,86 @@ static ssize_t enable_store(
 		struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t size)
 {
-	struct timed_output_dev *tdev = dev_get_drvdata(dev);
-	int value;
+    struct timed_output_dev *tdev = dev_get_drvdata(dev);
+    int value;
+    /*++ Huize - 20120403 add for controling intensity ++*/
+    int intensity;
+    /*-- Huize - 20120403 add for controling intensity --*/
 
-	if (sscanf(buf, "%d", &value) != 1)
-		return -EINVAL;
+    /*++ Huize - 20120403 modified for passing parameter of intensity ++*/
+    if (sscanf(buf, "%d %d", &value, &intensity) != 2)
+        return -EINVAL;
 
-	tdev->enable(tdev, value);
+    tdev->enable(tdev, value, intensity);
+    /*-- Huize - 20120403 modified for passing parameter of intensity --*/
 
-	return size;
+    return size;
 }
 
 static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
 
 static int create_timed_output_class(void)
 {
-	if (!timed_output_class) {
-		timed_output_class = class_create(THIS_MODULE, "timed_output");
-		if (IS_ERR(timed_output_class))
-			return PTR_ERR(timed_output_class);
-		atomic_set(&device_count, 0);
-	}
+    if (!timed_output_class) {
+        timed_output_class = class_create(THIS_MODULE, "timed_output");
+        if (IS_ERR(timed_output_class))
+            return PTR_ERR(timed_output_class);
+        atomic_set(&device_count, 0);
+    }
 
-	return 0;
+    return 0;
 }
 
 int timed_output_dev_register(struct timed_output_dev *tdev)
 {
-	int ret;
+    int ret;
 
-	if (!tdev || !tdev->name || !tdev->enable || !tdev->get_time)
-		return -EINVAL;
+    if (!tdev || !tdev->name || !tdev->enable || !tdev->get_time)
+        return -EINVAL;
 
-	ret = create_timed_output_class();
-	if (ret < 0)
-		return ret;
+    ret = create_timed_output_class();
+    if (ret < 0)
+        return ret;
 
-	tdev->index = atomic_inc_return(&device_count);
-	tdev->dev = device_create(timed_output_class, NULL,
-		MKDEV(0, tdev->index), NULL, tdev->name);
-	if (IS_ERR(tdev->dev))
-		return PTR_ERR(tdev->dev);
+    tdev->index = atomic_inc_return(&device_count);
+    tdev->dev = device_create(timed_output_class, NULL,
+        MKDEV(0, tdev->index), NULL, tdev->name);
+    if (IS_ERR(tdev->dev))
+        return PTR_ERR(tdev->dev);
 
-	ret = device_create_file(tdev->dev, &dev_attr_enable);
-	if (ret < 0)
-		goto err_create_file;
+    ret = device_create_file(tdev->dev, &dev_attr_enable);
+    if (ret < 0)
+        goto err_create_file;
 
-	dev_set_drvdata(tdev->dev, tdev);
-	tdev->state = 0;
-	return 0;
+    dev_set_drvdata(tdev->dev, tdev);
+    tdev->state = 0;
+    return 0;
 
 err_create_file:
-	device_destroy(timed_output_class, MKDEV(0, tdev->index));
-	printk(KERN_ERR "timed_output: Failed to register driver %s\n",
-			tdev->name);
+    device_destroy(timed_output_class, MKDEV(0, tdev->index));
+    printk(KERN_ERR "timed_output: Failed to register driver %s\n",
+            tdev->name);
 
-	return ret;
+    return ret;
 }
 EXPORT_SYMBOL_GPL(timed_output_dev_register);
 
 void timed_output_dev_unregister(struct timed_output_dev *tdev)
 {
-	device_remove_file(tdev->dev, &dev_attr_enable);
-	device_destroy(timed_output_class, MKDEV(0, tdev->index));
-	dev_set_drvdata(tdev->dev, NULL);
+    device_remove_file(tdev->dev, &dev_attr_enable);
+    device_destroy(timed_output_class, MKDEV(0, tdev->index));
+    dev_set_drvdata(tdev->dev, NULL);
 }
 EXPORT_SYMBOL_GPL(timed_output_dev_unregister);
 
 static int __init timed_output_init(void)
 {
-	return create_timed_output_class();
+    return create_timed_output_class();
 }
 
 static void __exit timed_output_exit(void)
 {
-	class_destroy(timed_output_class);
+    class_destroy(timed_output_class);
 }
 
 module_init(timed_output_init);

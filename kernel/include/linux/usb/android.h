@@ -19,7 +19,6 @@
 
 struct android_usb_platform_data {
 	int (*update_pid_and_serial_num)(uint32_t, const char *);
-        char can_stall;//MTD-CONN-EH-PCCOMPANION-01+
 };
 
 #endif	/* __LINUX_USB_ANDROID_H */

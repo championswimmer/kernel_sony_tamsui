@@ -1,7 +1,6 @@
 /*
  * WPA Supplicant / Control interface (shared code for all backends)
  * Copyright (c) 2004-2010, Jouni Malinen <j@w1.fi>
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -3161,13 +3160,13 @@ static int wpa_supplicant_ctrl_iface_set_apdu_socket(
 {
 	size_t len;
 	int ret;
-
+  //TPSW1_SoMC_SS_3rd_Patches_Begin
     if (apdu_socket == NULL) {
 	    wpa_printf(MSG_DEBUG, "apdu_socket == NULL");
     } else {
 	    wpa_printf(MSG_DEBUG, "apdu_socket == %s", apdu_socket);
     }
-
+   //TPSW1_SoMC_SS_3rd_Patches_End
 	len = sizeof(wpa_s->apdu_socket);
 	ret = os_snprintf(wpa_s->apdu_socket, len, "%s", apdu_socket);
 	if (ret < 0 || (size_t) ret >= len)
@@ -3240,7 +3239,10 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		os_memcpy(reply, "PONG\n", 5);
 		reply_len = 5;
 	} else if (os_strncmp(buf, "SET_APDU_SOCKET ", 16) == 0) {
-	    wpa_printf(MSG_DEBUG, "enter SET_APDU_SOCKET");
+	 //TPSW1_SoMC_SS_3rd_Patches_Begin   
+          wpa_printf(MSG_DEBUG, "enter SET_APDU_SOCKET");
+	 //TPSW1_SoMC_SS_3rd_Patches_End	
+
 		if (wpa_supplicant_ctrl_iface_set_apdu_socket(wpa_s, buf + 16))
 			reply_len = -1;
 	} else if (os_strncmp(buf, "RELOG", 5) == 0) {

@@ -3,14 +3,8 @@
  * Copyright (c) 2006, Dan Williams <dcbw@redhat.com> and Red Hat, Inc.
  * Copyright (c) 2009-2010, Witold Sowa <witold.sowa@gmail.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #ifndef CTRL_IFACE_DBUS_NEW_H
@@ -179,7 +173,8 @@ void wpas_dbus_signal_p2p_group_started(struct wpa_supplicant *wpa_s,
 					int client, int network_id);
 void wpas_dbus_register_p2p_group(struct wpa_supplicant *wpa_s,
 				  struct wpa_ssid *ssid);
-void wpas_dbus_signal_p2p_go_neg_resp(struct wpa_supplicant *wpa_s, int status);
+void wpas_dbus_signal_p2p_go_neg_resp(struct wpa_supplicant *wpa_s,
+				      struct p2p_go_neg_results *res);
 void wpas_dbus_unregister_p2p_group(struct wpa_supplicant *wpa_s,
 				    const struct wpa_ssid *ssid);
 int wpas_dbus_register_persistent_group(struct wpa_supplicant *wpa_s,
@@ -385,7 +380,8 @@ static inline int wpas_dbus_unregister_persistent_group(
 }
 
 static inline void
-wpas_dbus_signal_p2p_go_neg_resp(struct wpa_supplicant *wpa_s, int status)
+wpas_dbus_signal_p2p_go_neg_resp(struct wpa_supplicant *wpa_s,
+				 struct p2p_go_neg_results *res)
 {
 }
 

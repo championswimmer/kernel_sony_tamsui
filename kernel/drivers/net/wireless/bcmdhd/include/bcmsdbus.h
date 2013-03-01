@@ -3,7 +3,6 @@
  * host controller drivers.
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -117,13 +116,5 @@ extern int sdioh_sdio_reset(sdioh_info_t *si);
 void *bcmsdh_get_sdioh(bcmsdh_info_t *sdh);
 
 
-
-extern SDIOH_API_RC sdioh_sleep(sdioh_info_t *si, bool enab);
-
-/* GPIO support */
-extern SDIOH_API_RC sdioh_gpio_init(sdioh_info_t *sd);
-extern bool sdioh_gpioin(sdioh_info_t *sd, uint32 gpio);
-extern SDIOH_API_RC sdioh_gpioouten(sdioh_info_t *sd, uint32 gpio);
-extern SDIOH_API_RC sdioh_gpioout(sdioh_info_t *sd, uint32 gpio, bool enab);
 
 #endif /* _sdio_api_h_ */

@@ -2,7 +2,6 @@
  * Linux Wireless Extensions support
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -1739,7 +1738,6 @@ wl_iw_control_wl_off(
 		sdioh_stop(NULL);
 #endif
 
-		
 		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
 
 		wl_iw_send_priv_event(dev, "STOP");
@@ -8215,7 +8213,6 @@ wl_iw_event(struct net_device *dev, wl_event_msg_t *e, void* data)
 			WL_TRACE(("Link UP\n"));
 
 		}
-		net_os_wake_lock_timeout_enable(dev, DHD_EVENT_TIMEOUT);
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		break;
 	case WLC_E_ACTION_FRAME:
@@ -8316,7 +8313,6 @@ wl_iw_event(struct net_device *dev, wl_event_msg_t *e, void* data)
 		WL_ERROR(("%s Event WLC_E_PFN_NET_FOUND, send %s up : find %s len=%d\n",
 		   __FUNCTION__, PNO_EVENT_UP, netinfo->pfnsubnet.SSID,
 		   netinfo->pfnsubnet.SSID_len));
-		net_os_wake_lock_timeout_enable(dev, DHD_EVENT_TIMEOUT);
 		cmd = IWEVCUSTOM;
 		memset(&wrqu, 0, sizeof(wrqu));
 		strcpy(extra, PNO_EVENT_UP);

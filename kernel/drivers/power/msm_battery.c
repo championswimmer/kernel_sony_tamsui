@@ -15,7 +15,9 @@
  * this needs to be before <linux/kernel.h> is loaded,
  * and <linux/sched.h> loads <linux/kernel.h>
  */
+/*++ Edison - 20110929 Enable the debug information ++*/
 #define DEBUG  0
+/*-- Edison - 20110929 Enable the debug information --*/
 
 #include <linux/slab.h>
 #include <linux/earlysuspend.h>
@@ -34,6 +36,20 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_battery.h>
 
+/*Edison add for protection IC test 20111122*/
+#include <linux/delay.h>
+#include <linux/gpio.h>
+#include <asm/irq.h>
+#include <linux/irq.h>
+#include <linux/interrupt.h>
+
+static struct delayed_work protection_ic_work;
+
+/*Edison add for protection IC test 20111122*/
+
+// Edison add for capacity translation++
+#define BATTERY_CAPACITY_REAL
+// Edison add for capacity translation--
 #define BATTERY_RPC_PROG	0x30000089
 #define BATTERY_RPC_VER_1_1	0x00010001
 #define BATTERY_RPC_VER_2_1	0x00020001
@@ -54,6 +70,9 @@
 #define BATTERY_DEREGISTER_CLIENT_PROC			5
 #define BATTERY_READ_MV_PROC				12
 #define BATTERY_ENABLE_DISABLE_FILTER_PROC		14
+/*Edison add ATS & ERROR EVENT 20111122 ++*/
+#define BATTERY_READ_TEMP_PROC				17
+/*Edison add ATS & ERROR EVENT 20111122 --*/
 
 #define VBATT_FILTER			2
 
@@ -65,6 +84,10 @@
 #define BATTERY_HIGH		4300
 
 #define ONCRPC_CHG_GET_GENERAL_STATUS_PROC	12
+//[Arima Edison] add for trigger early suspend condition++
+#define BATTERY_TRIGGER_SUSPEND				16
+#define BATTERY_TRIGGER_TELEPHONY				17
+//[Arima Edison] add for trigger early suspend condition-- 
 #define ONCRPC_CHARGER_API_VERSIONS_PROC	0xffffffff
 
 #define BATT_RPC_TIMEOUT    5000	/* 5 sec */
@@ -176,17 +199,123 @@ enum chg_battery_level_type {
 	BATTERY_LEVEL_INVALID
 };
 
+/*Edison add ATS & ERROR EVENT 20111122 ++*/
+enum charging_status_event {
+	CHARGING_EVENT_NORMAL = 0,
+	CHARGING_EVENT_PROTECTION_IC_WARNING,
+	CHARGING_EVENT_TEMPERATURE_WARNING,	
+	CHARGING_EVENT_BATTERY_DISCONNECTED,
+	CHARGING_EVENT_ALIENCE_BATTERY,
+	CHARGING_EVENT_OVER_VOLTAGE,
+	
+};
+static u8 WARNING_EVENT_TRIGGER = CHARGING_EVENT_NORMAL ;
+/*Edison add ATS & ERROR EVENT 20111122 --*/
+
+static struct wake_lock wall_charger_wake_lock;
+
+
+/*Edison add for protection IC trigger 20111122 ++*/
+static irqreturn_t msm_protection_set(int irq, void *dev_id);
+static void protection_ic_debounce(struct work_struct *work); 
+
+static void msm_batt_update_psy_status(void);
+
+struct irqaction protection_ic_irq = {
+	.handler = msm_protection_set,
+	.name = "protection ic",
+	.flags = IRQF_SHARED
+};
+
+static irqreturn_t msm_protection_set(int irq, void *dev_id)
+{	
+
+	schedule_delayed_work(&protection_ic_work,msecs_to_jiffies(10));
+	
+	return IRQ_HANDLED;	
+}
+
+/*Edison add for protection IC trigger  20111122--*/
+
+// Edison add for capacity translation++
+#ifdef BATTERY_CAPACITY_REAL
+struct voltage2capacity{
+u32	mv;
+u32	percent;
+};	
+
+#if 1
+struct voltage2capacity Vbat_Percent_type1 [] =
+{
+		{4171 , 100},		
+		{4114 , 95  },	
+		{4009 , 83  },	
+		{3947 , 74  },	
+		{3907 , 67  },	
+		{3863 , 59  },	
+		{3830 , 56  },	
+		{3813 , 53  },	
+		{3791 , 46  },	
+		{3771 , 33  },	
+		{3754 , 25  },	
+		{3735 , 20  },	
+		{3717 , 17  },	
+		{3681 , 13  },	
+		{3664 , 8    },	
+		{3651 , 6    },	
+		{3635 , 5    },	
+		{3560 , 3    },	
+		{3408 , 1    },
+		{3247 , 0    },	
+};
+#else
+struct voltage2capacity Vbat_Percent_type2 [] =
+{
+		{4161 , 100},		
+		{4124 , 98  },	
+		{4044 , 90  },	
+		{4003 , 85  },	
+		{3966 , 80  },	
+		{3933 , 75  },	
+		{3888 , 67  },	
+		{3849 , 60  },	
+		{3813 , 55  },	
+		{3787 , 47  },	
+		{3772 , 30  },	
+		{3751 , 25  },	
+		{3718 , 25  },	
+		{3681 , 16  },	
+		{3660 , 14  },	
+		{3589 , 10  },	
+		{3546 , 7  },	
+		{3495 , 4    },	
+		{3404 , 2    },	
+		{3250 , 0    },
+		
+};
+#endif
+
+#endif
+// Edison add for capacity translation--
+
 #ifndef CONFIG_BATTERY_MSM_FAKE
 struct rpc_reply_batt_chg_v1 {
 	struct rpc_reply_hdr hdr;
 	u32 	more_data;
 
-	u32	charger_status;
-	u32	charger_type;
-	u32	battery_status;
-	u32	battery_level;
-	u32     battery_voltage;
-	u32	battery_temp;
+	u32	 charger_status;
+	u32	 charger_type;
+	u32	 battery_status;
+	u32	 battery_level;
+	u32  battery_voltage;
+	int	 battery_temp;
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	u32  charger_voltage;
+	u32  charger_current;
+	u32  charging_state_status;
+	u32  mCurrentState;
+	u32  fake_battery_voltage;
+	/*Edison add ATS & ERROR EVENT 20111122 --*/
 };
 
 struct rpc_reply_batt_chg_v2 {
@@ -209,6 +338,7 @@ static union rpc_reply_batt_chg rep_batt_chg;
 struct msm_battery_info {
 	u32 voltage_max_design;
 	u32 voltage_min_design;
+	u32 voltage_fail_safe;
 	u32 chg_api_version;
 	u32 batt_technology;
 	u32 batt_api_version;
@@ -227,7 +357,7 @@ struct msm_battery_info {
 	u32 battery_status;
 	u32 battery_level;
 	u32 battery_voltage; /* in millie volts */
-	u32 battery_temp;  /* in celsius */
+	int battery_temp;  /* in celsius */
 
 	u32(*calculate_capacity) (u32 voltage);
 
@@ -245,6 +375,15 @@ struct msm_battery_info {
 
 	u32 vbatt_modify_reply_avail;
 
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	u32  charger_voltage;
+	u32  charger_current;
+	u32  charging_state_status;
+	u32  mCurrentState;
+	u8    error_event;
+	u32 fake_battery_voltage;
+	/*Edison add ATS & ERROR EVENT 20111122 --*/
+
 	struct early_suspend early_suspend;
 };
 
@@ -261,6 +400,14 @@ static struct msm_battery_info msm_batt_info = {
 	.batt_valid  = 1,
 	.battery_temp = 23,
 	.vbatt_modify_reply_avail = 0,
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	.charger_current = 0,
+	.charger_voltage = 0,
+	.charging_state_status = 0,
+	.mCurrentState = 0,
+	.fake_battery_voltage = 0,
+	.error_event = CHARGING_EVENT_NORMAL,
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
 };
 
 static enum power_supply_property msm_power_props[] = {
@@ -271,6 +418,70 @@ static char *msm_power_supplied_to[] = {
 	"battery",
 };
 
+
+//[Arima Edison] use to update telephony status ++
+
+static int msm_set_telephony_status_rpc(uint32_t value)
+{
+	int rc = 0;
+	struct hsusb_start_req {
+		struct rpc_request_hdr hdr;
+		uint32_t set;
+	} req;
+
+	if (!msm_batt_info.chg_ep || IS_ERR(msm_batt_info.chg_ep))
+		return -EAGAIN;
+	req.set = cpu_to_be32(value);
+	
+	rc = msm_rpc_call(msm_batt_info.chg_ep, BATTERY_TRIGGER_TELEPHONY,
+			&req, sizeof(req), 5 * HZ);
+
+	if (rc < 0) {
+		pr_err("%s: charger_i_available failed! rc = %d\n",
+			__func__, rc);
+	} 
+
+	return rc;
+}
+
+static ssize_t msm_batt_set_telephony_status(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+
+	static unsigned long telephony_on ;	
+	static int telephone_on_flag = 0;
+	
+	if (strict_strtoul(buf, 10, &telephony_on))
+		return -EINVAL;	
+
+	if(telephony_on>0)
+		telephony_on = 1;
+
+	if(telephony_on!=telephone_on_flag)
+	{
+		msm_set_telephony_status_rpc((uint32_t)telephony_on);
+		telephone_on_flag = telephony_on;
+	}		
+	
+	//printk(KERN_EMERG "%s , telephony_on = %lu  \n",__func__,telephony_on);
+		
+	return count;
+}
+
+
+static DEVICE_ATTR(set_telephony_status , 0644 , NULL , msm_batt_set_telephony_status);
+static struct attribute *msm_battery_attributes[] = {
+	&dev_attr_set_telephony_status.attr,
+	NULL
+};
+static struct attribute_group msm_battery_attribute_group = {
+	.attrs = msm_battery_attributes
+};
+
+
+//[Arima Edison] use to update telephony status --
+
 static int msm_power_get_property(struct power_supply *psy,
 				  enum power_supply_property psp,
 				  union power_supply_propval *val)
@@ -280,11 +491,14 @@ static int msm_power_get_property(struct power_supply *psy,
 		if (psy->type == POWER_SUPPLY_TYPE_MAINS) {
 			val->intval = msm_batt_info.current_chg_source & AC_CHG
 			    ? 1 : 0;
+		//printk(KERN_EMERG "AC_CHG : (%d) \n",val->intval);
 		}
 		if (psy->type == POWER_SUPPLY_TYPE_USB) {
 			val->intval = msm_batt_info.current_chg_source & USB_CHG
 			    ? 1 : 0;
+		//printk(KERN_EMERG "USB_CHG : (%d) \n",val->intval);	
 		}
+		
 		break;
 	default:
 		return -EINVAL;
@@ -321,7 +535,44 @@ static enum power_supply_property msm_batt_power_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CAPACITY,
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_CURRENT_AVG,
+	POWER_SUPPLY_PROP_POWER_AVG,	
+	POWER_SUPPLY_PROP_ERROR_EVENT,
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
 };
+
+// Edison add for capacity translation++
+#ifdef BATTERY_CAPACITY_REAL
+static u32 msm_batt_capacity_real(u32 current_voltage)
+{
+	static int i;
+	static int current_capacity;
+
+	//printk(KERN_NOTICE "Edison in msm_batt_capacity_edison = %d",current_voltage);
+	if (current_voltage >= Vbat_Percent_type1[0].mv)		
+		current_capacity = 100;			
+	else if(current_voltage < Vbat_Percent_type1[19].mv)
+		current_capacity=  0;			
+	else
+	{
+		for(i=0;i<19;i++)
+		{
+			if(current_voltage >= Vbat_Percent_type1[i+1].mv && current_voltage <Vbat_Percent_type1[i].mv)
+			{
+			current_capacity =  Vbat_Percent_type1[i+1].percent 	\
+			+(Vbat_Percent_type1[i].percent-Vbat_Percent_type1[i+1].percent) \
+			*(current_voltage-Vbat_Percent_type1[i+1].mv)\
+			/(Vbat_Percent_type1[i].mv-Vbat_Percent_type1[i+1].mv);			
+			}
+		}		
+	}
+	//printk(KERN_NOTICE "Edison capacity = %d ", current_capacity);		
+	return current_capacity;
+}
+#endif
+// Edison add for capacity translation--
 
 static int msm_batt_power_get_property(struct power_supply *psy,
 				       enum power_supply_property psp,
@@ -347,11 +598,30 @@ static int msm_batt_power_get_property(struct power_supply *psy,
 		val->intval = msm_batt_info.voltage_min_design;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = msm_batt_info.battery_voltage;
+		val->intval = msm_batt_info.battery_voltage*1000;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = msm_batt_info.batt_capacity;
 		break;
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	case POWER_SUPPLY_PROP_TEMP:
+		val->intval = msm_batt_info.battery_temp*10;
+		// add for demo
+		//val->intval = 250;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_AVG:
+		val->intval = msm_batt_info.charger_current;
+		//printk(KERN_EMERG "msm_batt_info.charger_current = %d \n",msm_batt_info.charger_current);
+		break;
+	case POWER_SUPPLY_PROP_POWER_AVG:
+		val->intval = msm_batt_info.charger_voltage;
+		break;			
+	case POWER_SUPPLY_PROP_ERROR_EVENT:		
+		val->intval = msm_batt_info.error_event;
+		//printk("msm_batt_info.error_event = %d",msm_batt_info.error_event);
+		WARNING_EVENT_TRIGGER = CHARGING_EVENT_NORMAL;
+		break;
+	/*Edison add ATS & ERROR EVENT 20111122 --*/		
 	default:
 		return -EINVAL;
 	}
@@ -370,6 +640,12 @@ static struct power_supply msm_psy_batt = {
 struct msm_batt_get_volt_ret_data {
 	u32 battery_voltage;
 };
+/*Edison add ATS & ERROR EVENT 20111122 ++*/
+struct msm_batt_get_temp_data {
+	int battery_temp;
+};
+
+/*Edison add ATS & ERROR EVENT 20111122 --*/
 
 static int msm_batt_get_volt_ret_func(struct msm_rpc_client *batt_client,
 				       void *buf, void *data)
@@ -383,6 +659,23 @@ static int msm_batt_get_volt_ret_func(struct msm_rpc_client *batt_client,
 
 	return 0;
 }
+
+/*Edison add ATS & ERROR EVENT 20111122 ++*/
+static int msm_batt_get_temp_ret_func(struct msm_rpc_client *batt_client,
+				       void *buf, void *data)
+{
+	struct msm_batt_get_temp_data *data_ptr, *buf_ptr;
+
+	data_ptr = (struct msm_batt_get_temp_data *)data;
+	buf_ptr = (struct msm_batt_get_temp_data *)buf;
+
+	data_ptr->battery_temp = be32_to_cpu(buf_ptr->battery_temp);
+	//printk("%s : battery_temp = %d \n",__func__,data_ptr->battery_temp);
+
+	return 0;
+}
+
+/*Edison add ATS & ERROR EVENT 20111122 --*/
 
 static u32 msm_batt_get_vbatt_voltage(void)
 {
@@ -403,6 +696,57 @@ static u32 msm_batt_get_vbatt_voltage(void)
 
 	return rep.battery_voltage;
 }
+
+/*Edison add ATS & ERROR EVENT 20111122 ++*/
+static int msm_batt_get_temp(void)
+{
+	int rc;
+
+	struct msm_batt_get_temp_data rep;
+
+	rc = msm_rpc_client_req(msm_batt_info.batt_client,
+			BATTERY_READ_TEMP_PROC,
+			NULL, NULL,
+			msm_batt_get_temp_ret_func, &rep,
+			msecs_to_jiffies(BATT_RPC_TIMEOUT));
+
+	if (rc < 0) {
+		pr_err("%s: FAIL: vbatt get temp. rc=%d\n", __func__, rc);
+		return 0;
+	}
+	//printk("rep.battery_temp = %d",rep.battery_temp);
+	return rep.battery_temp;
+}
+
+/*Edison add ATS & ERROR EVENT 20111122 --*/
+
+//[Arima Edison] add for trigger early suspend condition++
+/*if value==1, means kernel enter early suspend*/
+static int msm_trigger_suspend(uint32_t value)
+{
+	int rc = 0;
+	struct hsusb_start_req {
+		struct rpc_request_hdr hdr;
+		uint32_t set;
+	} req;
+
+	if (!msm_batt_info.chg_ep || IS_ERR(msm_batt_info.chg_ep))
+		return -EAGAIN;
+	req.set = cpu_to_be32(value);
+	
+	rc = msm_rpc_call(msm_batt_info.chg_ep, BATTERY_TRIGGER_SUSPEND,
+			&req, sizeof(req), 5 * HZ);
+
+	if (rc < 0) {
+		pr_err("%s: msm_trigger_suspend failed! rc = %d\n",
+			__func__, rc);
+	} 
+
+	return rc;
+}
+//[Arima Edison] add for trigger early suspend condition--
+
+
 
 #define	be32_to_cpu_self(v)	(v = be32_to_cpu(v))
 
@@ -437,6 +781,13 @@ static int msm_batt_get_batt_chg_status(void)
 		be32_to_cpu_self(v1p->battery_level);
 		be32_to_cpu_self(v1p->battery_voltage);
 		be32_to_cpu_self(v1p->battery_temp);
+		/*Edison add ATS & ERROR EVENT 20111122 ++*/
+		be32_to_cpu_self(v1p->charger_voltage);
+		be32_to_cpu_self(v1p->charger_current);
+		be32_to_cpu_self(v1p->charging_state_status);
+		be32_to_cpu_self(v1p->mCurrentState);
+		be32_to_cpu_self(v1p->fake_battery_voltage);		
+		/*Edison add ATS & ERROR EVENT 20111122 --*/
 	} else {
 		pr_err("%s: No battery/charger data in RPC reply\n", __func__);
 		return -EIO;
@@ -447,13 +798,24 @@ static int msm_batt_get_batt_chg_status(void)
 
 static void msm_batt_update_psy_status(void)
 {
+	static u8 current_has_update;
 	static u32 unnecessary_event_count;
+	//[Arima Edison] registe new capacity ++
+	u32  capacity_temp;
+	//[Arima Edison] registe new capacity --
 	u32	charger_status;
 	u32	charger_type;
 	u32	battery_status;
 	u32	battery_level;
-	u32     battery_voltage;
-	u32	battery_temp;
+	u32 battery_voltage;
+	int battery_temp;
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	u32    charger_current;
+	u32    charger_voltage;
+	u32    charging_state_status = 0;
+	u32    mCurrentState;
+	u32    fake_battery_voltage;
+	/*Edison add ATS & ERROR EVENT 20111122 --*/
 	struct	power_supply	*supp;
 
 	if (msm_batt_get_batt_chg_status())
@@ -463,21 +825,40 @@ static void msm_batt_update_psy_status(void)
 	charger_type = rep_batt_chg.v1.charger_type;
 	battery_status = rep_batt_chg.v1.battery_status;
 	battery_level = rep_batt_chg.v1.battery_level;
+	fake_battery_voltage = rep_batt_chg.v1.fake_battery_voltage;
 	battery_voltage = rep_batt_chg.v1.battery_voltage;
-	battery_temp = rep_batt_chg.v1.battery_temp;
+	//printk(KERN_EMERG "real battery_voltage = %d fake_battery_voltage %d \n",battery_voltage,fake_battery_voltage);
+	battery_temp = msm_batt_get_temp();
 
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	charger_voltage = rep_batt_chg.v1.charger_voltage;
+	charger_current = rep_batt_chg.v1.charger_current;
+	charging_state_status = rep_batt_chg.v1.charging_state_status;
+	mCurrentState = rep_batt_chg.v1.mCurrentState;
+	
+	/*Edison add ATS & ERROR EVENT 20111122 --+*/
+	//printk("charger voltage = %d  ,  charger current = %d   \n",charger_voltage,charger_current);
 	/* Make correction for battery status */
 	if (battery_status == BATTERY_STATUS_INVALID_v1) {
 		if (msm_batt_info.chg_api_version < CHG_RPC_VER_3_1)
 			battery_status = BATTERY_STATUS_INVALID;
 	}
 
+	//[Arima Edison] add to remove current update trigger ++
+	if(charger_status==CHARGER_STATUS_INVALID && current_has_update==1)
+		current_has_update=0;
+	//[Arima Edison] add to remove current update trigger --
+
 	if (charger_status == msm_batt_info.charger_status &&
 	    charger_type == msm_batt_info.charger_type &&
 	    battery_status == msm_batt_info.battery_status &&
 	    battery_level == msm_batt_info.battery_level &&
 	    battery_voltage == msm_batt_info.battery_voltage &&
-	    battery_temp == msm_batt_info.battery_temp) {
+	    battery_temp == msm_batt_info.battery_temp && 
+	    charger_current == msm_batt_info.charger_current &&
+	    charging_state_status == msm_batt_info.charging_state_status &&
+	    mCurrentState == msm_batt_info.mCurrentState
+	    ) {
 		/* Got unnecessary event from Modem PMIC VBATT driver.
 		 * Nothing changed in Battery or charger status.
 		 */
@@ -490,9 +871,12 @@ static void msm_batt_update_psy_status(void)
 
 	unnecessary_event_count = 0;
 
-	DBG_LIMIT("BATT: rcvd: %d, %d, %d, %d; %d, %d\n",
+	printk(KERN_EMERG "BATT: rcvd: %d, %d, %d, %d; %d, %d ; %d , %d\n",
 		 charger_status, charger_type, battery_status,
-		 battery_level, battery_voltage, battery_temp);
+		 battery_level, battery_voltage, battery_temp, charging_state_status, mCurrentState);
+
+	msm_batt_info.charging_state_status = charging_state_status; 
+	msm_batt_info.mCurrentState = mCurrentState; 
 
 	if (battery_status == BATTERY_STATUS_INVALID &&
 	    battery_level != BATTERY_LEVEL_INVALID) {
@@ -502,19 +886,28 @@ static void msm_batt_update_psy_status(void)
 	}
 
 	if (msm_batt_info.charger_type != charger_type) {
-		if (charger_type == CHARGER_TYPE_USB_WALL ||
-		    charger_type == CHARGER_TYPE_USB_PC ||
+		/*++ Edison - 20111017 change usb wall charger definition ++*/
+		if ( charger_type == CHARGER_TYPE_USB_PC ||
 		    charger_type == CHARGER_TYPE_USB_CARKIT) {
+		/*-- Edison - 20111017 change usb wall charger definition --*/
 			DBG_LIMIT("BATT: USB charger plugged in\n");
 			msm_batt_info.current_chg_source = USB_CHG;
 			supp = &msm_psy_usb;
-		} else if (charger_type == CHARGER_TYPE_WALL) {
+		/*++ Edison - 20111017 change usb wall charger definition ++*/
+		} else if (charger_type == CHARGER_TYPE_USB_WALL ||
+				charger_type == CHARGER_TYPE_WALL) {
+		/*-- Edison - 20111017 change usb wall charger definition --*/
 			DBG_LIMIT("BATT: AC Wall changer plugged in\n");
 			msm_batt_info.current_chg_source = AC_CHG;
 			supp = &msm_psy_ac;
+			
+			wake_lock(&wall_charger_wake_lock);
 		} else {
 			if (msm_batt_info.current_chg_source & AC_CHG)
+			{
+				wake_unlock(&wall_charger_wake_lock);
 				DBG_LIMIT("BATT: AC Wall charger removed\n");
+			}	
 			else if (msm_batt_info.current_chg_source & USB_CHG)
 				DBG_LIMIT("BATT: USB charger removed\n");
 			else
@@ -565,12 +958,16 @@ static void msm_batt_update_psy_status(void)
 
 	/* Correct battery voltage and status */
 	if (!battery_voltage) {
-		if (charger_status == CHARGER_STATUS_INVALID) {
-			DBG_LIMIT("BATT: Read VBATT\n");
-			battery_voltage = msm_batt_get_vbatt_voltage();
-		} else
-			/* Use previous */
+		if (charger_status == CHARGER_STATUS_INVALID) {			
+			battery_voltage = msm_batt_get_vbatt_voltage();	
+			DBG_LIMIT("BATT: Read VBATT (%d)\n",battery_voltage);
+			printk(KERN_NOTICE "BATT: Read VBATT (%d)\n",battery_voltage);
+		} 
+		else
+		{
+			/* Use previous */			
 			battery_voltage = msm_batt_info.battery_voltage;
+		}	
 	}
 	if (battery_status == BATTERY_STATUS_INVALID) {
 		if (battery_voltage >= msm_batt_info.voltage_min_design &&
@@ -632,21 +1029,110 @@ static void msm_batt_update_psy_status(void)
 	msm_batt_info.battery_status 	= battery_status;
 	msm_batt_info.battery_level 	= battery_level;
 	msm_batt_info.battery_temp 	= battery_temp;
+	/*Edison add ATS & ERROR EVENT 20111122 ++*/
+	msm_batt_info.charger_current = charger_current;
+	if(charger_current>800 || charger_current<=0)
+		msm_batt_info.charger_current=0;
+	else
+		msm_batt_info.charger_current = charger_current;
+	msm_batt_info.charger_voltage = charger_voltage;
+	/*Edison add ATS & ERROR EVENT 20111122 --*/
 
+	if (msm_batt_info.battery_voltage>=4500 && WARNING_EVENT_TRIGGER == CHARGING_EVENT_NORMAL)
+		WARNING_EVENT_TRIGGER = CHARGING_EVENT_OVER_VOLTAGE;
+	//Edison add for warning event 20111122 ++	
+	if(msm_batt_info.charger_status!=CHARGER_STATUS_INVALID)
+	{
+		if((battery_temp>=55 || battery_temp <0)&&
+			(charger_status==CHARGER_STATUS_GOOD||charger_status==CHARGER_STATUS_WEAK))
+		{		
+			if(WARNING_EVENT_TRIGGER == CHARGING_EVENT_NORMAL)
+				WARNING_EVENT_TRIGGER = CHARGING_EVENT_TEMPERATURE_WARNING;
+			printk("temperature error = %d",battery_temp);
+		}		
+	}
+	
+	msm_batt_info.error_event = WARNING_EVENT_TRIGGER ;
+	//Edison add for warning event 20111122 --	
+
+	//[Arima Edison] add for update charger current info ++
+	if(!current_has_update && msm_batt_info.charger_current>0 )
+	{
+		current_has_update = 1;
+		if (!supp)
+			supp = msm_batt_info.current_ps;
+	}
+	//[Arima Edison] add for update charger current info --
+
+    
+	//upodate battery capacity ++
 	if (msm_batt_info.battery_voltage != battery_voltage) {
-		msm_batt_info.battery_voltage  	= battery_voltage;
-		msm_batt_info.batt_capacity =
-			msm_batt_info.calculate_capacity(battery_voltage);
-		DBG_LIMIT("BATT: voltage = %u mV [capacity = %d%%]\n",
-			 battery_voltage, msm_batt_info.batt_capacity);
+		msm_batt_info.battery_voltage  = battery_voltage;
+
+		capacity_temp = msm_batt_info.calculate_capacity(msm_batt_info.battery_voltage);
+		msm_batt_info.batt_capacity = capacity_temp;
+#if 0
+		if(fake_battery_voltage!=0 && fake_battery_voltage<=msm_batt_info.battery_voltage)  // fake voltage
+		{				
+			capacity_temp = msm_batt_info.calculate_capacity(fake_battery_voltage);			
+			if(charger_status == CHARGER_STATUS_GOOD && msm_batt_info.batt_capacity<capacity_temp)
+			{
+				// when charging, capaticy should not decrease
+				msm_batt_info.batt_capacity = capacity_temp;
+				//printk(KERN_EMERG "capacity1 \n");
+			}	
+			else if(charger_status != CHARGER_STATUS_GOOD && capacity_temp<msm_batt_info.batt_capacity) 
+			{
+				// when not charging, capaticy should not increase
+				msm_batt_info.batt_capacity = capacity_temp;
+				//printk(KERN_EMERG "capacity2  \n");
+			}	
+			else
+				printk(KERN_EMERG "capacity not update \n");
+			DBG_LIMIT("BATT1: voltage = %u mV [capacity = %d%%]  charger_status : (%d)\n",
+			 	battery_voltage, msm_batt_info.batt_capacity,charger_status);
+		}	
+		else    // real voltage
+		{
+			capacity_temp = msm_batt_info.calculate_capacity(msm_batt_info.battery_voltage);			
+			 if(charger_status == CHARGER_STATUS_GOOD && msm_batt_info.batt_capacity<capacity_temp)
+			 {
+				// when charging, capaticy should not decrease
+				msm_batt_info.batt_capacity = capacity_temp;
+				//printk(KERN_EMERG "capacity3 \n");
+			 }				 
+			else if(capacity_temp<msm_batt_info.batt_capacity)
+			{
+				// when not charging, capaticy should not increase
+				msm_batt_info.batt_capacity = capacity_temp;
+				//printk(KERN_EMERG "capacity4 \n");
+			}	
+			else
+				printk(KERN_EMERG "capacity not update \n");		
+			DBG_LIMIT("BATT2: voltage = %u mV [capacity = %d%%]  charger_status : (%d) \n",
+				 battery_voltage, msm_batt_info.batt_capacity,charger_status);
+		}  		    
+#endif
 
 		if (!supp)
 			supp = msm_batt_info.current_ps;
 	}
 
-	if (supp) {
+	//Edison add to update charging state if full charged ++
+	if(msm_batt_info.battery_level==BATTERY_LEVEL_FULL && msm_batt_info.batt_status==POWER_SUPPLY_STATUS_CHARGING) 
+	{
+		msm_batt_info.batt_status = POWER_SUPPLY_STATUS_FULL;	
+		//[Arima Edison] we set capacity always to 100 if battery status is full, will it cause other impact ?? 
+		msm_batt_info.batt_capacity = 100; 
+		//[Arima Edison] we set capacity always to 100 if battery status is full, will it cause other impact ?? 
+		if (!supp)
+			supp = msm_batt_info.current_ps;
+	}
+	//Edison add to update charging state if full charged --
+
+	if (supp) {		
 		msm_batt_info.current_ps = supp;
-		DBG_LIMIT("BATT: Supply = %s\n", supp->name);
+		//printk(KERN_EMERG "BATT: Supply = %s\n", supp->name);
 		power_supply_changed(supp);
 	}
 }
@@ -756,12 +1242,18 @@ void msm_batt_early_suspend(struct early_suspend *h)
 {
 	int rc;
 
-	pr_debug("%s: enter\n", __func__);
-
+	//Edison add  ---> it's a workaround 
+		
+	printk(KERN_EMERG "%s: enter\n", __func__);
+	rc = msm_trigger_suspend(1);
+		return;
+	#if 0	
 	if (msm_batt_info.batt_handle != INVALID_BATT_HANDLE) {
 		rc = msm_batt_modify_client(msm_batt_info.batt_handle,
-				BATTERY_LOW, BATTERY_VOLTAGE_BELOW_THIS_LEVEL,
-				BATTERY_CB_ID_LOW_VOL, BATTERY_LOW);
+				msm_batt_info.voltage_fail_safe,
+				BATTERY_VOLTAGE_BELOW_THIS_LEVEL,
+				BATTERY_CB_ID_LOW_VOL,
+				msm_batt_info.voltage_fail_safe);
 
 		if (rc < 0) {
 			pr_err("%s: msm_batt_modify_client. rc=%d\n",
@@ -772,31 +1264,42 @@ void msm_batt_early_suspend(struct early_suspend *h)
 		pr_err("%s: ERROR. invalid batt_handle\n", __func__);
 		return;
 	}
-
+	#endif
 	pr_debug("%s: exit\n", __func__);
 }
 
 void msm_batt_late_resume(struct early_suspend *h)
 {
 	int rc;
+	static u8 msm_batt_client_flag = 0;
 
-	pr_debug("%s: enter\n", __func__);
+	//printk(KERN_EMERG "%s: enter\n", __func__);
+	rc = msm_trigger_suspend(0);
 
-	if (msm_batt_info.batt_handle != INVALID_BATT_HANDLE) {
-		rc = msm_batt_modify_client(msm_batt_info.batt_handle,
-				BATTERY_LOW, BATTERY_ALL_ACTIVITY,
-			       BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
-		if (rc < 0) {
-			pr_err("%s: msm_batt_modify_client FAIL rc=%d\n",
+	if (msm_batt_info.batt_handle != INVALID_BATT_HANDLE ) {
+
+		if(!msm_batt_client_flag)
+		{
+			rc = msm_batt_modify_client(msm_batt_info.batt_handle,
+					BATTERY_LOW, BATTERY_ALL_ACTIVITY,
+			       	BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
+			if (rc < 0) {
+				pr_err("%s: msm_batt_modify_client FAIL rc=%d\n",
 			       __func__, rc);
-			return;
+				return;
+			}
+			else
+			{
+				msm_batt_client_flag = 1;
+			}
 		}
 	} else {
 		pr_err("%s: ERROR. invalid batt_handle\n", __func__);
 		return;
 	}
-
+   //[Arima Edison] should we update battery info whenever we leave sleep!? ++
 	msm_batt_update_psy_status();
+	//[Arima Edison] should we update battery info whenever we leave sleep!? --
 	pr_debug("%s: exit\n", __func__);
 }
 #endif
@@ -1173,6 +1676,8 @@ static int msm_batt_cleanup(void)
 	return rc;
 }
 
+// Edison add for capacity translation++
+#ifndef BATTERY_CAPACITY_REAL
 static u32 msm_batt_capacity(u32 current_voltage)
 {
 	u32 low_voltage = msm_batt_info.voltage_min_design;
@@ -1186,6 +1691,8 @@ static u32 msm_batt_capacity(u32 current_voltage)
 		return (current_voltage - low_voltage) * 100
 			/ (high_voltage - low_voltage);
 }
+#endif
+// Edison add for capacity translation--
 
 #ifndef CONFIG_BATTERY_MSM_FAKE
 int msm_batt_get_charger_api_version(void)
@@ -1314,16 +1821,39 @@ static int msm_batt_cb_func(struct msm_rpc_client *client,
 		pr_err("%s: FAIL: sending reply. rc=%d\n", __func__, rc);
 
 	if (accept_status == RPC_ACCEPTSTAT_SUCCESS)
+	{
+		//printk(KERN_EMERG "%s  : RPC_ACCEPTSTAT_SUCCESS \n",__func__);
 		msm_batt_update_psy_status();
+	}	
 
 	return rc;
 }
 #endif  /* CONFIG_BATTERY_MSM_FAKE */
 
+static void protection_ic_debounce (struct work_struct *work)
+{
+	if(!gpio_get_value(41))		
+		WARNING_EVENT_TRIGGER = CHARGING_EVENT_PROTECTION_IC_WARNING;	
+	printk(KERN_NOTICE "gpio_get_value(41) =%d",gpio_get_value(41));
+	printk(KERN_NOTICE "PROTECTION_IC_WARNING_TRIGGER %d",WARNING_EVENT_TRIGGER);
+
+}
+
+
 static int __devinit msm_batt_probe(struct platform_device *pdev)
 {
 	int rc;
 	struct msm_psy_batt_pdata *pdata = pdev->dev.platform_data;
+	
+	wake_lock_init(&wall_charger_wake_lock,
+		       WAKE_LOCK_SUSPEND,
+		       "charger_wakelock");
+	
+	INIT_DELAYED_WORK(&protection_ic_work, protection_ic_debounce);
+
+	//Edison add battery information update --
+
+	//INIT_WORK(&dev->reset_work, emac_reset_work);
 
 	if (pdev->id != -1) {
 		dev_err(&pdev->dev,
@@ -1373,19 +1903,36 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 
 	msm_batt_info.voltage_max_design = pdata->voltage_max_design;
 	msm_batt_info.voltage_min_design = pdata->voltage_min_design;
-	msm_batt_info.batt_technology = pdata->batt_technology;
+	msm_batt_info.batt_technology = pdata->batt_technology;	
+	
+	// Edison add for capacity translation++
+	#ifdef BATTERY_CAPACITY_REAL
+	msm_batt_info.calculate_capacity = msm_batt_capacity_real;
+	#else
 	msm_batt_info.calculate_capacity = pdata->calculate_capacity;
-
+	#endif
+	// Edison add for capacity translation--
+	
 	if (!msm_batt_info.voltage_min_design)
 		msm_batt_info.voltage_min_design = BATTERY_LOW;
 	if (!msm_batt_info.voltage_max_design)
 		msm_batt_info.voltage_max_design = BATTERY_HIGH;
+	if (!msm_batt_info.voltage_fail_safe)
+		msm_batt_info.voltage_fail_safe  = BATTERY_LOW;
 
 	if (msm_batt_info.batt_technology == POWER_SUPPLY_TECHNOLOGY_UNKNOWN)
 		msm_batt_info.batt_technology = POWER_SUPPLY_TECHNOLOGY_LION;
 
+// Edison add for capacity translation++
 	if (!msm_batt_info.calculate_capacity)
+	{
+		#ifdef BATTERY_CAPACITY_REAL
+		msm_batt_info.calculate_capacity = msm_batt_capacity_real;
+		#else
 		msm_batt_info.calculate_capacity = msm_batt_capacity;
+		#endif
+	}	
+// Edison add for capacity translation--
 
 	rc = power_supply_register(&pdev->dev, &msm_psy_batt);
 	if (rc < 0) {
@@ -1393,6 +1940,11 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 			" rc=%d\n", __func__, rc);
 		msm_batt_cleanup();
 		return rc;
+	}
+	else
+	{	
+		//[Arima Ediosn] should add some other protect??
+		rc = sysfs_create_group(&msm_psy_batt.dev->kobj,&msm_battery_attribute_group);
 	}
 	msm_batt_info.msm_psy_batt = &msm_psy_batt;
 
@@ -1428,6 +1980,29 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 	power_supply_changed(&msm_psy_ac);
 #endif  /* CONFIG_BATTERY_MSM_FAKE */
 
+/*Edison add for protection IC alarm 20111122 ++*/
+
+      rc = gpio_tlmm_config(GPIO_CFG(41, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
+	msleep(10);
+			
+      if(gpio_get_value(41))  
+      	{
+      		//Jordan-20111230 , new function for Qualcomm ICS baseline  
+      		pr_info("-- PROTECTION IC INT  --\n");
+		printk(KERN_NOTICE "Edison protection test %d ",irq_set_irq_type(gpio_to_irq(41),IRQF_TRIGGER_FALLING));	
+		printk(KERN_NOTICE "Edison protection test %d ",setup_irq(gpio_to_irq(41),&protection_ic_irq));
+		enable_irq(gpio_to_irq(41));
+		printk(KERN_NOTICE "Edison protection test %d ",irq_set_irq_wake(gpio_to_irq(41),1));
+		//Jordan-20111230 , new function for Qualcomm ICS baseline  
+      	}			
+	else
+	{
+		pr_info("-- PROTECTION IC INT FAIL --\n");
+		gpio_free(41);
+	}
+/*Edison add for protection IC alarm 20111122 --*/	
+
 	return 0;
 }
 
@@ -1436,6 +2011,7 @@ static int __devexit msm_batt_remove(struct platform_device *pdev)
 	int rc;
 	rc = msm_batt_cleanup();
 
+	
 	if (rc < 0) {
 		dev_err(&pdev->dev,
 			"%s: msm_batt_cleanup  failed rc=%d\n", __func__, rc);

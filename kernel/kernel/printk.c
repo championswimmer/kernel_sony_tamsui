@@ -1,7 +1,6 @@
 /*
  *  linux/kernel/printk.c
  *
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
  * Modified to make sys_syslog() more flexible: added commands to
@@ -60,14 +59,20 @@ void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 /* We show everything that is MORE important than this.. */
 #define MINIMUM_CONSOLE_LOGLEVEL 1 /* Minimum loglevel we let people use */
 #define DEFAULT_CONSOLE_LOGLEVEL 7 /* anything MORE serious than KERN_DEBUG */
+//[Arima Edison] add a element to contol external log ++
+#define DEFAULT_EXTERNAL_LOGLEVEL 0
+//[Arima Edison] add a element to contol external log --
 
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
 
-int console_printk[4] = {
+int console_printk[5] = {  // original we only use 4 element
 	DEFAULT_CONSOLE_LOGLEVEL,	/* console_loglevel */
 	DEFAULT_MESSAGE_LOGLEVEL,	/* default_message_loglevel */
 	MINIMUM_CONSOLE_LOGLEVEL,	/* minimum_console_loglevel */
 	DEFAULT_CONSOLE_LOGLEVEL,	/* default_console_loglevel */
+	//[Arima Edison] add a element to contol external log ++
+	DEFAULT_EXTERNAL_LOGLEVEL,
+	//[Arima Edison] add a element to contol external log --
 };
 
 /*
@@ -349,9 +354,7 @@ static int syslog_action_restricted(int type)
 	if (dmesg_restrict)
 		return 1;
 	/* Unless restricted, we allow "read all" and "get buffer size" for everybody */
-    /* FIH-SW3-KERNEL-TH-add_SYSLOG_ACTION_READ-00*[ */
-	return type != SYSLOG_ACTION_READ_ALL && type != SYSLOG_ACTION_SIZE_BUFFER && type != SYSLOG_ACTION_READ;
-    /* FIH-SW3-KERNEL-TH-add_SYSLOG_ACTION_READ-00*] */
+	return type != SYSLOG_ACTION_READ_ALL && type != SYSLOG_ACTION_SIZE_BUFFER;
 }
 
 static int check_syslog_permissions(int type, bool from_file)
@@ -1151,18 +1154,8 @@ int update_console_cmdline(char *name, int idx, char *name_new, int idx_new, cha
 	return -1;
 }
 
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00*[ */ 
-#ifdef CONFIG_FEATURE_FIH_SW3_BUILDTYPE_DEBUG
-/* FIH-SW3-KERNEL-TH-temp_enable_console_suspend-01* */ 
-int console_suspend_enabled = 0;
-#else
 int console_suspend_enabled = 1;
-#endif
-/* FIH-SW3-KERNEL-TH-dynamically_disable_UART-00*[ */ 
-
 EXPORT_SYMBOL(console_suspend_enabled);
-
-module_param_named(console_suspend, console_suspend_enabled, bool, S_IRUGO | S_IWUSR | S_IWGRP); //SW2-5-1-MP-DbgCfgTool-00+
 
 static int __init console_suspend_disable(char *str)
 {

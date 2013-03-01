@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2005 Tower Technologies
  * Author: Alessandro Zummo <a.zummo@towertech.it>
- * Copyright (C) 2011-2012, Foxconn International Holdings, Ltd. All rights reserved.
  *
  * class skeleton from drivers/hwmon/hwmon.c
  *
@@ -21,11 +20,6 @@
 
 #include "rtc-core.h"
 
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FIH_LAST_ALOG
-#include "mach/alog_ram_console.h"
-#endif
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
 
 static DEFINE_IDR(rtc_idr);
 static DEFINE_MUTEX(idr_lock);
@@ -55,18 +49,6 @@ static int rtc_suspend(struct device *dev, pm_message_t mesg)
 	struct rtc_device	*rtc = to_rtc_device(dev);
 	struct rtc_time		tm;
 	struct timespec		delta, delta_delta;
-
-/*FIH-SW3-KERNEL-JC-Porting-02+]*/
-#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
-    printk(KERN_INFO "[PM]rtc_suspend(): %s, dev_name = %s\n", rtc->name, dev_name(&rtc->dev));
-#endif
-/*FIH-SW3-KERNEL-JC-Porting-02+]*/
-
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FIH_LAST_ALOG
-	alog_ram_console_sync_time(LOG_TYPE_ALL, SYNC_BEFORE);
-#endif	
-/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
 	if (strcmp(dev_name(&rtc->dev), CONFIG_RTC_HCTOSYS_DEVICE) != 0)
 		return 0;
 
@@ -138,14 +120,6 @@ static int rtc_resume(struct device *dev)
 			timespec_sub(new_system, old_system));
 
 	timekeeping_inject_sleeptime(&sleep_time);
-	
-	/* FIH-SW3-KERNEL-TH-add_last_alog-00+[ */
-#ifdef CONFIG_FIH_LAST_ALOG
-	alog_ram_console_sync_time(LOG_TYPE_ALL, SYNC_AFTER);
-#endif	
-	/* FIH-SW3-KERNEL-TH-add_last_alog-00+] */
-
-	
 	return 0;
 }
 

@@ -184,10 +184,6 @@ source "drivers/input/touchscreen/Kconfig"
 
 source "drivers/input/misc/Kconfig"
 
-# FIH-SW1-PERIPHERAL-FG-SENSOR-00+[
-source "drivers/input/sensors/Kconfig"
-# FIH-SW1-PERIPHERAL-FG-SENSOR-00+]
-
 endif
 
 menu "Hardware I/O ports"

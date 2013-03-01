@@ -5,7 +5,6 @@
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2010,2012 Code Aurora Forum. All rights reserved.
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -526,7 +525,7 @@ static gboolean sbc_getcap_ind(struct avdtp *session, struct avdtp_local_sep *se
 	sbc_cap.cap.media_codec_type = A2DP_CODEC_SBC;
 
 #ifdef ANDROID
-	sbc_cap.frequency = SBC_SAMPLING_FREQ_44100;
+	sbc_cap.frequency = SBC_SAMPLING_FREQ_48000;
 #else
 	sbc_cap.frequency = ( SBC_SAMPLING_FREQ_48000 |
 				SBC_SAMPLING_FREQ_44100 |
@@ -1902,10 +1901,10 @@ static gboolean select_sbc_params(struct sbc_codec_cap *cap,
 	cap->cap.media_type = AVDTP_MEDIA_TYPE_AUDIO;
 	cap->cap.media_codec_type = A2DP_CODEC_SBC;
 
-	if (supported->frequency & SBC_SAMPLING_FREQ_44100)
-		cap->frequency = SBC_SAMPLING_FREQ_44100;
-	else if (supported->frequency & SBC_SAMPLING_FREQ_48000)
+	if (supported->frequency & SBC_SAMPLING_FREQ_48000)
 		cap->frequency = SBC_SAMPLING_FREQ_48000;
+	else if (supported->frequency & SBC_SAMPLING_FREQ_44100)
+		cap->frequency = SBC_SAMPLING_FREQ_44100;
 	else if (supported->frequency & SBC_SAMPLING_FREQ_32000)
 		cap->frequency = SBC_SAMPLING_FREQ_32000;
 	else if (supported->frequency & SBC_SAMPLING_FREQ_16000)
@@ -1979,10 +1978,22 @@ static gboolean select_capabilities(struct avdtp *session,
 	struct sbc_codec_cap sbc_cap;
 	bdaddr_t src, dst;
 	gboolean edr_capability;
+	struct avdtp_service_capability *media_scms_t;
+	struct avdtp_content_protection_capability scms_t_cap = {0x02, 0x00};
 
 	media_codec = avdtp_get_codec(rsep);
 	if (!media_codec)
 		return FALSE;
+
+	media_scms_t = avdtp_get_remote_sep_protection(rsep);
+	if (avdtp_get_protection_req(session)) {
+		if (!media_scms_t ||
+			(memcmp(media_scms_t->data,
+					&scms_t_cap, sizeof(scms_t_cap)) != 0))
+			return FALSE;
+	}
+
+
 
 	avdtp_get_peers(session, &src, &dst);
 	edr_capability = a2dp_read_edrcapability(&src, &dst);
@@ -2005,6 +2016,17 @@ static gboolean select_capabilities(struct avdtp *session,
 		delay_reporting = avdtp_service_cap_new(AVDTP_DELAY_REPORTING,
 								NULL, 0);
 		*caps = g_slist_append(*caps, delay_reporting);
+	}
+
+	if (avdtp_get_protection_req(session)) {
+		if (media_scms_t &&
+			(memcmp(media_scms_t->data, &scms_t_cap,
+						sizeof(scms_t_cap)) == 0)) {
+			media_scms_t = avdtp_service_cap_new(
+							AVDTP_CONTENT_PROTECTION,
+							&scms_t_cap, 2);
+			*caps = g_slist_append(*caps, media_scms_t);
+		}
 	}
 
 	return TRUE;

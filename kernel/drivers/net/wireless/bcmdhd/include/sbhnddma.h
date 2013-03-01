@@ -3,7 +3,6 @@
  * This supports the following chips: BCM42xx, 44xx, 47xx .
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * 
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -218,7 +217,7 @@ typedef volatile struct {
 #define D64_XC_BL_SHIFT		18
 
 
-#define	D64_XP_LD_MASK		0x00001fff	
+#define	D64_XP_LD_MASK		0x00000fff	
 
 
 #define	D64_XS0_CD_MASK		0x00001fff	
@@ -261,7 +260,7 @@ typedef volatile struct {
 #define DMA_CTRL_USB_BOUNDRY4KB_WAR (1 << 4)
 
 
-#define	D64_RP_LD_MASK		0x00001fff	
+#define	D64_RP_LD_MASK		0x00000fff	
 
 
 #define	D64_RS0_CD_MASK		0x00001fff	

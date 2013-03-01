@@ -66,7 +66,8 @@ typedef enum {
 	BT_IO_OPT_MODE,
 	BT_IO_OPT_FLUSHABLE,
 	BT_IO_OPT_POWER_ACTIVE,
-	BT_IO_OPT_FLUSH_TIMEOUT
+	BT_IO_OPT_FLUSH_TIMEOUT,
+	BT_IO_OPT_LE_PARAMS,
 } BtIOOption;
 
 typedef enum {
@@ -98,4 +99,6 @@ GIOChannel *bt_io_listen(BtIOType type, BtIOConnect connect,
 				GDestroyNotify destroy, GError **err,
 				BtIOOption opt1, ...);
 
+gboolean get_le_params(int sock, struct bt_le_params *params, GError **err);
+gboolean set_le_params(int sock, struct bt_le_params *params, GError **err);
 #endif

@@ -35,6 +35,10 @@ ifneq ($(SUPPORT_COMPLEX_SCRIPTS),false)
     SUPPORT_COMPLEX_SCRIPTS = true
 endif
 
+# Arima Rockyang added 20120608 - WML support
+ENABLE_WML := true
+# Arima Rockyang added end
+
 # Two ways to control which JS engine is used:
 # 1. use JS_ENGINE environment variable, value can be either 'jsc' or 'v8'
 #    This is the preferred way.
@@ -284,6 +288,16 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 LOCAL_CFLAGS := $(LOCAL_CFLAGS) \
          -DLOG_TAG_NODE=\"webkit-node\"
 endif
+
+# Arima Rockyang added 20120608 - WML support
+ifeq ($(ENABLE_WML),true)
+LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
+        $(WEBCORE_PATH)/wml \
+        $(WEBCORE_INTERMEDIATES_PATH)/wml
+
+LOCAL_CFLAGS += -DENABLE_WML=1
+endif
+# Arima Rockyang added end
 
 ifeq ($(JAVASCRIPT_ENGINE),v8)
 # Include WTF source file.

@@ -4,7 +4,6 @@
  *  Copyright (C) 2003-2004 Russell King, All Rights Reserved.
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2007 Pierre Ossman, All Rights Reserved.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -277,7 +276,7 @@ static int mmc_read_switch(struct mmc_card *card)
 		printk(KERN_WARNING "%s: card lacks mandatory switch "
 			"function, performance might suffer.\n",
 			mmc_hostname(card->host));
-		return -EIO;
+		return 0;
 	}
 
 	err = -EIO;

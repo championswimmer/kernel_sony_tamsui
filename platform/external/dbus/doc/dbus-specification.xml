@@ -3,12 +3,11 @@
 "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd"
 [
 ]>
-
 <article id="index">
   <articleinfo>
     <title>D-Bus Specification</title>
-    <releaseinfo>Version 0.14</releaseinfo>
-    <date>May 12, 2010</date>
+    <releaseinfo>Version 0.15</releaseinfo>
+    <date>3 November 2010</date>
     <authorgroup>
       <author>
 	<firstname>Havoc</firstname>
@@ -40,7 +39,73 @@
           </address>
 	</affiliation>
       </author>
+      <author>
+	<firstname>Sven</firstname>
+	<surname>Herzberg</surname>
+	<affiliation>
+	  <orgname>Imendio AB</orgname>
+	  <address>
+            <email>sven@imendio.com</email>
+          </address>
+	</affiliation>
+      </author>
     </authorgroup>
+   <revhistory>
+     <revision>
+       <revnumber>current</revnumber>
+       <date><ulink url='http://cgit.freedesktop.org/dbus/dbus/log/doc/dbus-specification.xml'>commit log</ulink></date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.15</revnumber>
+       <date>3 November 2010</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.14</revnumber>
+       <date>12 May 2010</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.13</revnumber>
+       <date>23 Dezember 2009</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.12</revnumber>
+       <date>7 November, 2006</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.11</revnumber>
+       <date>6 February 2005</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.10</revnumber>
+       <date>28 January 2005</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.9</revnumber>
+       <date>7 Januar 2005</date>
+       <authorinitials></authorinitials>
+       <revremark></revremark>
+     </revision>
+     <revision>
+       <revnumber>0.8</revnumber>
+       <date>06 September 2003</date>
+       <authorinitials></authorinitials>
+       <revremark>First released document.</revremark>
+     </revision>
+   </revhistory>
   </articleinfo>
 
   <sect1 id="introduction">
@@ -2411,8 +2476,8 @@
       [FIXME we need to specify in detail each transport and its possible arguments]
     
       Current transports include: unix domain sockets (including 
-      abstract namespace on linux), TCP/IP, and a debug/testing transport using 
-      in-process pipes. Future possible transports include one that 
+      abstract namespace on linux), launchd, TCP/IP, and a debug/testing transport
+      using in-process pipes. Future possible transports include one that
       tunnels over X11 protocol.
     </para>
   
@@ -2465,6 +2530,53 @@
             <entry>abstract</entry>
             <entry>(string)</entry>
             <entry>unique string (path) in the abstract namespace. If set, the "path" or "tempdir" key must not be set.</entry>
+          </row>
+        </tbody>
+        </tgroup>
+       </informaltable>
+      </sect3>
+    </sect2>
+    <sect2 id="transports-launchd">
+      <title>launchd</title>
+      <para>
+        launchd is a open-source server management system that replaces init, inetd
+        and cron on Apple Mac OS X versions 10.4 and above. It provides a common session
+        bus address for each user and deprecates the X11-enabled D-Bus launcher on OSX.
+      </para>
+
+      <para>
+        launchd allocates a socket and provides it with the unix path through the
+        DBUS_LAUNCHD_SESSION_BUS_SOCKET variable in launchd's environment. Every process
+        spawned by launchd (or dbus-daemon, if it was started by launchd) can access
+        it through its environment.
+        Other processes can query for the launchd socket by executing:
+        $ launchctl getenv DBUS_LAUNCHD_SESSION_BUS_SOCKET
+        This is normally done by the D-Bus client library so doesn't have to be done
+        manually.
+      </para>
+      <para>
+        launchd is not available on Microsoft Windows.
+      </para>
+      <sect3 id="transports-launchd-addresses">
+        <title>Server Address Format</title>
+        <para>
+          launchd addresses are identified by the "launchd:" prefix
+          and support the following key/value pairs:
+        </para>
+        <informaltable>
+         <tgroup cols="3">
+          <thead>
+           <row>
+            <entry>Name</entry>
+            <entry>Values</entry>
+            <entry>Description</entry>
+           </row>
+          </thead>
+          <tbody>
+           <row>
+            <entry>env</entry>
+            <entry>(environment variable)</entry>
+            <entry>path of the unix domain socket for the launchd created dbus-daemon.</entry>
           </row>
         </tbody>
         </tgroup>
@@ -2600,10 +2712,96 @@
        </informaltable>
       </sect3>
     </sect2>
+   </sect1>
+   <sect1 id="meta-transports">
+    <title>Meta Transports</title>
+    <para>
+      Meta transports are a kind of transport with special enhancements or
+      behavior. Currently available meta transports include: autolaunch
+    </para>
 
-  </sect1>
+    <sect2 id="meta-transports-autolaunch">
+     <title>Autolaunch</title>
+     <para>The autolaunch transport provides a way for dbus clients to autodetect
+       a running dbus session bus and to autolaunch a session bus if not present.
+     </para>
+     <sect3 id="meta-transports-autolaunch-addresses">
+       <title>Server Address Format</title>
+       <para>
+         Autolaunch addresses uses the "autolaunch:" prefix and support the
+         following key/value pairs:
+       </para>
+       <informaltable>
+        <tgroup cols="3">
+         <thead>
+          <row>
+           <entry>Name</entry>
+           <entry>Values</entry>
+           <entry>Description</entry>
+          </row>
+         </thead>
+         <tbody>
+          <row>
+           <entry>scope</entry>
+           <entry>(string)</entry>
+           <entry>scope of autolaunch (Windows only)
+            <itemizedlist>
+             <listitem>
+              <para>
+               "*install-path" - limit session bus to dbus installation path.
+               The dbus installation path is determined from the location of
+               the shared dbus library. If the library is located in a 'bin'
+               subdirectory the installation root is the directory above,
+               otherwise the directory where the library lives is taken as
+               installation root.
+               <programlisting>
+                   &lt;install-root&gt;/bin/[lib]dbus-1.dll
+                   &lt;install-root&gt;/[lib]dbus-1.dll
+               </programlisting>
+              </para>
+             </listitem>
+             <listitem>
+              <para>
+               "*user" - limit session bus to the recent user.
+              </para>
+             </listitem>
+             <listitem>
+              <para>
+               other values - specify dedicated session bus like "release",
+               "debug" or other
+              </para>
+             </listitem>
+            </itemizedlist>
+           </entry>
+         </row>
+        </tbody>
+       </tgroup>
+      </informaltable>
+     </sect3>
 
-  <sect1 id="naming-conventions">
+     <sect3 id="meta-transports-autolaunch-windows-implementation">
+      <title>Windows implementation</title>
+      <para>
+        On start, the server opens a platform specific transport, creates a mutex
+        and a shared memory section containing the related session bus address.
+        This mutex will be inspected by the dbus client library to detect a
+        running dbus session bus. The access to the mutex and the shared memory
+        section are protected by global locks.
+      </para>
+      <para>
+       In the recent implementation the autolaunch transport uses a tcp transport
+       on localhost with a port choosen from the operating system. This detail may
+       change in the future.
+      </para>
+      <para>
+        Disclaimer: The recent implementation is in an early state and may not
+        work in all cirumstances and/or may have security issues. Because of this
+        the implementation is not documentated yet.
+      </para>
+     </sect3>
+    </sect2>
+   </sect1>
+   <sect1 id="naming-conventions">
     <title>Naming Conventions</title>
     
     <para>
@@ -2999,6 +3197,10 @@
         linkend="message-protocol-header-fields"/>).  If the
         <literal>DESTINATION</literal> field is present, it specifies a message
         recipient by name. Method calls and replies normally specify this field.
+        The message bus must send messages (of any type) with the
+        <literal>DESTINATION</literal> field set to the specified recipient,
+        regardless of whether the recipient has set up a match rule matching
+        the message.
       </para>
 
       <para>
@@ -3589,17 +3791,27 @@
         <xref linkend="message-bus-types"/>.
       </para>
       <para>
-        [FIXME the file format should be much better specified than "similar to
-        .desktop entries" esp. since desktop entries are already
-        badly-specified. ;-)] Service description files have the ".service" file
+        Service description files have the ".service" file
         extension. The message bus will only load service description files
         ending with .service; all other files will be ignored.  The file format
         is similar to that of <ulink
-        url="http://www.freedesktop.org/standards/desktop-entry-spec/desktop-entry-spec.html">desktop
+        url="http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html">desktop
         entries</ulink>. All service description files must be in UTF-8
         encoding. To ensure that there will be no name collisions, service files
         must be namespaced using the same mechanism as messages and service
         names.
+      </para>
+
+      <para>
+        [FIXME the file format should be much better specified than "similar to
+        .desktop entries" esp. since desktop entries are already
+        badly-specified. ;-)]
+        These sections from the specification apply to service files as well:
+
+        <itemizedlist>
+          <listitem><para>General syntax</para></listitem>
+          <listitem><para>Comment format</para></listitem>
+        </itemizedlist>
 
         <figure>
 	  <title>Example service description file</title>
@@ -3694,11 +3906,221 @@
           The environment variable should have precedence over the 
           root window property.
         </para>
-        <para>
-          [FIXME specify location of .service files, probably using 
-          DESKTOP_DIRS etc. from basedir specification, though login session 
-          bus is not really desktop-specific]
-        </para>
+        <para>The address of the login session message bus is given in the
+        <literal>DBUS_SESSION_BUS_ADDRESS</literal> environment variable. If
+        DBUS_SESSION_BUS_ADDRESS is not set, or if it's set to the string
+        "autolaunch:", the system should use platform-specific methods of
+        locating a running D-Bus session server, or starting one if a running
+        instance cannot be found. Note that this mechanism is not recommended
+        for attempting to determine if a daemon is running. It is inherently
+        racy to attempt to make this determination, since the bus daemon may
+        be started just before or just after the determination is made.
+        Therefore, it is recommended that applications do not try to make this
+        determination for their functionality purposes, and instead they
+        should attempt to start the server.</para>
+
+        <sect4 id="message-bus-types-login-x-windows">
+          <title>X Windowing System</title>
+          <para>
+            For the X Windowing System, the application must locate the
+            window owner of the selection represented by the atom formed by
+            concatenating:
+            <itemizedlist>
+              <listitem>
+                <para>the literal string "_DBUS_SESSION_BUS_SELECTION_"</para>
+              </listitem>
+
+              <listitem>
+                <para>the current user's username</para>
+              </listitem>
+
+              <listitem>
+                <para>the literal character '_' (underscore)</para>
+              </listitem>
+
+              <listitem>
+                <para>the machine's ID</para>
+              </listitem>
+            </itemizedlist>
+          </para>
+
+          <para>
+            The following properties are defined for the window that owns
+            this X selection:
+            <informaltable frame="all">
+              <tgroup cols="2">
+                <tbody>
+                  <row>
+                    <entry>
+                      <para>Atom</para>
+                    </entry>
+
+                    <entry>
+                      <para>meaning</para>
+                    </entry>
+                  </row>
+
+                  <row>
+                    <entry>
+                      <para>_DBUS_SESSION_BUS_ADDRESS</para>
+                    </entry>
+
+                    <entry>
+                      <para>the actual address of the server socket</para>
+                    </entry>
+                  </row>
+
+                  <row>
+                    <entry>
+                      <para>_DBUS_SESSION_BUS_PID</para>
+                    </entry>
+
+                    <entry>
+                      <para>the PID of the server process</para>
+                    </entry>
+                  </row>
+                </tbody>
+              </tgroup>
+            </informaltable>
+          </para>
+
+          <para>
+            At least the _DBUS_SESSION_BUS_ADDRESS property MUST be
+            present in this window.
+          </para>
+
+          <para>
+            If the X selection cannot be located or if reading the
+            properties from the window fails, the implementation MUST conclude
+            that there is no D-Bus server running and proceed to start a new
+            server. (See below on concurrency issues)
+          </para>
+
+          <para>
+            Failure to connect to the D-Bus server address thus obtained
+            MUST be treated as a fatal connection error and should be reported
+            to the application.
+          </para>
+
+          <para>
+            As an alternative, an implementation MAY find the information
+            in the following file located in the current user's home directory,
+            in subdirectory .dbus/session-bus/:
+            <itemizedlist>
+              <listitem>
+                <para>the machine's ID</para>
+              </listitem>
+
+              <listitem>
+                <para>the literal character '-' (dash)</para>
+              </listitem>
+
+              <listitem>
+                <para>the X display without the screen number, with the
+                following prefixes removed, if present: ":", "localhost:"
+                ."localhost.localdomain:". That is, a display of
+                "localhost:10.0" produces just the number "10"</para>
+              </listitem>
+            </itemizedlist>
+          </para>
+
+          <para>
+            The contents of this file NAME=value assignment pairs and
+            lines starting with # are comments (no comments are allowed
+            otherwise). The following variable names are defined:
+            <informaltable
+              frame="all">
+              <tgroup cols="2">
+                <tbody>
+                  <row>
+                    <entry>
+                      <para>Variable</para>
+                    </entry>
+
+                    <entry>
+                      <para>meaning</para>
+                    </entry>
+                  </row>
+
+                  <row>
+                    <entry>
+                      <para>DBUS_SESSION_BUS_ADDRESS</para>
+                    </entry>
+
+                    <entry>
+                      <para>the actual address of the server socket</para>
+                    </entry>
+                  </row>
+
+                  <row>
+                    <entry>
+                      <para>DBUS_SESSION_BUS_PID</para>
+                    </entry>
+
+                    <entry>
+                      <para>the PID of the server process</para>
+                    </entry>
+                  </row>
+
+                  <row>
+                    <entry>
+                      <para>DBUS_SESSION_BUS_WINDOWID</para>
+                    </entry>
+
+                    <entry>
+                      <para>the window ID</para>
+                    </entry>
+                  </row>
+                </tbody>
+              </tgroup>
+            </informaltable>
+          </para>
+
+          <para>
+            At least the DBUS_SESSION_BUS_ADDRESS variable MUST be present
+            in this file.
+          </para>
+
+          <para>
+            Failure to open this file MUST be interpreted as absence of a
+            running server. Therefore, the implementation MUST proceed to
+            attempting to launch a new bus server if the file cannot be
+            opened.
+          </para>
+
+          <para>
+            However, success in opening this file MUST NOT lead to the
+            conclusion that the server is running. Thus, a failure to connect to
+            the bus address obtained by the alternative method MUST NOT be
+            considered a fatal error. If the connection cannot be established,
+            the implementation MUST proceed to check the X selection settings or
+            to start the server on its own.
+          </para>
+
+          <para>
+            If the implementation concludes that the D-Bus server is not
+            running it MUST attempt to start a new server and it MUST also
+            ensure that the daemon started as an effect of the "autolaunch"
+            mechanism provides the lookup mechanisms described above, so
+            subsequent calls can locate the newly started server. The
+            implementation MUST also ensure that if two or more concurrent
+            initiations happen, only one server remains running and all other
+            initiations are able to obtain the address of this server and
+            connect to it. In other words, the implementation MUST ensure that
+            the X selection is not present when it attempts to set it, without
+            allowing another process to set the selection between the
+            verification and the setting (e.g., by using XGrabServer /
+            XungrabServer).
+          </para>
+        </sect4>
+        <sect4>
+          <title></title>
+          <para>
+            [FIXME specify location of .service files, probably using
+            DESKTOP_DIRS etc. from basedir specification, though login session
+            bus is not really desktop-specific]
+          </para>
+        </sect4>
       </sect3>
       <sect3 id="message-bus-types-system">
         <title>System message bus</title>

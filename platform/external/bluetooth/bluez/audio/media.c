@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2007  Nokia Corporation
  *  Copyright (C) 2004-2009  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
+ *
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -151,13 +151,16 @@ static void headset_setconf_cb(struct media_endpoint *endpoint, void *ret,
 
 	if (ret != NULL)
 		return;
-
-//MTD_CONN_DL_Tapioca_ICS-00997-[
+   //TPSW1_SoMC_2nd_Patches_Begin
+//Tamsui3_CONN_DL_Tapioca_ICS-00997-[
 //	headset_set_state(dev, HEADSET_STATE_DISCONNECTED);
-//MTD_CONN_DL_Tapioca_ICS-00997-]
-//MTD_CONN_DL_Tapioca_ICS-00997+[
+//Tamsui3_CONN_DL_Tapioca_ICS-00997-]
+//Tamsui3_CONN_DL_Tapioca_ICS-00997+[
 	headset_shutdown(dev);
-//MTD_CONN_DL_Tapioca_ICS-00997+]
+//Tamsui3_CONN_DL_Tapioca_ICS-00997+]
+ //TPSW1_SoMC_2nd_Patches_End
+
+
 }
 
 static void headset_state_changed(struct audio_device *dev,

@@ -264,17 +264,12 @@ static struct clk_lookup msm_clocks_7x27a[] = {
 	CLK_LOOKUP("ahb_m_clk",		ahb_m_clk.c,	NULL),
 	CLK_LOOKUP("ahb_s_clk",		ahb_s_clk.c,	NULL),
 	CLK_LOOKUP("cam_m_clk",		cam_m_clk.c,	NULL),
-    //SW2D2-MM-MC-Camera-BringUpMt9v115Sensor-01+{
-    CLK_LOOKUP("csi_clk",       csi0_clk.c, "msm_camera_mt9v115.0"),
-    CLK_LOOKUP("csi_pclk",      csi0_p_clk.c,   "msm_camera_mt9v115.0"),
-    CLK_LOOKUP("csi_vfe_clk",   csi0_vfe_clk.c, "msm_camera_mt9v115.0"),
-    //SW2D2-MM-MC-Camera-BringUpMt9v115Sensor-01+}
-	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov9726.0"),
-	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov9726.0"),
-	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov9726.0"),
-	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov7692.0"),
-	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov7692.0"),
-	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov7692.0"),
+	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_s5k5ca.0"),
+	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_s5k5ca.0"),
+	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_s5k5ca.0"),
+	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_mt9v115_front.0"),
+	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_mt9v115_front.0"),
+	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_mt9v115_front.0"),
 	CLK_LOOKUP("csi_clk",		csi1_clk.c,	NULL),
 	CLK_LOOKUP("csi_pclk",		csi1_p_clk.c,	NULL),
 	CLK_LOOKUP("csi_vfe_clk",	csi1_vfe_clk.c,	NULL),
@@ -325,11 +320,6 @@ static struct clk_lookup msm_clocks_7x27a[] = {
 	CLK_LOOKUP("iface_clk",		tsif_p_clk.c,	"msm_tsif.0"),
 	CLK_LOOKUP("core_clk",		uart1_clk.c,	"msm_serial.0"),
 	CLK_LOOKUP("core_clk",		uart2_clk.c,	"msm_serial.1"),
-	/*MTD-BSP-KC-Kernek_Porting_2010-00+[*/
-	#ifdef CONFIG_SERIAL_MSM_CONSOLE
-	CLK_LOOKUP("core_clk",		uart3_clk.c,	"msm_serial.2"), 
-	#endif
-	/*MTD-BSP-KC-Kernek_Porting_2010-00+]*/
 	CLK_LOOKUP("core_clk",		uart1dm_clk.c,	"msm_serial_hs.0"),
 	CLK_LOOKUP("core_clk",		uart2dm_clk.c,	"msm_serial_hsl.0"),
 	CLK_LOOKUP("core_clk",		usb_hs_core_clk.c, "msm_otg"),

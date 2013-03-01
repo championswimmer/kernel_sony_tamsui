@@ -5,7 +5,7 @@
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2011, Code Aurora Forum. All rights reserved.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
+ *
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -246,9 +246,11 @@ static void device_free(gpointer user_data)
 	g_slist_foreach(device->primaries, (GFunc) g_free, NULL);
 	g_slist_free(device->primaries);
 
-	if (device->tmp_records)
+	if (device->tmp_records) {
 		sdp_list_free(device->tmp_records,
 					(sdp_free_func_t) sdp_record_free);
+		device->tmp_records = NULL;
+	}
 
 	if (device->disconn_timer)
 		g_source_remove(device->disconn_timer);
@@ -697,6 +699,28 @@ fail:
 	return btd_error_failed(msg, strerror(-err));
 }
 
+static DBusMessage *le_discover_primary_services(DBusConnection *conn,
+					DBusMessage *msg, void *user_data)
+{
+	struct btd_device *device = user_data;
+	int err;
+
+	if (device->browse)
+		return btd_error_in_progress(msg);
+
+	DBG("Device type %s", (device->type == DEVICE_TYPE_LE) ? "LE":"BR/EDR");
+
+	if (device->type != DEVICE_TYPE_LE) {
+		return btd_error_not_supported(msg);
+	}
+
+	err = device_browse_primary(device, NULL, NULL, FALSE);
+	if (err < 0)
+		return btd_error_failed(msg, strerror(-err));
+
+	return dbus_message_new_method_return(msg);
+}
+
 static const char *browse_request_get_requestor(struct browse_req *req)
 {
 	if (!req->msg)
@@ -726,10 +750,12 @@ static void discover_services_reply(struct browse_req *req, int err,
 	DBusMessage *reply;
 	DBusMessageIter iter, dict;
 	sdp_list_t *seq;
-  //SW3-CONN-DL-TT466_ramdump--[
+  //TPSW1_SoMC_2nd_Patches_Begin
+//SW3-CONN-DL-TT466_ramdump--[
 //	if (!req->msg)
 //		return;
   //SW3-CONN-DL-TT466_ramdump--] 
+  //TPSW1_SoMC_2nd_Patches_End
 	if (err) {
 		const char *err_if;
 
@@ -737,7 +763,8 @@ static void discover_services_reply(struct browse_req *req, int err,
 			err_if = ERROR_INTERFACE ".ConnectionAttemptFailed";
 		else
 			err_if = ERROR_INTERFACE ".Failed";
-    //SW3-CONN-DL-TT466_ramdump**[
+    //TPSW1_SoMC_2nd_Patches_Begin
+     //SW3-CONN-DL-TT466_ramdump**[
     if (req->msg) {
         DBG("reg->msg is true, err = %d", err );
         reply = dbus_message_new_error(req->msg, err_if, strerror(-err));
@@ -758,7 +785,8 @@ static void discover_services_reply(struct browse_req *req, int err,
 //		g_dbus_send_message(req->conn, reply);
 
     //SW3-CONN-DL-TT466_ramdump**]  
-
+//TPSW1_SoMC_2nd_Patches_End
+	
 		return;
 	}
 
@@ -945,20 +973,28 @@ static DBusMessage *set_connection_params(DBusConnection *conn,
 						void *user_data)
 {
 	struct btd_device *device = user_data;
-	uint16_t interval_min, interval_max, slave_latency, timeout_multiplier;
+	struct bt_le_params params;
+	bdaddr_t src;
 	int ret;
 
-	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_UINT16, &interval_min,
-					DBUS_TYPE_UINT16, &interval_max,
-					DBUS_TYPE_UINT16, &slave_latency,
-					DBUS_TYPE_UINT16, &timeout_multiplier,
-					DBUS_TYPE_INVALID) == FALSE)
+	if (dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_BYTE, &params.prohibit_remote_chg,
+			DBUS_TYPE_BYTE, &params.filter_policy,
+			DBUS_TYPE_UINT16, &params.scan_interval,
+			DBUS_TYPE_UINT16, &params.scan_window,
+			DBUS_TYPE_UINT16, &params.interval_min,
+			DBUS_TYPE_UINT16, &params.interval_max,
+			DBUS_TYPE_UINT16, &params.latency,
+			DBUS_TYPE_UINT16, &params.supervision_timeout,
+			DBUS_TYPE_UINT16, &params.min_ce_len,
+			DBUS_TYPE_UINT16, &params.max_ce_len,
+			DBUS_TYPE_UINT16, &params.conn_timeout,
+			DBUS_TYPE_INVALID) == FALSE)
 		goto fail;
 
-	ret = btd_adapter_set_connection_params(device->adapter,
-					&device->bdaddr,
-					interval_min, interval_max,
-					slave_latency, timeout_multiplier);
+	adapter_get_address(device->adapter, &src);
+
+	ret = write_le_params(&src, &device->bdaddr, &params);
 
 	if (ret)
 		goto fail;
@@ -966,7 +1002,38 @@ static DBusMessage *set_connection_params(DBusConnection *conn,
 	return dbus_message_new_method_return(msg);
 fail:
 	return g_dbus_create_error(msg, ERROR_INTERFACE ".Failed",
-					"SetConnectionParams Failed");
+					"SetLEConnectParams Failed");
+}
+
+static DBusMessage *update_connection_params(DBusConnection *conn,
+						DBusMessage *msg,
+						void *user_data)
+{
+	struct btd_device *device = user_data;
+	uint8_t prohibit_remote_chg;
+	uint16_t interval_min, interval_max, latency, supervision_timeout;
+	int ret;
+
+	if (dbus_message_get_args(msg, NULL,
+					DBUS_TYPE_BYTE, &prohibit_remote_chg,
+					DBUS_TYPE_UINT16, &interval_min,
+					DBUS_TYPE_UINT16, &interval_max,
+					DBUS_TYPE_UINT16, &latency,
+					DBUS_TYPE_UINT16, &supervision_timeout,
+					DBUS_TYPE_INVALID) == FALSE)
+		goto fail;
+
+	ret = attrib_client_update(device, prohibit_remote_chg,
+					interval_min, interval_max,
+					latency, supervision_timeout);
+
+	if (ret)
+		goto fail;
+
+	return dbus_message_new_method_return(msg);
+fail:
+	return g_dbus_create_error(msg, ERROR_INTERFACE ".Failed",
+					"UpdateLEConnectionParams Failed");
 }
 
 static DBusMessage *register_rssi_watcher(DBusConnection *conn,
@@ -1081,9 +1148,11 @@ static GDBusMethodTable device_methods[] = {
 	{ "Disconnect",		"",	"",		disconnect,
 						G_DBUS_METHOD_FLAG_ASYNC},
 	{ "GetServiceAttributeValue",  "sq", "i",       get_service_attribute_value},
-	{ "SetConnectionParams",	"qqqq",	"",	set_connection_params	},
 	{ "RegisterRssiUpdateWatcher",	"nqb",	"",	register_rssi_watcher	},
 	{ "UnregisterRssiUpdateWatcher",	"",	"",	unregister_rssi_watcher	},
+	{ "SetLEConnectParams",	"yyqqqqqqqqq", "", set_connection_params },
+	{ "UpdateLEConnectionParams",	"yqqqq", "", update_connection_params },
+	{ "LeDiscoverPrimaryServices", "", "", le_discover_primary_services },
 	{ }
 };
 
@@ -1199,9 +1268,13 @@ int conn_get_pending_sec_level(struct btd_device *device, uint8_t *pending_sec_l
 	dev_id = hci_devid(addr);
 
 	dd = hci_open_dev(dev_id);
+	if (dd < 0)
+		return dd;
+
 	cr = g_malloc0(sizeof(*cr) + sizeof(struct hci_conn_info));
 
-	if(cr == NULL) {
+	if (cr == NULL) {
+		hci_close_dev(dd);
 		return  -ENOMEM;
 	}
 	cr->type = ACL_LINK;
@@ -1212,6 +1285,7 @@ int conn_get_pending_sec_level(struct btd_device *device, uint8_t *pending_sec_l
 		*pending_sec_level = cr->conn_info->pending_sec_level;
 	g_free(cr);
 
+	hci_close_dev(dd);
 	return err;
 }
 
@@ -1956,9 +2030,11 @@ static void search_cb(sdp_list_t *recs, int err, gpointer user_data)
 
 	update_services(req, recs);
 
-	if (device->tmp_records)
+	if (device->tmp_records) {
 		sdp_list_free(device->tmp_records,
 					(sdp_free_func_t) sdp_record_free);
+		device->tmp_records = NULL;
+	}
 
 	device->tmp_records = req->records;
 	req->records = NULL;
@@ -2166,13 +2242,12 @@ static void primary_cb(GSList *services, guint8 status, gpointer user_data)
 	struct btd_device *device = req->device;
 	GSList *l, *uuids = NULL;
 
-	if (!req->msg)
-		goto done;
-
 	if (status) {
-		DBusMessage *reply;
-		reply = btd_error_failed(req->msg, att_ecode2str(status));
-		g_dbus_send_message(req->conn, reply);
+		if (req->msg) {
+			DBusMessage *reply;
+			reply = btd_error_failed(req->msg, att_ecode2str(status));
+			g_dbus_send_message(req->conn, reply);
+		}
 		goto done;
 	}
 
@@ -2189,7 +2264,8 @@ static void primary_cb(GSList *services, guint8 status, gpointer user_data)
 
 	g_slist_free(uuids);
 
-	create_device_reply(device, req);
+	if (req->msg)
+		create_device_reply(device, req);
 
 	store_services(device);
 
@@ -2770,7 +2846,6 @@ void device_bonding_complete(struct btd_device *device, uint8_t status)
 		bonding_request_free(bonding);
 	} else {
 		if (!device->browse && !device->discov_timer &&
-				device_get_type(device) != DEVICE_TYPE_LE &&
 				main_opts.reverse_sdp) {
 			/* If we are not initiators and there is no currently
 			 * active discovery or discovery timer, set discovery

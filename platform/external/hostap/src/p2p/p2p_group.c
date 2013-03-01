@@ -2,14 +2,8 @@
  * Wi-Fi Direct - P2P group operations
  * Copyright (c) 2009-2010, Atheros Communications
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "includes.h"
@@ -141,11 +135,10 @@ static void p2p_client_info(struct wpabuf *ie, struct p2p_group_member *m)
 static void p2p_group_add_common_ies(struct p2p_group *group,
 				     struct wpabuf *ie)
 {
-	u8 dev_capab = 0, group_capab = 0;
+	u8 dev_capab = group->p2p->dev_capab, group_capab = 0;
 
 	/* P2P Capability */
-	dev_capab |= P2P_DEV_CAPAB_SERVICE_DISCOVERY;
-	dev_capab |= P2P_DEV_CAPAB_INVITATION_PROCEDURE;
+	dev_capab &= ~P2P_DEV_CAPAB_CLIENT_DISCOVERABILITY;
 	group_capab |= P2P_GROUP_CAPAB_GROUP_OWNER;
 	if (group->cfg->persistent_group) {
 		group_capab |= P2P_GROUP_CAPAB_PERSISTENT_GROUP;
@@ -186,18 +179,9 @@ static struct wpabuf * p2p_group_build_beacon_ie(struct p2p_group *group)
 
 	len = p2p_buf_add_ie_hdr(ie);
 	p2p_group_add_common_ies(group, ie);
-#ifdef ANDROID_BRCM_P2P_PATCH
-	/* P2P_ADDR: Use p2p_dev_addr instead of own mac addr*/
-	p2p_buf_add_device_id(ie, group->p2p->cfg->p2p_dev_addr);
-#else
 	p2p_buf_add_device_id(ie, group->p2p->cfg->dev_addr);
-#endif
 	p2p_group_add_noa(ie, group->noa);
 	p2p_buf_update_ie_hdr(ie, len);
-
-#ifdef CONFIG_WFD
-	wfd_add_wfd_ie(group->p2p->cfg->cb_ctx, group->p2p->wfd, ie);
-#endif
 
 	return ie;
 }
@@ -232,6 +216,17 @@ static struct wpabuf * p2p_group_build_probe_resp_ie(struct p2p_group *group)
 		     (u8 *) wpabuf_put(ie, 0) - group_info - 3);
 
 	p2p_buf_update_ie_hdr(ie, len);
+	return ie;
+}
+
+
+static struct wpabuf * p2p_group_build_assoc_resp_ie(struct p2p_group *group)
+{
+	struct wpabuf *ie;
+
+	ie = wpabuf_alloc(100);
+	if (ie == NULL)
+		return NULL;
 
 #ifdef CONFIG_WFD
 	wfd_add_wfd_ie(group->p2p->cfg->cb_ctx, group->p2p->wfd, ie);
@@ -245,6 +240,7 @@ static void p2p_group_update_ies(struct p2p_group *group)
 {
 	struct wpabuf *beacon_ie;
 	struct wpabuf *probe_resp_ie;
+	struct wpabuf *assoc_resp_ie;
 
 	probe_resp_ie = p2p_group_build_probe_resp_ie(group);
 	if (probe_resp_ie == NULL)
@@ -261,7 +257,11 @@ static void p2p_group_update_ies(struct p2p_group *group)
 	} else
 		beacon_ie = NULL;
 
-	group->cfg->ie_update(group->cfg->cb_ctx, beacon_ie, probe_resp_ie);
+	assoc_resp_ie = p2p_group_build_assoc_resp_ie(group);
+	wpa_hexdump_buf(MSG_MSGDUMP, "P2P: Update GO Assoc Response WFD IE",
+			assoc_resp_ie);
+
+	group->cfg->ie_update(group->cfg->cb_ctx, beacon_ie, probe_resp_ie, assoc_resp_ie);
 }
 
 
@@ -504,6 +504,31 @@ int p2p_group_match_dev_type(struct p2p_group *group, struct wpabuf *wps)
 }
 
 
+int p2p_group_match_dev_id(struct p2p_group *group, struct wpabuf *p2p)
+{
+	struct p2p_group_member *m;
+	struct p2p_message msg;
+
+	os_memset(&msg, 0, sizeof(msg));
+	if (p2p_parse_p2p_ie(p2p, &msg))
+		return 1; /* Failed to parse - assume no filter on Device ID */
+
+	if (!msg.device_id)
+		return 1; /* No filter on Device ID */
+
+	if (os_memcmp(msg.device_id, group->p2p->cfg->dev_addr, ETH_ALEN) == 0)
+		return 1; /* Match with our P2P Device Address */
+
+	for (m = group->members; m; m = m->next) {
+		if (os_memcmp(msg.device_id, m->dev_addr, ETH_ALEN) == 0)
+			return 1; /* Match with group client P2P Device Address */
+	}
+
+	/* No match with Device ID */
+	return 0;
+}
+
+
 void p2p_group_notif_formation_done(struct p2p_group *group)
 {
 	if (group == NULL)
@@ -683,11 +708,9 @@ u8 p2p_group_presence_req(struct p2p_group *group,
 		wpa_hexdump(MSG_DEBUG, "P2P: Current NoA", curr_noa,
 			    curr_noa_len);
 
-#ifndef ANDROID_BRCM_P2P_PATCH
 	/* TODO: properly process request and store copy */
-	if (curr_noa_len > 0)
+	if (curr_noa_len > 0 || curr_noa_len == -1)
 		return P2P_SC_FAIL_UNABLE_TO_ACCOMMODATE;
-#endif /* ANDROID_BRCM_P2P_PATCH */
 
 	return P2P_SC_SUCCESS;
 }
@@ -727,4 +750,16 @@ int p2p_group_is_client_connected(struct p2p_group *group, const u8 *dev_addr)
 	}
 
 	return 0;
+}
+
+
+int p2p_group_is_group_id_match(struct p2p_group *group, const u8 *group_id,
+				size_t group_id_len)
+{
+	if (group_id_len != ETH_ALEN + group->cfg->ssid_len)
+		return 0;
+	if (os_memcmp(group_id, group->p2p->cfg->dev_addr, ETH_ALEN) != 0)
+		return 0;
+	return os_memcmp(group_id + ETH_ALEN, group->cfg->ssid,
+			 group->cfg->ssid_len) == 0;
 }

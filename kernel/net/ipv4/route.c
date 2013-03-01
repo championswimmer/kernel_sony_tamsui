@@ -2616,10 +2616,20 @@ static struct rtable *ip_route_output_slow(struct net *net, struct flowi4 *fl4)
 	    res.type == RTN_UNICAST && !fl4->flowi4_oif)
 		fib_select_default(&res);
 
+	/*LYZ, 2012/8/14*/
+	rth = ERR_PTR(-EINVAL);
+	dev_out = FIB_RES_DEV(res);
+	if (dev_out == NULL){
+	    printk(KERN_ERR "dev_put = NULL\n");
+		goto out;
+	}
+	
 	if (!fl4->saddr)
 		fl4->saddr = FIB_RES_PREFSRC(net, res);
 
-	dev_out = FIB_RES_DEV(res);
+	/*LYZ, 2012/8/14*/
+	//dev_out = FIB_RES_DEV(res);
+	
 	fl4->flowi4_oif = dev_out->ifindex;
 
 

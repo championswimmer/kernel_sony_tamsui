@@ -3,7 +3,6 @@
  * Portions created by Sony Ericsson are Copyright (C) 2011,
  * 2012 Sony Ericsson Mobile Communications AB.
  * All Rights Reserved.
- * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -125,8 +124,10 @@ class WebFrame : public WebCoreRefObject {
     float density() const;
 
 #if USE(CHROME_NETWORK_STACK)
+    // BU1SW1_SoMC_SS_Patches ....... begin
     const WTF::String userAgentProfile();
     void setUserAgentProfile(WTF::String userAgentProfile) { mUserAgentProfile = userAgentProfile; }
+    // BU1SW1_SoMC_SS_Patches ....... end
     void didReceiveAuthenticationChallenge(WebUrlLoaderClient*, const std::string& host, const std::string& realm, bool useCachedCredentials, bool suppressDialog);
     void reportSslCertError(WebUrlLoaderClient* client, int cert_error, const std::string& cert, const std::string& url);
     void requestClientCert(WebUrlLoaderClient* client, const std::string& hostAndPort);
@@ -180,11 +181,11 @@ class WebFrame : public WebCoreRefObject {
     bool mBlockNetworkLoads;
     bool mUserInitiatedAction;
     WebCore::RenderSkinAndroid* m_renderSkins;
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
     WTF::String mUserAgentProfile;
 #endif
-    bool mPageLoadStarted;
-    bool mCloseUnusedSocketsEnabled;
+// BU1SW1_SoMC_SS_Patches ....... end
 };
 
 }   // namespace android

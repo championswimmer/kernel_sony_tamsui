@@ -10,7 +10,7 @@ ifeq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_MSM_CAMERA) += msm_isp.o msm.o msm_mem.o msm_mctl.o msm_mctl_buf.o msm_mctl_pp.o
   obj-$(CONFIG_MSM_CAMERA) += io/ sensors/ actuators/ csi/
 else
-  obj-$(CONFIG_MSM_CAMERA) += msm_camera.o fih_cam_api.o
+  obj-$(CONFIG_MSM_CAMERA) += msm_camera.o
 endif
 obj-$(CONFIG_MSM_CAMERA) += msm_axi_qos.o gemini/
 obj-$(CONFIG_MSM_CAMERA_FLASH) += flash.o
@@ -36,13 +36,6 @@ obj-$(CONFIG_MSM_CAMERA_AF_FOXCONN) += mt9p012_fox.o
 obj-$(CONFIG_MSM_CAMERA_AF_BAM) += mt9p012_bam.o
 obj-$(CONFIG_MT9P012_KM) += mt9p012_km.o mt9p012_km_reg.o
 obj-$(CONFIG_S5K3E2FX) += s5k3e2fx.o
-#SW2D2-MM-MC-Camera-BringUpS5k5cngSensorFor2nd-00+[
-obj-$(CONFIG_S5K5CAG) += s5k5cag.o s5k5cag_reg.o s5k5cag_2nd.o s5k5cag_2nd_reg.o
-#SW2D2-MM-MC-Camera-BringUpS5k5cngSensorFor2nd-00+]
-#SW2D2-MM-MC-Camera-BringUpMt9v115Sensor-00+[
-obj-$(CONFIG_ISX006) += isx006.o isx006_reg.o
-obj-$(CONFIG_MT9V115) += mt9v115.o mt9v115_reg.o
-#SW2D2-MM-MC-Camera-BringUpMt9v115Sensor-00+]
 #FIXME: Merge the two ifeq causes VX6953 preview not coming up.
 ifneq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_VX6953) += vx6953.o vx6953_reg.o
@@ -58,6 +51,14 @@ obj-$(CONFIG_WEBCAM_OV7692) += ov7692.o
 obj-$(CONFIG_WEBCAM_OV7692_QRD) += ov7692_qrd.o
 obj-$(CONFIG_OV5640) += ov5640.o
 obj-$(CONFIG_MT9D112) += mt9d112.o mt9d112_reg.o
-
+#++ Peter - 20111019  new camera sensor for Harry & WLA & Potter
+obj-$(CONFIG_S5K5CA) += s5k5ca.o s5k5ca_reg.o
+#-- Peter - 20111019  new camera sensor for Harry & WLA & Potter
+#++ Peter - 20111226  new camera sensor for Potter+
+obj-$(CONFIG_MT9P111) += mt9p111.o mt9p111_reg.o
+#-- Peter - 20111226  new camera sensor for Potter+
+#++ Peter - 20120202  new camera front sensor for Potter+
+obj-$(CONFIG_MT9V115_FRONT) += mt9v115_front.o mt9v115_front_reg.o
+#-- Peter - 20120202  new camera front sensor for Potter+
 obj-$(CONFIG_MT9D113) += mt9d113.o mt9d113_reg.o
 obj-$(CONFIG_FB_MSM_WRITEBACK_MSM_PANEL) += wfd/

@@ -1,9 +1,11 @@
+#TPSW1_SoMC_2nd_Patches_Begin
 BUILD_INPUT := false
 ifeq ($(BUILD_INPUT),true)
-
+#TPSW1_SoMC_2nd_Patches_End
 
 LOCAL_PATH:= $(call my-dir)
 
+# HID plugin
 
 include $(CLEAR_VARS)
 
@@ -42,5 +44,6 @@ LOCAL_UNSTRIPPED_PATH := $(TARGET_OUT_SHARED_LIBRARIES_UNSTRIPPED)/bluez-plugin
 LOCAL_MODULE := input
 
 include $(BUILD_SHARED_LIBRARY)
-
+#TPSW1_SoMC_2nd_Patches_Begin
 endif
+#TPSW1_SoMC_2nd_Patches_End

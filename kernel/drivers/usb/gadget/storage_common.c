@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2003-2008 Alan Stern
  * Copyeight (C) 2009 Samsung Electronics
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  * Author: Michal Nazarewicz (m.nazarewicz@samsung.com)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -221,14 +220,11 @@ struct interrupt_data {
 #define SS_UNRECOVERED_READ_ERROR		0x031100
 #define SS_WRITE_ERROR				0x030c02
 #define SS_WRITE_PROTECTED			0x072700
-#define SS_SCSI_SENSE_OPERATION_IN_PROGRESS 0x020407  /* MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd */
-
 
 #define SK(x)		((u8) ((x) >> 16))	/* Sense Key byte, etc. */
 #define ASC(x)		((u8) ((x) >> 8))
 #define ASCQ(x)		((u8) (x))
 
-#define RANDOM_WRITE_COUNT_TO_BE_FLUSHED (5)    /* MTD-Connectivity-FY-USB_WHQL_workaround */
 
 /*-------------------------------------------------------------------------*/
 
@@ -237,10 +233,7 @@ struct fsg_lun {
 	struct file	*filp;
 	loff_t		file_length;
 	loff_t		num_sectors;
-	
-    u8		random_write_count;    /* MTD-Connectivity-FY-USB_WHQL_workaround */
-    loff_t		last_offset;       /* MTD-Connectivity-FY-USB_WHQL_workaround */
-	
+
 	unsigned int	initially_ro:1;
 	unsigned int	ro:1;
 	unsigned int	removable:1;
@@ -249,9 +242,6 @@ struct fsg_lun {
 	unsigned int	registered:1;
 	unsigned int	info_valid:1;
 	unsigned int	nofua:1;
-
-	u8		shift_size;//MTD-CONN-EH-PCCOMPANION-01+
-	u8      attached_external_storage; /* MTD_Connectivity_FY_USB-IF_S3/4_resuming_workaourd */
 
 	u32		sense_data;
 	u32		sense_data_info;
@@ -566,8 +556,6 @@ static int fsg_lun_open(struct fsg_lun *curlun, const char *filename)
 	loff_t				min_sectors;
 
 	/* R/W if we can, R/O if we must */
-	printk(KERN_INFO "%s Start\n", __func__);
-
 	ro = curlun->initially_ro;
 	if (!ro) {
 		filp = filp_open(filename, O_RDWR | O_LARGEFILE, 0);
@@ -608,22 +596,13 @@ static int fsg_lun_open(struct fsg_lun *curlun, const char *filename)
 		rc = (int) size;
 		goto out;
 	}
-	//MTD-CONN-EH-PCCOMPANION-01-num_sectors = size >> 9;	/* File size in 512-byte blocks */
-        /* File size in 512 or 2048(cdrom) -byte blocks */
-	num_sectors = size >> curlun->shift_size;//MTD-CONN-EH-PCCOMPANION-01+
+	num_sectors = size >> 9;	/* File size in 512-byte blocks */
 	min_sectors = 1;
 	if (curlun->cdrom) {
-                //MTD-CONN-EH-PCCOMPANION-02*{
-                #if 0
 		num_sectors &= ~3;	/* Reduce to a multiple of 2048 */
 		min_sectors = 300*4;	/* Smallest track is 300 frames */
 		if (num_sectors >= 256*60*75*4) {
 			num_sectors = (256*60*75 - 1) * 4;
-                #endif
-                min_sectors = 300;	/* Smallest track is 300 frames */
-		if (num_sectors >= 256*60*75) {
-			num_sectors = 256*60*75 - 1;
-                //MTD-CONN-EH-PCCOMPANION-02*}
 			LINFO(curlun, "file too big: %s\n", filename);
 			LINFO(curlun, "using only first %d blocks\n",
 					(int) num_sectors);
@@ -640,7 +619,6 @@ static int fsg_lun_open(struct fsg_lun *curlun, const char *filename)
 	curlun->filp = filp;
 	curlun->file_length = size;
 	curlun->num_sectors = num_sectors;
-	printk(KERN_INFO "%s(): open backing file: %s\n\n", __func__, filename);
 	LDBG(curlun, "open backing file: %s\n", filename);
 	rc = 0;
 
@@ -656,9 +634,6 @@ static void fsg_lun_close(struct fsg_lun *curlun)
 		LDBG(curlun, "close backing file\n");
 		fput(curlun->filp);
 		curlun->filp = NULL;
-		curlun->last_offset = 0;        /* MTD-Connectivity-FY-USB_WHQL_workaround++ */
-		curlun->random_write_count = 0; /* MTD-Connectivity-FY-USB_WHQL_workaround++ */
-		printk(KERN_INFO "%s(): closed backing file\n", __func__);
 	}
 }
 
@@ -672,19 +647,10 @@ static void fsg_lun_close(struct fsg_lun *curlun)
 static int fsg_lun_fsync_sub(struct fsg_lun *curlun)
 {
 	struct file	*filp = curlun->filp;
-	int rc = 0;  /* MTD-Connectivity-FY-USB_WHQL_workaround */
 
 	if (curlun->ro || !filp)
 		return 0;
-    /* MTD-Connectivity-FY-USB_WHQL_workaround++ */
-	rc = vfs_fsync(filp, 1);
-    if (!rc) {
-		curlun->last_offset = 0;
-		curlun->random_write_count = 0;
-	}
-	/* MTD-Connectivity-FY-USB_WHQL_workaround-- */
-	
-	return rc;
+	return vfs_fsync(filp, 1);
 }
 
 static void store_cdrom_address(u8 *dest, int msf, u32 addr)
@@ -850,24 +816,23 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
 	int		rc = 0;
 
-	printk(KERN_INFO "%s(): Start\n", __func__);
-
+// << FerryWu, 2012/06/25, prevent failure to unshare usbms in ubuntu
+#if 0
 #ifndef CONFIG_USB_ANDROID_MASS_STORAGE
 	/* disabled in android because we need to allow closing the backing file
 	 * if the media was removed
 	 */
 	if (curlun->prevent_medium_removal && fsg_lun_is_open(curlun)) {
-		printk(KERN_INFO "%s(): eject attempt prevented\n", __func__);
 		LDBG(curlun, "eject attempt prevented\n");
 		return -EBUSY;				/* "Door is locked" */
 	}
 #endif
+#endif
+// >> FerryWu, 2012/06/25, prevent failure to unshare usbms in ubuntu
 
 	/* Remove a trailing newline */
-	if (count > 0 && buf[count-1] == '\n') {
+	if (count > 0 && buf[count-1] == '\n')
 		((char *) buf)[count-1] = 0;		/* Ugh! */
-		printk(KERN_INFO "%s(): buf = %s\n", __func__, buf);
-	}
 
 	/* Eject current medium */
 	down_write(filesem);
@@ -886,3 +851,43 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	up_write(filesem);
 	return (rc < 0 ? rc : count);
 }
+
+// << FerryWu, 2012/08/05, support PC Companion
+static ssize_t fsg_show_cdrom(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
+
+	return sprintf(buf, "%d\n", curlun->cdrom);
+}
+
+static ssize_t fsg_store_cdrom(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	ssize_t		rc;
+	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
+	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
+	unsigned	cdrom;
+
+	rc = kstrtouint(buf, 2, &cdrom);
+	if (rc)
+		return rc;
+
+	/*
+	 * Allow the write-enable status to change only while the
+	 * backing file is closed.
+	 */
+	down_read(filesem);
+	if (fsg_lun_is_open(curlun)) {
+		LDBG(curlun, "cdrom status change prevented\n");
+		rc = -EBUSY;
+	} else {
+		curlun->cdrom = cdrom;
+		LDBG(curlun, "cdrom status set to %d\n", curlun->cdrom);
+		rc = count;
+	}
+	up_read(filesem);
+	return rc;
+}
+// >> FerryWu, 2012/08/05, support PC Companion
+

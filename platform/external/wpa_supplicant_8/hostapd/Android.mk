@@ -1,13 +1,14 @@
 LOCAL_PATH := $(call my-dir)
 
 WPA_BUILD_HOSTAPD := false
+#TPSW1_SoMC_2nd_Patches_Begin
 ifneq ($(HOSTAPD_VERSION),VER_0_8_X_BCM)
 ifneq ($(BOARD_HOSTAPD_DRIVER),)
   WPA_BUILD_HOSTAPD := true
   CONFIG_DRIVER_$(BOARD_HOSTAPD_DRIVER) := y
 endif
 endif
-
+#TPSW1_SoMC_2nd_Patches_End
 ifeq ($(WPA_BUILD_HOSTAPD),true)
 
 include $(LOCAL_PATH)/.config

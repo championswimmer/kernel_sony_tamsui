@@ -30,6 +30,7 @@
 #include "selinux.h"
 #include <dbus/dbus-list.h>
 #include <dbus/dbus-internals.h>
+#include <dbus/dbus-sysdeps.h>
 #include <string.h>
 
 typedef enum
@@ -689,12 +690,12 @@ start_busconfig_child (BusConfigParser   *parser,
 
       return TRUE;
     }
-  else if (element_type == ELEMENT_TYPE)
+  else if (element_type == ELEMENT_CONFIGTYPE)
     {
       if (!check_no_attributes (parser, "type", attribute_names, attribute_values, error))
         return FALSE;
 
-      if (push_element (parser, ELEMENT_TYPE) == NULL)
+      if (push_element (parser, ELEMENT_CONFIGTYPE) == NULL)
         {
           BUS_SET_OOM (error);
           return FALSE;
@@ -1222,97 +1223,96 @@ append_rule_from_element (BusConfigParser   *parser,
    * Pretty sure the below stuff is broken, FIXME think about it more.
    */
 
-  if (((send_interface && send_error) ||
-       (send_interface && receive_interface) ||
-       (send_interface && receive_member) ||
-       (send_interface && receive_error) ||
-       (send_interface && receive_sender) ||
-       (send_interface && receive_requested_reply) ||
-       (send_interface && own) ||
-       (send_interface && user) ||
-       (send_interface && group)) ||
+  if ((send_interface && (send_error ||
+                          receive_interface ||
+                          receive_member ||
+                          receive_error ||
+                          receive_sender ||
+                          receive_requested_reply ||
+                          own ||
+                          user ||
+                          group)) ||
 
-      ((send_member && send_error) ||
-       (send_member && receive_interface) ||
-       (send_member && receive_member) ||
-       (send_member && receive_error) ||
-       (send_member && receive_sender) ||
-       (send_member && receive_requested_reply) ||
-       (send_member && own) ||
-       (send_member && user) ||
-       (send_member && group)) ||
-      
-      ((send_error && receive_interface) ||
-       (send_error && receive_member) ||
-       (send_error && receive_error) ||
-       (send_error && receive_sender) ||
-       (send_error && receive_requested_reply) ||
-       (send_error && own) ||
-       (send_error && user) ||
-       (send_error && group)) ||
+      (send_member && (send_error ||
+                       receive_interface ||
+                       receive_member ||
+                       receive_error ||
+                       receive_sender ||
+                       receive_requested_reply ||
+                       own ||
+                       user ||
+                       group)) ||
 
-      ((send_destination && receive_interface) ||
-       (send_destination && receive_member) ||
-       (send_destination && receive_error) ||
-       (send_destination && receive_sender) ||
-       (send_destination && receive_requested_reply) ||
-       (send_destination && own) ||
-       (send_destination && user) ||
-       (send_destination && group)) ||
+      (send_error && (receive_interface ||
+                      receive_member ||
+                      receive_error ||
+                      receive_sender ||
+                      receive_requested_reply ||
+                      own ||
+                      user ||
+                      group)) ||
 
-      ((send_type && receive_interface) ||
-       (send_type && receive_member) ||
-       (send_type && receive_error) ||
-       (send_type && receive_sender) ||
-       (send_type && receive_requested_reply) ||
-       (send_type && own) ||
-       (send_type && user) ||
-       (send_type && group)) ||
+      (send_destination && (receive_interface ||
+                            receive_member ||
+                            receive_error ||
+                            receive_sender ||
+                            receive_requested_reply ||
+                            own ||
+                            user ||
+                            group)) ||
 
-      ((send_path && receive_interface) ||
-       (send_path && receive_member) ||
-       (send_path && receive_error) ||
-       (send_path && receive_sender) ||
-       (send_path && receive_requested_reply) ||
-       (send_path && own) ||
-       (send_path && user) ||
-       (send_path && group)) ||
+      (send_type && (receive_interface ||
+                     receive_member ||
+                     receive_error ||
+                     receive_sender ||
+                     receive_requested_reply ||
+                     own ||
+                     user ||
+                     group)) ||
 
-      ((send_requested_reply && receive_interface) ||
-       (send_requested_reply && receive_member) ||
-       (send_requested_reply && receive_error) ||
-       (send_requested_reply && receive_sender) ||
-       (send_requested_reply && receive_requested_reply) ||
-       (send_requested_reply && own) ||
-       (send_requested_reply && user) ||
-       (send_requested_reply && group)) ||
-      
-      ((receive_interface && receive_error) ||
-       (receive_interface && own) ||
-       (receive_interface && user) ||
-       (receive_interface && group)) ||
+      (send_path && (receive_interface ||
+                     receive_member ||
+                     receive_error ||
+                     receive_sender ||
+                     receive_requested_reply ||
+                     own ||
+                     user ||
+                     group)) ||
 
-      ((receive_member && receive_error) ||
-       (receive_member && own) ||
-       (receive_member && user) ||
-       (receive_member && group)) ||
-      
-      ((receive_error && own) ||
-       (receive_error && user) ||
-       (receive_error && group)) ||
+      (send_requested_reply && (receive_interface ||
+                                receive_member ||
+                                receive_error ||
+                                receive_sender ||
+                                receive_requested_reply ||
+                                own ||
+                                user ||
+                                group)) ||
 
-      ((eavesdrop && own) ||
-       (eavesdrop && user) ||
-       (eavesdrop && group)) ||
+      (receive_interface && (receive_error ||
+                             own ||
+                             user ||
+                             group)) ||
 
-      ((receive_requested_reply && own) ||
-       (receive_requested_reply && user) ||
-       (receive_requested_reply && group)) ||
-      
-      ((own && user) ||
-       (own && group)) ||
+      (receive_member && (receive_error ||
+                          own ||
+                          user ||
+                          group)) ||
 
-      ((user && group)))
+      (receive_error && (own ||
+                         user ||
+                         group)) ||
+
+      (eavesdrop && (own ||
+                     user ||
+                     group)) ||
+
+      (receive_requested_reply && (own ||
+                                   user ||
+                                   group)) ||
+
+      (own && (user || group)) ||
+
+      (user && group))
     {
       dbus_set_error (error, DBUS_ERROR_FAILED,
                       "Invalid combination of attributes on element <%s>",
@@ -2001,7 +2001,7 @@ bus_config_parser_end_element (BusConfigParser   *parser,
 
     case ELEMENT_INCLUDE:
     case ELEMENT_USER:
-    case ELEMENT_TYPE:
+    case ELEMENT_CONFIGTYPE:
     case ELEMENT_LISTEN:
     case ELEMENT_PIDFILE:
     case ELEMENT_AUTH:
@@ -2236,8 +2236,19 @@ include_dir (BusConfigParser   *parser,
         {
           if (!include_file (parser, &full_path, TRUE, error))
             {
-              _dbus_string_free (&full_path);
-              goto failed;
+              if (dbus_error_is_set (error))
+                {
+                  /* We log to syslog unconditionally here, because this is
+                   * the configuration parser, so we don't yet know whether
+                   * this bus is going to want to write to syslog! (There's
+                   * also some layer inversion going on, if we want to use
+                   * the bus context.) */
+                  _dbus_system_log (DBUS_SYSTEM_LOG_INFO,
+                                    "Encountered error '%s' while parsing '%s'\n",
+                                    error->message,
+                                    _dbus_string_get_const_data (&full_path));
+                  dbus_error_free (error);
+                }
             }
         }
 
@@ -2460,7 +2471,7 @@ bus_config_parser_content (BusConfigParser   *parser,
       }
       break;
 
-    case ELEMENT_TYPE:
+    case ELEMENT_CONFIGTYPE:
       {
         char *s;
 
@@ -3241,14 +3252,14 @@ process_test_equiv_subdir (const DBusString *test_base_dir,
 static const char *test_session_service_dir_matches[] = 
         {
 #ifdef DBUS_UNIX
+         "/testhome/foo/.testlocal/testshare/dbus-1/services",
          "/testusr/testlocal/testshare/dbus-1/services",
          "/testusr/testshare/dbus-1/services",
-#endif
          DBUS_DATADIR"/dbus-1/services",
-#ifdef DBUS_UNIX
-         "/testhome/foo/.testlocal/testshare/dbus-1/services",
 #endif
+/* will be filled in test_default_session_servicedirs() */
 #ifdef DBUS_WIN
+         NULL,
          NULL,
 #endif
          NULL
@@ -3262,6 +3273,16 @@ test_default_session_servicedirs (void)
   DBusString progs;
   const char *common_progs;
   int i;
+
+#ifdef DBUS_WIN
+  char buffer[1024];
+  if (_dbus_get_install_root(buffer, sizeof(buffer)))
+    {
+      strcat(buffer,DBUS_DATADIR);
+      strcat(buffer,"/dbus-1/services");
+      test_session_service_dir_matches[0] = buffer;
+    }
+#endif
 
   /* On Unix we don't actually use this variable, but it's easier to handle the
    * deallocation if we always allocate it, whether needed or not */
@@ -3374,6 +3395,10 @@ static const char *test_system_service_dir_matches[] =
          "/testusr/testshare/dbus-1/system-services",
 #endif
          DBUS_DATADIR"/dbus-1/system-services",
+#ifdef DBUS_UNIX
+         "/lib/dbus-1/system-services",
+#endif
+
 #ifdef DBUS_WIN
          NULL,
 #endif

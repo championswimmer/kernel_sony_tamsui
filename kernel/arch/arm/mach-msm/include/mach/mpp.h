@@ -53,6 +53,9 @@ enum {
 /* Use mpp number starting from 0 */
 int mpp_config_digital_out(unsigned mpp, unsigned config);
 int mpp_config_digital_in(unsigned mpp, unsigned config);
+/*++ Huize - 20120329 Add for button backlight is controlled by mpp ++*/
+int mpp_config_i_sink(unsigned mpp, unsigned config);
+/*-- Huize - 20120329 Add for button backlight is controlled by mpp --*/
 
 /* PM8058/PM8901 definitions */
 

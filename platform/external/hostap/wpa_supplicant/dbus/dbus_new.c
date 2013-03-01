@@ -4,14 +4,8 @@
  * Copyright (c) 2009-2010, Witold Sowa <witold.sowa@gmail.com>
  * Copyright (c) 2009, Jouni Malinen <j@w1.fi>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * Alternatively, this software may be distributed under the terms of BSD
- * license.
- *
- * See README and COPYING for more details.
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
  */
 
 #include "includes.h"
@@ -867,7 +861,7 @@ void wpas_dbus_signal_p2p_provision_discovery(struct wpa_supplicant *wpa_s,
 		return;
 
 	/* Check if this is a known peer */
-	if (p2p_get_peer_info(wpa_s->global->p2p, dev_addr, 0, NULL, 0) < 0)
+	if (!p2p_peer_known(wpa_s->global->p2p, dev_addr))
 		goto error;
 
 	os_snprintf(peer_obj_path, WPAS_DBUS_OBJECT_PATH_MAX,
@@ -1044,34 +1038,117 @@ nomem:
  * on status.
  * @status: Status of the GO neg request. 0 for success, other for errors.
  */
-void wpas_dbus_signal_p2p_go_neg_resp(struct wpa_supplicant *wpa_s, int status)
+void wpas_dbus_signal_p2p_go_neg_resp(struct wpa_supplicant *wpa_s,
+				      struct p2p_go_neg_results *res)
 {
 	DBusMessage *msg;
-	DBusMessageIter iter;
+	DBusMessageIter iter, dict_iter;
+	DBusMessageIter iter_dict_entry, iter_dict_val, iter_dict_array;
 	struct wpas_dbus_priv *iface;
+	char peer_obj_path[WPAS_DBUS_OBJECT_PATH_MAX], *path;
+	dbus_int32_t freqs[P2P_MAX_CHANNELS];
+	dbus_int32_t *f_array = freqs;
+
 
 	iface = wpa_s->global->dbus;
 
+	os_memset(freqs, 0, sizeof(freqs));
 	/* Do nothing if the control interface is not turned on */
 	if (iface == NULL)
 		return;
 
+	os_snprintf(peer_obj_path, WPAS_DBUS_OBJECT_PATH_MAX,
+		    "%s/" WPAS_DBUS_NEW_P2P_PEERS_PART "/" COMPACT_MACSTR,
+		    wpa_s->dbus_new_path, MAC2STR(res->peer_device_addr));
+	path = peer_obj_path;
+
 	msg = dbus_message_new_signal(wpa_s->dbus_new_path,
 				      WPAS_DBUS_NEW_IFACE_P2PDEVICE,
-				      status ? "GONegotiationFailure" :
-					       "GONegotiationSuccess");
+				      res->status ? "GONegotiationFailure" :
+						    "GONegotiationSuccess");
 	if (msg == NULL)
 		return;
 
-	if (status) {
-		dbus_message_iter_init_append(msg, &iter);
-		if (!dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32,
-						    &status)) {
-			wpa_printf(MSG_ERROR,
-				   "dbus: Failed to construct signal");
-			goto err;
+	dbus_message_iter_init_append(msg, &iter);
+	if (!wpa_dbus_dict_open_write(&iter, &dict_iter))
+		goto err;
+	if (!wpa_dbus_dict_append_object_path(&dict_iter, "peer_object",
+					      path) ||
+	    !wpa_dbus_dict_append_int32(&dict_iter, "status", res->status))
+		goto err;
+
+	if (!res->status) {
+		int i = 0;
+		int freq_list_num = 0;
+
+		if (res->role_go) {
+			if (!wpa_dbus_dict_append_byte_array(
+				    &dict_iter, "passphrase",
+				    (const char *) res->passphrase,
+				    sizeof(res->passphrase)))
+				goto err;
 		}
+
+		if (!wpa_dbus_dict_append_string(&dict_iter, "role_go",
+						 res->role_go ? "GO" :
+						 "client") ||
+		    !wpa_dbus_dict_append_int32(&dict_iter, "frequency",
+						res->freq) ||
+		    !wpa_dbus_dict_append_byte_array(&dict_iter, "ssid",
+						     (const char *) res->ssid,
+						     res->ssid_len) ||
+		    !wpa_dbus_dict_append_byte_array(&dict_iter,
+						     "peer_device_addr",
+						     (const char *)
+						     res->peer_device_addr,
+						     ETH_ALEN) ||
+		    !wpa_dbus_dict_append_byte_array(&dict_iter,
+						     "peer_interface_addr",
+						     (const char *)
+						     res->peer_interface_addr,
+						     ETH_ALEN) ||
+		    !wpa_dbus_dict_append_string(&dict_iter, "wps_method",
+						 p2p_wps_method_text(
+							 res->wps_method)))
+			goto err;
+
+		for (i = 0; i < P2P_MAX_CHANNELS; i++) {
+			if (res->freq_list[i]) {
+				freqs[i] = res->freq_list[i];
+				freq_list_num++;
+			}
+		}
+
+		if (!wpa_dbus_dict_begin_array(&dict_iter,
+					       "frequency_list",
+					       DBUS_TYPE_INT32_AS_STRING,
+					       &iter_dict_entry,
+					       &iter_dict_val,
+					       &iter_dict_array))
+			goto err;
+
+		if (!dbus_message_iter_append_fixed_array(&iter_dict_array,
+							  DBUS_TYPE_INT32,
+							  &f_array,
+							  freq_list_num))
+			goto err;
+
+		if (!wpa_dbus_dict_end_array(&dict_iter,
+					     &iter_dict_entry,
+					     &iter_dict_val,
+					     &iter_dict_array))
+			goto err;
+
+		if (!wpa_dbus_dict_append_int32(&dict_iter, "persistent_group",
+						res->persistent_group) ||
+		    !wpa_dbus_dict_append_uint32(&dict_iter,
+						 "peer_config_timeout",
+						 res->peer_config_timeout))
+			goto err;
 	}
+
+	if (!wpa_dbus_dict_close_write(&iter, &dict_iter))
+		goto err;
 
 	dbus_connection_send(iface->con, msg, NULL);
 err:
@@ -1274,7 +1351,7 @@ void wpas_dbus_signal_p2p_sd_request(struct wpa_supplicant *wpa_s,
 		return;
 
 	/* Check if this is a known peer */
-	if (p2p_get_peer_info(wpa_s->global->p2p, sa, 0, NULL, 0) < 0)
+	if (!p2p_peer_known(wpa_s->global->p2p, sa))
 		goto error;
 
 	os_snprintf(peer_obj_path, WPAS_DBUS_OBJECT_PATH_MAX,
@@ -1343,7 +1420,7 @@ void wpas_dbus_signal_p2p_sd_response(struct wpa_supplicant *wpa_s,
 		return;
 
 	/* Check if this is a known peer */
-	if (p2p_get_peer_info(wpa_s->global->p2p, sa, 0, NULL, 0) < 0)
+	if (!p2p_peer_known(wpa_s->global->p2p, sa))
 		goto error;
 
 	os_snprintf(peer_obj_path, WPAS_DBUS_OBJECT_PATH_MAX,
@@ -2472,6 +2549,10 @@ static const struct wpa_dbus_property_desc wpas_dbus_interface_properties[] = {
 	  wpas_dbus_getter_networks,
 	  NULL
 	},
+	{ "FastReauth", WPAS_DBUS_NEW_IFACE_INTERFACE, "b",
+	  wpas_dbus_getter_fast_reauth,
+	  wpas_dbus_setter_fast_reauth
+	},
 #ifdef CONFIG_WPS
 	{ "ProcessCredentials", WPAS_DBUS_NEW_IFACE_WPS, "b",
 	  wpas_dbus_getter_process_credentials,
@@ -2810,8 +2891,36 @@ int wpas_dbus_unregister_interface(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_P2P
 
 static const struct wpa_dbus_property_desc wpas_dbus_p2p_peer_properties[] = {
-	{ "Properties", WPAS_DBUS_NEW_IFACE_P2P_PEER, "a{sv}",
-	  wpas_dbus_getter_p2p_peer_properties,
+	{ "DeviceName", WPAS_DBUS_NEW_IFACE_P2P_PEER, "s",
+	  wpas_dbus_getter_p2p_peer_device_name,
+	  NULL
+	},
+	{ "PrimaryDeviceType", WPAS_DBUS_NEW_IFACE_P2P_PEER, "ay",
+	  wpas_dbus_getter_p2p_peer_primary_device_type,
+	  NULL
+	},
+	{ "config_method", WPAS_DBUS_NEW_IFACE_P2P_PEER, "q",
+	  wpas_dbus_getter_p2p_peer_config_method,
+	  NULL
+	},
+	{ "level", WPAS_DBUS_NEW_IFACE_P2P_PEER, "i",
+	  wpas_dbus_getter_p2p_peer_level,
+	  NULL
+	},
+	{ "devicecapability", WPAS_DBUS_NEW_IFACE_P2P_PEER, "y",
+	  wpas_dbus_getter_p2p_peer_device_capability,
+	  NULL
+	},
+	{ "groupcapability", WPAS_DBUS_NEW_IFACE_P2P_PEER, "y",
+	  wpas_dbus_getter_p2p_peer_group_capability,
+	  NULL
+	},
+	{ "SecondaryDeviceTypes", WPAS_DBUS_NEW_IFACE_P2P_PEER, "aay",
+	  wpas_dbus_getter_p2p_peer_secondary_device_types,
+	  NULL
+	},
+	{ "VendorExtension", WPAS_DBUS_NEW_IFACE_P2P_PEER, "aay",
+	  wpas_dbus_getter_p2p_peer_vendor_extension,
 	  NULL
 	},
 	{ "IEs", WPAS_DBUS_NEW_IFACE_P2P_PEER, "ay",
@@ -3011,10 +3120,37 @@ static const struct wpa_dbus_property_desc wpas_dbus_p2p_group_properties[] = {
 	  wpas_dbus_getter_p2p_group_members,
 	  NULL
 	},
-	{ "Properties",
-	  WPAS_DBUS_NEW_IFACE_P2P_GROUP, "a{sv}",
-	  wpas_dbus_getter_p2p_group_properties,
-	  wpas_dbus_setter_p2p_group_properties
+	{ "Group", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "o",
+	  wpas_dbus_getter_p2p_group,
+	  NULL
+	},
+	{ "Role", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "s",
+	  wpas_dbus_getter_p2p_role,
+	  NULL
+	},
+	{ "SSID", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "ay",
+	  wpas_dbus_getter_p2p_group_ssid,
+	  NULL
+	},
+	{ "BSSID", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "ay",
+	  wpas_dbus_getter_p2p_group_bssid,
+	  NULL
+	},
+	{ "Frequency", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "q",
+	  wpas_dbus_getter_p2p_group_frequency,
+	  NULL
+	},
+	{ "Passphrase", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "s",
+	  wpas_dbus_getter_p2p_group_passphrase,
+	  NULL
+	},
+	{ "PSK", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "ay",
+	  wpas_dbus_getter_p2p_group_psk,
+	  NULL
+	},
+	{ "WPSVendorExtensions", WPAS_DBUS_NEW_IFACE_P2P_GROUP, "aay",
+	  wpas_dbus_getter_p2p_group_vendor_ext,
+	  wpas_dbus_setter_p2p_group_vendor_ext
 	},
 	{ NULL, NULL, NULL, NULL, NULL }
 };
@@ -3136,10 +3272,6 @@ void wpas_dbus_unregister_p2p_group(struct wpa_supplicant *wpa_s,
 
 static const struct wpa_dbus_property_desc
 wpas_dbus_p2p_groupmember_properties[] = {
-	{ "Properties", WPAS_DBUS_NEW_IFACE_P2P_GROUPMEMBER, "a{sv}",
-	  wpas_dbus_getter_p2p_group_properties,
-	  NULL
-	},
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 

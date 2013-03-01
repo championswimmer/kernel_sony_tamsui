@@ -108,4 +108,4 @@ int ath_deinit(void);
 #ifdef CONFIG_BT_HCIUART_IBS
 int ibs_init(void);
 int ibs_deinit(void);
-#endif 
+#endif

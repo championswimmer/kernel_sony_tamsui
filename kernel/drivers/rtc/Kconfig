@@ -5,15 +5,17 @@
 config RTC_LIB
 	bool
 
+# /*++ Huize - 20111201 config RTC_CLASS default from n to y ++*/
 menuconfig RTC_CLASS
 	bool "Real Time Clock"
-	default n
+	default y
 	depends on !S390
 	select RTC_LIB
 	help
 	  Generic RTC class support. If you say yes here, you will
  	  be allowed to plug one or more RTCs to your system. You will
 	  probably want to enable one or more of the interfaces below.
+# /*-- Huize - 20111201 config RTC_CLASS default from n to y --*/
 
 if RTC_CLASS
 

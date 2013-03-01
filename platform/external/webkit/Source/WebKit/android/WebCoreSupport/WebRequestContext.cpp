@@ -95,7 +95,7 @@ void WebRequestContext::setUserAgent(const String& string)
     MutexLocker lock(m_userAgentMutex);
     m_userAgent = string.utf8().data();
 }
-
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
 void WebRequestContext::setUserAgentProfile(const String& string)
 {
@@ -103,7 +103,7 @@ void WebRequestContext::setUserAgentProfile(const String& string)
     m_userAgentProfile = string.utf8().data();
 }
 #endif
-
+// BU1SW1_SoMC_SS_Patches ....... end
 void WebRequestContext::setCacheMode(int mode)
 {
     m_cacheMode = mode;
@@ -119,7 +119,7 @@ const std::string& WebRequestContext::GetUserAgent(const GURL& url) const
     MutexLocker lock(m_userAgentMutex);
     return m_userAgent;
 }
-
+// BU1SW1_SoMC_SS_Patches ....... begin
 #if USE(CHROME_NETWORK_STACK)
 const std::string& WebRequestContext::GetUserAgentProfile() const
 {
@@ -127,7 +127,7 @@ const std::string& WebRequestContext::GetUserAgentProfile() const
     return m_userAgentProfile;
 }
 #endif
-
+// BU1SW1_SoMC_SS_Patches ....... end
 void WebRequestContext::setAcceptLanguage(const String& string)
 {
     MutexLocker lock(acceptLanguageMutex);

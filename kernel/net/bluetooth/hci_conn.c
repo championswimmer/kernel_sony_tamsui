@@ -44,38 +44,102 @@
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
+#include <net/bluetooth/l2cap.h>
 
-static void hci_le_connect(struct hci_conn *conn)
+struct hci_conn *hci_le_connect(struct hci_dev *hdev, __u16 pkt_type,
+				bdaddr_t *dst, __u8 sec_level, __u8 auth_type,
+				struct bt_le_params *le_params)
 {
-	struct hci_dev *hdev = conn->hdev;
+	struct hci_conn *le;
 	struct hci_cp_le_create_conn cp;
+	struct adv_entry *entry;
+	struct link_key *key;
 
-	BT_DBG("%p", conn);
+	BT_DBG("%p", hdev);
 
-	conn->state = BT_CONNECT;
-	conn->out = 1;
-	conn->link_mode |= HCI_LM_MASTER;
-	conn->sec_level = BT_SECURITY_LOW;
-	conn->type = LE_LINK;
+	le = hci_conn_hash_lookup_ba(hdev, LE_LINK, dst);
+	if (le) {
+		hci_conn_hold(le);
+		return le;
+	}
+
+	key = hci_find_link_key_type(hdev, dst, KEY_TYPE_LTK);
+	if (!key) {
+		entry = hci_find_adv_entry(hdev, dst);
+		if (entry)
+			le = hci_le_conn_add(hdev, dst,
+					entry->bdaddr_type);
+		else
+			le = hci_le_conn_add(hdev, dst, 0);
+	} else {
+		le = hci_le_conn_add(hdev, dst, key->addr_type);
+	}
+
+	if (!le)
+		return ERR_PTR(-ENOMEM);
+
+	hci_conn_hold(le);
+
+	le->state = BT_CONNECT;
+	le->out = 1;
+	le->link_mode |= HCI_LM_MASTER;
+	le->sec_level = BT_SECURITY_LOW;
+	le->type = LE_LINK;
 
 	memset(&cp, 0, sizeof(cp));
-	cp.scan_interval = cpu_to_le16(0x0004);
-	cp.scan_window = cpu_to_le16(0x0004);
-	bacpy(&cp.peer_addr, &conn->dst);
-	cp.peer_addr_type = conn->dst_type;
-	cp.conn_interval_min = cpu_to_le16(0x0008);
-	cp.conn_interval_max = cpu_to_le16(0x0100);
-	cp.supervision_timeout = cpu_to_le16(1000);
-	cp.min_ce_len = cpu_to_le16(0x0001);
-	cp.max_ce_len = cpu_to_le16(0x0001);
+	if (l2cap_sock_le_params_valid(le_params)) {
+		cp.supervision_timeout =
+				cpu_to_le16(le_params->supervision_timeout);
+		cp.scan_interval = cpu_to_le16(le_params->scan_interval);
+		cp.scan_window = cpu_to_le16(le_params->scan_window);
+		cp.conn_interval_min = cpu_to_le16(le_params->interval_min);
+		cp.conn_interval_max = cpu_to_le16(le_params->interval_max);
+		cp.conn_latency = cpu_to_le16(le_params->latency);
+		cp.min_ce_len = cpu_to_le16(le_params->min_ce_len);
+		cp.max_ce_len = cpu_to_le16(le_params->max_ce_len);
+		le->conn_timeout = le_params->conn_timeout;
+	} else {
+		cp.supervision_timeout = cpu_to_le16(BT_LE_SUP_TO_DEFAULT);
+		cp.scan_interval = cpu_to_le16(BT_LE_SCAN_INTERVAL_DEF);
+		cp.scan_window = cpu_to_le16(BT_LE_SCAN_WINDOW_DEF);
+		cp.conn_interval_min = cpu_to_le16(BT_LE_CONN_INTERVAL_MIN_DEF);
+		cp.conn_interval_max = cpu_to_le16(BT_LE_CONN_INTERVAL_MAX_DEF);
+		cp.conn_latency = cpu_to_le16(BT_LE_LATENCY_DEF);
+		le->conn_timeout = 5;
+	}
+	bacpy(&cp.peer_addr, &le->dst);
+	cp.peer_addr_type = le->dst_type;
 
 	hci_send_cmd(hdev, HCI_OP_LE_CREATE_CONN, sizeof(cp), &cp);
+
+	return le;
 }
+EXPORT_SYMBOL(hci_le_connect);
 
 static void hci_le_connect_cancel(struct hci_conn *conn)
 {
 	hci_send_cmd(conn->hdev, HCI_OP_LE_CREATE_CONN_CANCEL, 0, NULL);
 }
+
+/*Arima AlvinChen 20120824 add for A2DP&OPP issue ++++++++++++++++++++*/
+static inline bool is_role_switch_possible(struct hci_dev *hdev)
+{
+	if (hci_conn_hash_lookup_state(hdev, ACL_LINK, BT_CONNECTED))
+		return false;
+	return true;
+}
+/*Arima AlvinChen 20120821 add for HFP&OPP issue ++++++++++++*/
+/*static inline bool is_sco_active(struct hci_dev *hdev)
+{
+       if (hci_conn_hash_lookup_state(hdev, SCO_LINK, BT_CONNECTED) ||
+	   	(hci_conn_hash_lookup_state(hdev, ESCO_LINK, 
+	   	BT_CONNECTED)))
+	   	return true;
+	   return false;
+}
+*/
+/*Arima AlvinChen 20120821 add for HFP&OPP issue ---------------*/
+/*Arima AlvinChen 20120824 add for A2DP&OPP issue --------------------------*/
 
 void hci_acl_connect(struct hci_conn *conn)
 {
@@ -112,8 +176,16 @@ void hci_acl_connect(struct hci_conn *conn)
 	}
 
 	cp.pkt_type = cpu_to_le16(conn->pkt_type);
-	if (lmp_rswitch_capable(hdev) && !(hdev->link_mode & HCI_LM_MASTER))
+  	/*Arima AlvinChen 20120824 add for A2DP&OPP issue +++++++++++++++++++++++++++++*/
+	if (lmp_rswitch_capable(hdev) && !(hdev->link_mode & HCI_LM_MASTER) && is_role_switch_possible(hdev))
+	{
+	/*Arima AlvinChen 20120821 add for HFP&OPP issue +++++++++++++++*/
+	//if (lmp_rswitch_capable(hdev) && !(hdev->link_mode & HCI_LM_MASTER)) //modify for HFP&OPP issue
+	//if (lmp_rswitch_capable(hdev) && !(hdev->link_mode & HCI_LM_MASTER) && !(is_sco_active(hdev)))   //modify for A2DP&OPP issue
+	/*Arima AlvinChen 20120821 add for HFP&OPP issue -------------------*/
+	/*Arima AlvinChen 20120824 add for A2DP&OPP issue -------------------------------------*/
 		cp.role_switch = 0x01;
+	}
 	else
 		cp.role_switch = 0x00;
 
@@ -364,6 +436,24 @@ static void hci_conn_rssi_update(struct work_struct *work)
 	hci_read_rssi(conn);
 }
 
+static void encryption_disabled_timeout(unsigned long userdata)
+{
+	struct hci_conn *conn = (struct hci_conn *)userdata;
+	BT_INFO("conn %p Grace Prd Exp ", conn);
+
+	hci_encrypt_cfm(conn, 0, 0);
+
+	if (test_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend)) {
+		struct hci_cp_set_conn_encrypt cp;
+		BT_INFO("HCI_CONN_ENCRYPT_PEND is set");
+		cp.handle  = cpu_to_le16(conn->handle);
+		cp.encrypt = 1;
+		hci_send_cmd(conn->hdev, HCI_OP_SET_CONN_ENCRYPT,
+						sizeof(cp), &cp);
+	}
+
+}
+
 struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
 					__u16 pkt_type, bdaddr_t *dst)
 {
@@ -417,6 +507,8 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
 	setup_timer(&conn->disc_timer, hci_conn_timeout, (unsigned long)conn);
 	setup_timer(&conn->idle_timer, hci_conn_idle, (unsigned long)conn);
 	INIT_DELAYED_WORK(&conn->rssi_update_work, hci_conn_rssi_update);
+	setup_timer(&conn->encrypt_pause_timer, encryption_disabled_timeout,
+			(unsigned long)conn);
 
 	atomic_set(&conn->refcnt, 0);
 
@@ -460,6 +552,7 @@ int hci_conn_del(struct hci_conn *conn)
 	del_timer(&conn->disc_timer);
 	del_timer(&conn->smp_timer);
 	__cancel_delayed_work(&conn->rssi_update_work);
+	del_timer(&conn->encrypt_pause_timer);
 
 	if (conn->type == ACL_LINK) {
 		struct hci_conn *sco = conn->link;
@@ -664,41 +757,12 @@ struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
 {
 	struct hci_conn *acl;
 	struct hci_conn *sco;
-	struct hci_conn *le;
 
 	BT_DBG("%s dst %s", hdev->name, batostr(dst));
 
-	if (type == LE_LINK) {
-		struct adv_entry *entry;
-		struct link_key *key;
-
-		le = hci_conn_hash_lookup_ba(hdev, LE_LINK, dst);
-		if (le) {
-			hci_conn_hold(le);
-			return le;
-		}
-
-		key = hci_find_link_key_type(hdev, dst, KEY_TYPE_LTK);
-		if (!key) {
-			entry = hci_find_adv_entry(hdev, dst);
-			if (entry)
-				le = hci_le_conn_add(hdev, dst,
-						entry->bdaddr_type);
-			else
-				le = hci_le_conn_add(hdev, dst, 0);
-		} else {
-			le = hci_le_conn_add(hdev, dst, key->addr_type);
-		}
-
-		if (!le)
-			return ERR_PTR(-ENOMEM);
-
-		hci_le_connect(le);
-
-		hci_conn_hold(le);
-
-		return le;
-	}
+	if (type == LE_LINK)
+		return hci_le_connect(hdev, pkt_type, dst, sec_level,
+							auth_type, NULL);
 
 	acl = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst);
 	if (!acl) {
@@ -854,6 +918,10 @@ int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type)
 
 	if (hci_conn_auth(conn, sec_level, auth_type)) {
 		struct hci_cp_set_conn_encrypt cp;
+		if (timer_pending(&conn->encrypt_pause_timer)) {
+			BT_INFO("encrypt_pause_timer is pending");
+			return 0;
+		}
 		cp.handle  = cpu_to_le16(conn->handle);
 		cp.encrypt = 1;
 		hci_send_cmd(conn->hdev, HCI_OP_SET_CONN_ENCRYPT,

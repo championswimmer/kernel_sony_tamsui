@@ -217,11 +217,6 @@ dbus_message_set_serial (DBusMessage   *message,
  * itself not incremented.  Ownership of link and counter refcount is
  * passed to the message.
  *
- * This function may be called with locks held. As a result, the counter's
- * notify function is not called; the caller is expected to either call
- * _dbus_counter_notify() on the counter when they are no longer holding
- * locks, or take the same action that would be taken by the notify function.
- *
  * @param message the message
  * @param link link with counter as data
  */
@@ -264,11 +259,6 @@ _dbus_message_add_counter_link (DBusMessage  *message,
  * Adds a counter to be incremented immediately with the size/unix fds
  * of this message, and decremented by the size/unix fds of this
  * message when this message if finalized.
- *
- * This function may be called with locks held. As a result, the counter's
- * notify function is not called; the caller is expected to either call
- * _dbus_counter_notify() on the counter when they are no longer holding
- * locks, or take the same action that would be taken by the notify function.
  *
  * @param message the message
  * @param counter the counter
@@ -322,7 +312,6 @@ _dbus_message_remove_counter (DBusMessage  *message,
   _dbus_counter_adjust_unix_fd (counter, - message->unix_fd_counter_delta);
 #endif
 
-  _dbus_counter_notify (counter);
   _dbus_counter_unref (counter);
 }
 
@@ -537,7 +526,8 @@ dbus_message_get_cached (void)
   _dbus_assert (i < MAX_MESSAGE_CACHE_SIZE);
   _dbus_assert (message != NULL);
 
-  _dbus_assert (message->refcount.value == 0);
+  _dbus_assert (_dbus_atomic_get (&message->refcount) == 0);
+
   _dbus_assert (message->counters == NULL);
   
   _DBUS_UNLOCK (message_cache);
@@ -584,7 +574,6 @@ free_counter (void *element,
   _dbus_counter_adjust_unix_fd (counter, - message->unix_fd_counter_delta);
 #endif
 
-  _dbus_counter_notify (counter);
   _dbus_counter_unref (counter);
 }
 
@@ -598,8 +587,8 @@ dbus_message_cache_or_finalize (DBusMessage *message)
 {
   dbus_bool_t was_cached;
   int i;
-  
-  _dbus_assert (message->refcount.value == 0);
+
+  _dbus_assert (_dbus_atomic_get (&message->refcount) == 0);
 
   /* This calls application code and has to be done first thing
    * without holding the lock
@@ -661,8 +650,8 @@ dbus_message_cache_or_finalize (DBusMessage *message)
 #endif
 
  out:
-  _dbus_assert (message->refcount.value == 0);
-  
+  _dbus_assert (_dbus_atomic_get (&message->refcount) == 0);
+
   _DBUS_UNLOCK (message_cache);
   
   if (!was_cached)
@@ -1051,7 +1040,7 @@ dbus_message_get_reply_serial  (DBusMessage *message)
 static void
 dbus_message_finalize (DBusMessage *message)
 {
-  _dbus_assert (message->refcount.value == 0);
+  _dbus_assert (_dbus_atomic_get (&message->refcount) == 0);
 
   /* This calls application callbacks! */
   _dbus_data_slot_list_free (&message->slot_list);
@@ -1068,8 +1057,8 @@ dbus_message_finalize (DBusMessage *message)
   dbus_free(message->unix_fds);
 #endif
 
-  _dbus_assert (message->refcount.value == 0);
-  
+  _dbus_assert (_dbus_atomic_get (&message->refcount) == 0);
+
   dbus_free (message);
 }
 
@@ -1088,7 +1077,7 @@ dbus_message_new_empty_header (void)
   else
     {
       from_cache = FALSE;
-      message = dbus_new (DBusMessage, 1);
+      message = dbus_new0 (DBusMessage, 1);
       if (message == NULL)
         return NULL;
 #ifndef DBUS_DISABLE_CHECKS
@@ -1100,8 +1089,9 @@ dbus_message_new_empty_header (void)
       message->n_unix_fds_allocated = 0;
 #endif
     }
-  
-  message->refcount.value = 1;
+
+  _dbus_atomic_inc (&message->refcount);
+
   message->byte_order = DBUS_COMPILER_BYTE_ORDER;
   message->locked = FALSE;
 #ifndef DBUS_DISABLE_CHECKS
@@ -1460,7 +1450,7 @@ dbus_message_copy (const DBusMessage *message)
   if (retval == NULL)
     return NULL;
 
-  retval->refcount.value = 1;
+  _dbus_atomic_inc (&retval->refcount);
   retval->byte_order = message->byte_order;
   retval->locked = FALSE;
 #ifndef DBUS_DISABLE_CHECKS
@@ -1531,14 +1521,20 @@ dbus_message_copy (const DBusMessage *message)
 DBusMessage *
 dbus_message_ref (DBusMessage *message)
 {
+#ifndef DBUS_DISABLE_ASSERT
   dbus_int32_t old_refcount;
+#endif
 
   _dbus_return_val_if_fail (message != NULL, NULL);
   _dbus_return_val_if_fail (message->generation == _dbus_current_generation, NULL);
   _dbus_return_val_if_fail (!message->in_cache, NULL);
-  
+
+#ifdef DBUS_DISABLE_ASSERT
+  _dbus_atomic_inc (&message->refcount);
+#else
   old_refcount = _dbus_atomic_inc (&message->refcount);
   _dbus_assert (old_refcount >= 1);
+#endif
 
   return message;
 }
@@ -1561,7 +1557,7 @@ dbus_message_unref (DBusMessage *message)
 
   old_refcount = _dbus_atomic_dec (&message->refcount);
 
-  _dbus_assert (old_refcount >= 0);
+  _dbus_assert (old_refcount >= 1);
 
   if (old_refcount == 1)
     {
@@ -1991,7 +1987,7 @@ dbus_message_iter_next (DBusMessageIter *iter)
  * #DBUS_TYPE_INVALID. You can thus write a loop as follows:
  *
  * @code
- * dbus_message_iter_init (&iter);
+ * dbus_message_iter_init (message, &iter);
  * while ((current_type = dbus_message_iter_get_arg_type (&iter)) != DBUS_TYPE_INVALID)
  *   dbus_message_iter_next (&iter);
  * @endcode
@@ -2527,6 +2523,39 @@ dbus_message_iter_append_basic (DBusMessageIter *iter,
   _dbus_return_val_if_fail (dbus_type_is_basic (type), FALSE);
   _dbus_return_val_if_fail (value != NULL, FALSE);
 
+#ifndef DBUS_DISABLE_CHECKS
+  switch (type)
+    {
+      const char * const *string_p;
+      const dbus_bool_t *bool_p;
+
+      case DBUS_TYPE_STRING:
+        string_p = value;
+        _dbus_return_val_if_fail (_dbus_check_is_valid_utf8 (*string_p), FALSE);
+        break;
+
+      case DBUS_TYPE_OBJECT_PATH:
+        string_p = value;
+        _dbus_return_val_if_fail (_dbus_check_is_valid_path (*string_p), FALSE);
+        break;
+
+      case DBUS_TYPE_SIGNATURE:
+        string_p = value;
+        _dbus_return_val_if_fail (_dbus_check_is_valid_signature (*string_p), FALSE);
+        break;
+
+      case DBUS_TYPE_BOOLEAN:
+        bool_p = value;
+        _dbus_return_val_if_fail (*bool_p == 0 || *bool_p == 1, FALSE);
+        break;
+
+      default:
+          {
+            /* nothing to check, all possible values are allowed */
+          }
+    }
+#endif
+
   if (!_dbus_message_iter_open_signature (real))
     return FALSE;
 
@@ -2610,10 +2639,6 @@ dbus_message_iter_append_basic (DBusMessageIter *iter,
  * @todo If this fails due to lack of memory, the message is hosed and
  * you have to start over building the whole message.
  *
- * For Unix file descriptors this function will internally duplicate
- * the descriptor you passed in. Hence you may close the descriptor
- * immediately after this call.
- *
  * @param iter the append iterator
  * @param element_type the type of the array elements
  * @param value the address of the array
@@ -2638,6 +2663,19 @@ dbus_message_iter_append_fixed_array (DBusMessageIter *iter,
   _dbus_return_val_if_fail (n_elements <=
                             DBUS_MAXIMUM_ARRAY_LENGTH / _dbus_type_get_alignment (element_type),
                             FALSE);
+
+#ifndef DBUS_DISABLE_CHECKS
+  if (element_type == DBUS_TYPE_BOOLEAN)
+    {
+      const dbus_bool_t * const *bools = value;
+      int i;
+
+      for (i = 0; i < n_elements; i++)
+        {
+          _dbus_return_val_if_fail ((*bools)[i] == 0 || (*bools)[i] == 1, FALSE);
+        }
+    }
+#endif
 
   ret = _dbus_type_writer_write_fixed_multi (&real->u.writer, element_type, value, n_elements);
 
@@ -4650,7 +4688,7 @@ dbus_message_demarshal_bytes_needed(const char *buf,
 
   if (validity == DBUS_VALID)
     {
-      _dbus_assert(have_message);
+      _dbus_assert (have_message || (header_len + body_len) > len);
       return header_len + body_len;
     }
   else

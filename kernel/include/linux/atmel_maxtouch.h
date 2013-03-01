@@ -3,7 +3,6 @@
  *  
  *  Copyright (c) 2010 Atmel Corporation
  *  Copyright (C) 2010 Ulf Samuelsson (ulf@atmel.com)
- * Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -298,8 +297,8 @@ static int mxt_write_block_bl(struct i2c_client *client, u16 length, u8 *value);
  * @max_x:              Reported X range
  * @max_y:              Reported Y range
  */
-/*FIH-SW3-PERIPHERAL-CH-TouchDriver_Porting_fix_error_2015-00+*/
-struct mxt_platform_data {
+ 
+struct maxtouch_platform_data {
 	u8    numtouch;	/* Number of touches to report	*/
 	int   (*init_platform_hw)(struct i2c_client *client);
 	int   (*exit_platform_hw)(struct i2c_client *client);

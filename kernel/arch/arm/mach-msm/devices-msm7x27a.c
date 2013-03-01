@@ -17,6 +17,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/init.h>
 #include <mach/irqs.h>
+#include <linux/notifier.h> //Arima 20121002 rickzhong: QCT patch:Clear kernel log 
 #include <mach/msm_iomap.h>
 #include <mach/board.h>
 #include <mach/dma.h>
@@ -24,6 +25,7 @@
 #include <asm/mach/flash.h>
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/mach/mmc.h>
+#include <asm/cacheflush.h>//Arima 20121002 rickzhong: QCT patch:Clear kernel log 
 #include <mach/rpc_hsusb.h>
 #include <mach/socinfo.h>
 
@@ -348,7 +350,9 @@ static struct resource resources_nand[] = {
 	},
 };
 
-struct flash_platform_data msm_nand_data;
+struct flash_platform_data msm_nand_data = {
+	.version = VERSION_2,
+};
 
 struct platform_device msm_device_nand = {
 	.name		= "msm_nand",
@@ -427,8 +431,8 @@ static struct resource resources_sdc3[] = {
 	},
 	{
 		.name	= "sdcc_dma_chnl",
-		.start	= DMOV_SDC3_CHAN,
-		.end	= DMOV_SDC3_CHAN,
+		.start	= DMOV_NAND_CHAN,
+		.end	= DMOV_NAND_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
@@ -691,7 +695,7 @@ struct platform_device msm_kgsl_3d0 = {
 
 void __init msm7x25a_kgsl_3d0_init(void)
 {
-	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa()) {
+	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa() || cpu_is_msm7x25ab()) {
 		kgsl_3d0_pdata.num_levels = 2;
 		kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 133330000;
 		kgsl_3d0_pdata.pwrlevel[0].bus_freq = 160000000;
@@ -754,6 +758,76 @@ struct platform_device led_pdev = {
 	},
 };
 
+#ifdef CONFIG_LEDS_ARIMA_GPIO
+//<<SKIES 2011/10/19, button-backlight
+static struct led_info arima_btbl_gpio_led_pdata = {
+	.name = "button-backlight",
+};
+
+struct platform_device button_led_pdev = {
+	.name	= "leds-arima-gpio",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &arima_btbl_gpio_led_pdata,
+	},
+};
+//>>SKIES 2011/10/19
+#endif
+
+/*++ Huize - 20120329 Add for button backlight is controlled by mpp ++*/
+#ifdef CONFIG_LEDS_ACM_BUTTON_BACKLIGHT
+static struct led_info leds_acm_btbl_pdata = {
+	.name = "button-backlight",
+};
+
+struct platform_device button_led_pdev = {
+	.name	= "leds-acm-button_backlight",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &leds_acm_btbl_pdata,
+	},
+};
+#endif
+/*-- Huize - 20120329 Add for button backlight is controlled by mpp --*/
+
+
+//Edison add RGB LED test ++
+static struct led_info red_led_pdata = {
+	.name = "red",
+};
+
+struct platform_device red_led_pdev = {
+	.name	= "leds-acm-red",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &red_led_pdata,
+	},
+};
+static struct led_info green_led_pdata = {
+	.name = "green",
+};
+
+struct platform_device green_led_pdev = {
+	.name	= "leds-acm-green",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &green_led_pdata,
+	},
+};
+static struct led_info blue_led_pdata = {
+	.name = "blue",
+};
+
+struct platform_device blue_led_pdev = {
+	.name	= "leds-acm-blue",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &blue_led_pdata,
+	},
+};
+//Edison add RGB LED test --
+
+
 struct platform_device asoc_msm_pcm = {
 	.name   = "msm-dsp-audio",
 	.id     = 0,
@@ -794,10 +868,32 @@ static int msm7627a_init_gpio(void)
 }
 postcore_initcall(msm7627a_init_gpio);
 
+/*Arima+ 20121002 rickzhong: QCT patch:Clear kernel log */
+static int msm7627a_panic_handler(struct notifier_block *this,
+		unsigned long event, void *ptr)
+{
+	flush_cache_all();
+	outer_flush_all();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block panic_handler = {
+	.notifier_call = msm7627a_panic_handler,
+};
+
+static int __init panic_register(void)
+{
+	atomic_notifier_chain_register(&panic_notifier_list,
+			&panic_handler);
+	return 0;
+}
+module_init(panic_register);
+/*Arima- 20121002 rickzhong: QCT patch:Clear kernel log */
+
 int __init msm7x2x_misc_init(void)
 {
 	msm_clock_init(&msm7x27a_clock_init_data);
-	if (cpu_is_msm7x27aa())
+	if (cpu_is_msm7x27aa() || cpu_is_msm7x25ab())
 		acpuclk_init(&acpuclk_7x27aa_soc_data);
 	else
 		acpuclk_init(&acpuclk_7x27a_soc_data);

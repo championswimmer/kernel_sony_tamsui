@@ -6,7 +6,6 @@
  *  Copyright (C) 2004-2009  Marcel Holtmann <marcel@holtmann.org>
  *  Copyright (C) 2009-2010  Motorola Inc.
  *  Copyright (C) 2010, Code Aurora Forum. All rights reserved.
- *  Copyright(C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -218,6 +217,9 @@ static void stream_state_changed(struct avdtp_stream *stream,
 			reply = dbus_message_new_method_return(p->msg);
 			g_dbus_send_message(p->conn, reply);
 			pending_request_free(dev, p);
+			if (sink->session) {
+				avdtp_disconnect_session(sink->session);
+			}
 		}
 
 		if (sink->session) {
@@ -428,9 +430,12 @@ static void discovery_complete(struct avdtp *session, GSList *seps, struct avdtp
 
 	DBG("Discovery complete");
 
+	sink->protected = sink->protection_required;
+
+	avdtp_set_protection_req(sink->session, sink->protected);
+
 	id = a2dp_select_capabilities(sink->session, AVDTP_SEP_TYPE_SINK, NULL,
 						select_complete, sink);
-	sink->protected = sink->protection_required;
 	if (id == 0)
 		goto failed;
 

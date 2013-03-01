@@ -223,6 +223,25 @@ struct msm_snd_volume_config {
 	uint32_t method;
 	uint32_t volume;
 };
+/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+struct msm_snd_info_config {
+  	uint32_t secondary_mic;
+ 	uint32_t reserved_1;
+ 	uint32_t reserved_2;
+};
+/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
+/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+struct msm_snd_voip_config {
+  	uint32_t audiopath;
+ 	uint32_t voip_mute;
+ 	uint32_t reserved_2;
+};
+/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+struct msm_snd_tty_config {
+ 	uint32_t tty_mode;
+};
+/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/
 
 #define SND_SET_VOLUME _IOW(SND_IOCTL_MAGIC, 3, struct msm_snd_volume_config *)
 
@@ -247,6 +266,15 @@ struct msm_snd_endpoint {
 
 #define SND_AVC_CTL _IOW(SND_IOCTL_MAGIC, 6, unsigned *)
 #define SND_AGC_CTL _IOW(SND_IOCTL_MAGIC, 7, unsigned *)
+/*++ Kevin Shiu - 20120612 implement secondary mic test ++*/
+#define SND_SET_INFO	_IOW(SND_IOCTL_MAGIC, 8, unsigned *)	
+/*-- Kevin Shiu - 20120612 implement secondary mic test --*/
+/*++ Kevin Shiu - 20121002 voip mute and change path ++*/
+#define SND_SET_VOIP	_IOW(SND_IOCTL_MAGIC, 9, unsigned *)	
+/*-- Kevin Shiu - 20121002 voip mute and change path --*/
+/*++ Kvein Shiu - 20121103 always enable hesd bias when TTY turn on ++*/
+#define SND_SET_TTY		_IOW(SND_IOCTL_MAGIC, 10, unsigned *)
+/*-- Kvein Shiu - 20121103 always enable hesd bias when TTY turn on --*/
 
 struct msm_audio_pcm_config {
 	uint32_t pcm_feedback;	/* 0 - disable > 0 - enable */

@@ -1,5 +1,4 @@
 /* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
- * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -387,7 +386,7 @@ static enum hrtimer_restart msm_otg_timer_func(struct hrtimer *_timer)
 	else
 		set_bit(dev->active_tmout, &dev->tmouts);
 
-	printk(KERN_DEBUG "expired %s timer\n", timer_string(dev->active_tmout));//MTD-CONN-EH-LOG-03*
+	pr_debug("expired %s timer\n", timer_string(dev->active_tmout));
 	queue_work(dev->wq, &dev->sm_work);
 	return HRTIMER_NORESTART;
 }
@@ -804,7 +803,7 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	 */
 	if (dev->pdata->config_vddcx)
 		dev->pdata->config_vddcx(0);
-	printk(KERN_DEBUG "%s: usb in low power mode\n", __func__);//MTD-CONN-EH-LOG-03*
+	pr_info("%s: usb in low power mode\n", __func__);
 
 out:
 	enable_irq(dev->irq);
@@ -856,7 +855,7 @@ static int msm_otg_resume(struct msm_otg *dev)
 
 	atomic_set(&dev->in_lpm, 0);
 
-	printk(KERN_DEBUG "%s: usb exited from low power mode\n", __func__);//MTD-CONN-EH-LOG-03*
+	pr_info("%s: usb exited from low power mode\n", __func__);
 
 	return 0;
 }
@@ -899,8 +898,8 @@ static void msm_otg_resume_w(struct work_struct *w)
 	enable_phy_clk();
 	while (is_phy_clk_disabled() || !is_phy_active()) {
 		if (time_after(jiffies, timeout)) {
-			printk(KERN_DEBUG "%s: Unable to wakeup phy. is_phy_active: %x\n",
-				 __func__, !!is_phy_active());//MTD-CONN-EH-LOG-03*
+			pr_err("%s: Unable to wakeup phy. is_phy_active: %x\n",
+				 __func__, !!is_phy_active());
 			/* Reset both phy and link */
 			otg_reset(&dev->otg, 1);
 			break;
@@ -919,7 +918,6 @@ phy_resumed:
 	 */
 	if (readl_relaxed(USB_OTGSC) & OTGSC_BSVIS) {
 		set_bit(B_SESS_VLD, &dev->inputs);
-		printk(KERN_DEBUG "%s: Set USB state to B_SESS_VLD and handle in sm_work\n", __func__);//MTD-EH-LOG-02+
 		queue_work(dev->wq, &dev->sm_work);
 	}
 	if (dev->pmic_id_notif_supp) {
@@ -1232,7 +1230,6 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	unsigned long flags;
 
 	if (atomic_read(&dev->in_lpm)) {
-		printk(KERN_DEBUG "%s: Using workqueue to handle lpm mode\n", __func__);//MTD-EH-LOG-03+
 		disable_irq_nosync(dev->irq);
 		wake_lock(&dev->wlock);
 		queue_work(dev->wq, &dev->otg_resume_work);
@@ -1264,11 +1261,9 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	if ((otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
 		if (otgsc & OTGSC_ID) {
 			pr_debug("Id set\n");
-			printk(KERN_DEBUG "%s: Id set\n", __func__);//MTD-EH-LOG-03+
 			set_bit(ID, &dev->inputs);
 		} else {
 			pr_debug("Id clear\n");
-			printk(KERN_DEBUG "%s: Id clear\n", __func__);//MTD-EH-LOG-03+
 			/* Assert a_bus_req to supply power on
 			 * VBUS when Micro/Mini-A cable is connected
 			 * with out user intervention.
@@ -1289,17 +1284,14 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 			goto out;
 		if (otgsc & OTGSC_BSV) {
 			pr_debug("BSV set\n");
-			printk(KERN_DEBUG "%s: BSV set\n", __func__);//MTD-EH-LOG-03+
 			set_bit(B_SESS_VLD, &dev->inputs);
 		} else {
 			pr_debug("BSV clear\n");
-			printk(KERN_DEBUG "%s: BSV clear\n", __func__);//MTD-EH-LOG-03+
 			clear_bit(B_SESS_VLD, &dev->inputs);
 		}
 		work = 1;
 	} else if (otgsc & OTGSC_DPIS) {
 		pr_debug("DPIS detected\n");
-		printk(KERN_DEBUG "%s: DPIS detected\n", __func__);//MTD-EH-LOG-03+
 		writel(otgsc, USB_OTGSC);
 		set_bit(A_SRP_DET, &dev->inputs);
 		set_bit(A_BUS_REQ, &dev->inputs);
@@ -1307,7 +1299,6 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	} else if (sts & STS_PCI) {
 		pc = readl(USB_PORTSC);
 		pr_debug("portsc = %x\n", pc);
-		printk(KERN_DEBUG "%s: portsc = %x\n", __func__, pc);//MTD-EH-LOG-03+
 		ret = IRQ_NONE;
 		/* HCD Acks PCI interrupt. We use this to switch
 		 * between different OTG states.
@@ -1318,14 +1309,12 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 			if (dev->otg.host->b_hnp_enable && (pc & PORTSC_CSC) &&
 					!(pc & PORTSC_CCS)) {
 				pr_debug("B_CONN clear\n");
-				printk(KERN_DEBUG "%s: B_CONN clear\n", __func__);//MTD-EH-LOG-03+
 				clear_bit(B_CONN, &dev->inputs);
 			}
 			break;
 		case OTG_STATE_B_WAIT_ACON:
 			if ((pc & PORTSC_CSC) && (pc & PORTSC_CCS)) {
 				pr_debug("A_CONN set\n");
-				printk(KERN_DEBUG "%s: A_CONN set\n", __func__);//MTD-EH-LOG-03+
 				set_bit(A_CONN, &dev->inputs);
 				/* Clear ASE0_BRST timer */
 				msm_otg_del_timer(dev);
@@ -1334,7 +1323,6 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 		case OTG_STATE_B_HOST:
 			if ((pc & PORTSC_CSC) && !(pc & PORTSC_CCS)) {
 				pr_debug("A_CONN clear\n");
-				printk(KERN_DEBUG "%s: A_CONN clear\n", __func__);//MTD-EH-LOG-03+
 				clear_bit(A_CONN, &dev->inputs);
 			}
 			break;
@@ -1368,7 +1356,7 @@ static void phy_clk_reset(struct msm_otg *dev)
 
 	rc = clk_reset(dev->phy_reset_clk, assert);
 	if (rc) {
-		printk(KERN_DEBUG "%s: phy clk assert failed\n", __func__);//MTD-CONN-EH-LOG-03*
+		pr_err("%s: phy clk assert failed\n", __func__);
 		return;
 	}
 
@@ -1376,7 +1364,7 @@ static void phy_clk_reset(struct msm_otg *dev)
 
 	rc = clk_reset(dev->phy_reset_clk, !assert);
 	if (rc) {
-		printk(KERN_DEBUG  "%s: phy clk deassert failed\n", __func__);//MTD-CONN-EH-LOG-03*
+		pr_err("%s: phy clk deassert failed\n", __func__);
 		return;
 	}
 
@@ -1675,8 +1663,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 	if (atomic_read(&dev->in_lpm))
 		msm_otg_set_suspend(&dev->otg, 0);
 
-	printk(KERN_INFO "msm72k_otg:%s\n", __func__);//MTD-CONN-EH-LOG-02+
-
 	spin_lock_irqsave(&dev->lock, flags);
 	state = dev->otg.state;
 	spin_unlock_irqrestore(&dev->lock, flags);
@@ -1735,7 +1721,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		if (!test_bit(ID, &dev->inputs) ||
 				test_bit(ID_A, &dev->inputs)) {
 			pr_debug("!id || id_A\n");
-			printk(KERN_DEBUG "%s: !id || id_A\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(B_BUS_REQ, &dev->inputs);
 			otg_reset(&dev->otg, 0);
 
@@ -1747,7 +1732,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		} else if (test_bit(B_SESS_VLD, &dev->inputs) &&
 				!test_bit(ID_B, &dev->inputs)) {
 			pr_debug("b_sess_vld\n");
-			printk(KERN_DEBUG "%s: b_sess_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_B_PERIPHERAL;
 			spin_unlock_irqrestore(&dev->lock, flags);
@@ -1755,7 +1739,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_start_peripheral(&dev->otg, 1);
 		} else if (test_bit(B_BUS_REQ, &dev->inputs)) {
 			pr_debug("b_sess_end && b_bus_req\n");
-			printk(KERN_DEBUG "%s: b_sess_end && b_bus_req\n", __func__);//MTD-CONN-EH-LOG-03*
 			ret = msm_otg_start_srp(&dev->otg);
 			if (ret < 0) {
 				/* notify user space */
@@ -1774,7 +1757,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		} else {
 			msm_otg_set_power(&dev->otg, 0);
 			pr_debug("entering into lpm\n");
-			printk(KERN_DEBUG "%s: entering into lpm\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_put_suspend(dev);
 
 			if (dev->pdata->ldo_set_voltage)
@@ -1788,7 +1770,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				(test_bit(B_SESS_VLD, &dev->inputs) &&
 				!test_bit(ID_B, &dev->inputs))) {
 			pr_debug("!id || id_a/c || b_sess_vld+!id_b\n");
-			printk(KERN_DEBUG "%s: !id || id_a/c || b_sess_vld+!id_b\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_del_timer(dev);
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_B_IDLE;
@@ -1796,7 +1777,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			work = 1;
 		} else if (test_bit(B_SRP_FAIL, &dev->tmouts)) {
 			pr_debug("b_srp_fail\n");
-			printk(KERN_DEBUG "%s: b_srp_fail\n", __func__);//MTD-CONN-EH-LOG-03*
 			/* notify user space */
 			msm_otg_send_event(&dev->otg,
 				OTG_EVENT_NO_RESP_FOR_SRP);
@@ -1815,7 +1795,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				test_bit(ID_B, &dev->inputs) ||
 				!test_bit(B_SESS_VLD, &dev->inputs)) {
 			pr_debug("!id  || id_a/b || !b_sess_vld\n");
-			printk(KERN_DEBUG "%s: !id  || id_a/b || !b_sess_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(B_BUS_REQ, &dev->inputs);
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_B_IDLE;
@@ -1830,7 +1809,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				dev->otg.gadget->b_hnp_enable &&
 				test_bit(A_BUS_SUSPEND, &dev->inputs)) {
 			pr_debug("b_bus_req && b_hnp_en && a_bus_suspend\n");
-			printk(KERN_DEBUG "%s: b_bus_req && b_hnp_en && a_bus_suspend\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_start_timer(dev, TB_ASE0_BRST, B_ASE0_BRST);
 			msm_otg_start_peripheral(&dev->otg, 0);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -1852,7 +1830,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			/* Workaround: Reset PHY in SE1 state */
 			otg_reset(&dev->otg, 1);
 			pr_debug("entering into lpm with wall-charger\n");
-			printk(KERN_DEBUG "%s: entering into lpm with wall-charger\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_put_suspend(dev);
 			/* Allow idle power collapse */
 			otg_pm_qos_update_latency(dev, 0);
@@ -1864,7 +1841,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				test_bit(ID_B, &dev->inputs) ||
 				!test_bit(B_SESS_VLD, &dev->inputs)) {
 			pr_debug("!id || id_a/b || !b_sess_vld\n");
-			printk(KERN_DEBUG "%s: !id || id_a/b || !b_sess_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_del_timer(dev);
 			/* A-device is physically disconnected during
 			 * HNP. Remove HCD.
@@ -1884,7 +1860,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			work = 1;
 		} else if (test_bit(A_CONN, &dev->inputs)) {
 			pr_debug("a_conn\n");
-			printk(KERN_DEBUG "%s: a_conn\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(A_BUS_SUSPEND, &dev->inputs);
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_B_HOST;
@@ -1899,7 +1874,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			 * not handled for now.
 			 */
 			pr_debug("b_ase0_brst_tmout\n");
-			printk(KERN_DEBUG "%s: b_ase0_brst_tmout\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_send_event(&dev->otg,
 				OTG_EVENT_HNP_FAILED);
 			msm_otg_start_host(&dev->otg, REQUEST_STOP);
@@ -1924,7 +1898,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		if (!test_bit(B_BUS_REQ, &dev->inputs) ||
 				!test_bit(A_CONN, &dev->inputs)) {
 			pr_debug("!b_bus_req || !a_conn\n");
-			printk(KERN_DEBUG "%s: !b_bus_req || !a_conn\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(A_CONN, &dev->inputs);
 			clear_bit(B_BUS_REQ, &dev->inputs);
 
@@ -1947,7 +1920,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		if (test_bit(ID, &dev->inputs) &&
 				!test_bit(ID_A, &dev->inputs)) {
 			pr_debug("id && !id_a\n");
-			printk(KERN_DEBUG "%s: id && !id_a\n", __func__);//MTD-CONN-EH-LOG-03*
 			dev->otg.default_a = 0;
 			otg_reset(&dev->otg, 0);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -1959,7 +1931,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				(test_bit(A_SRP_DET, &dev->inputs) ||
 				 test_bit(A_BUS_REQ, &dev->inputs))) {
 			pr_debug("!a_bus_drop && (a_srp_det || a_bus_req)\n");
-			printk(KERN_DEBUG "%s: !a_bus_drop && (a_srp_det || a_bus_req)\n", __func__);//MTD-CONN-EH-LOG-03*
 
 			clear_bit(A_SRP_DET, &dev->inputs);
 			/* Disable SRP detection */
@@ -1978,7 +1949,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			/* no need to schedule work now */
 		} else {
 			pr_debug("No session requested\n");
-			printk(KERN_DEBUG "%s: No session requested\n", __func__);//MTD-CONN-EH-LOG-03*
 
 			/* A-device is not providing power on VBUS.
 			 * Enable SRP detection.
@@ -1995,7 +1965,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				test_bit(A_BUS_DROP, &dev->inputs) ||
 				test_bit(A_WAIT_VRISE, &dev->tmouts)) {
 			pr_debug("id || a_bus_drop || a_wait_vrise_tmout\n");
-			printk(KERN_DEBUG "%s: id || a_bus_drop || a_wait_vrise_tmout\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(A_BUS_REQ, &dev->inputs);
 			msm_otg_del_timer(dev);
 			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
@@ -2005,7 +1974,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_start_timer(dev, TA_WAIT_VFALL, A_WAIT_VFALL);
 		} else if (test_bit(A_VBUS_VLD, &dev->inputs)) {
 			pr_debug("a_vbus_vld\n");
-			printk(KERN_DEBUG "%s: a_vbus_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_A_WAIT_BCON;
 			spin_unlock_irqrestore(&dev->lock, flags);
@@ -2023,8 +1991,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				test_bit(A_WAIT_BCON, &dev->tmouts)) {
 			pr_debug("id_f/b/c || a_bus_drop ||"
 					"a_wait_bcon_tmout\n");
-			printk(KERN_DEBUG "%s: id_f/b/c || a_bus_drop ||"
-					"a_wait_bcon_tmout\n", __func__);//MTD-CONN-EH-LOG-03*
 			if (test_bit(A_WAIT_BCON, &dev->tmouts))
 				msm_otg_send_event(&dev->otg,
 					OTG_EVENT_DEV_CONN_TMOUT);
@@ -2046,7 +2012,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_start_timer(dev, TA_WAIT_VFALL, A_WAIT_VFALL);
 		} else if (test_bit(B_CONN, &dev->inputs)) {
 			pr_debug("b_conn\n");
-			printk(KERN_DEBUG "%s: b_conn\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_del_timer(dev);
 			/* HCD is added already. just move to
 			 * A_HOST state.
@@ -2061,7 +2026,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			}
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
 			pr_debug("!a_vbus_vld\n");
-			printk(KERN_DEBUG "%s: !a_vbus_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_del_timer(dev);
 			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -2081,7 +2045,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				!test_bit(ID_A, &dev->inputs)) ||
 				test_bit(A_BUS_DROP, &dev->inputs)) {
 			pr_debug("id_f/b/c || a_bus_drop\n");
-			printk(KERN_DEBUG "%s: id_f/b/c || a_bus_drop\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(B_CONN, &dev->inputs);
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_A_WAIT_VFALL;
@@ -2095,7 +2058,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_set_power(&dev->otg, 0);
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
 			pr_debug("!a_vbus_vld\n");
-			printk(KERN_DEBUG "%s: !a_vbus_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			clear_bit(B_CONN, &dev->inputs);
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_A_VBUS_ERR;
@@ -2109,7 +2071,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			 * suspended or HNP is in progress.
 			 */
 			pr_debug("!a_bus_req\n");
-			printk(KERN_DEBUG "%s: !a_bus_req\n", __func__);//MTD-CONN-EH-LOG-03*
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_A_SUSPEND;
 			spin_unlock_irqrestore(&dev->lock, flags);
@@ -2125,7 +2086,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 						USB_IDCHG_MIN - USB_IB_UNCFG);
 		} else if (!test_bit(B_CONN, &dev->inputs)) {
 			pr_debug("!b_conn\n");
-			printk(KERN_DEBUG "%s: !b_conn\n", __func__);//MTD-CONN-EH-LOG-03*
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->otg.state = OTG_STATE_A_WAIT_BCON;
 			spin_unlock_irqrestore(&dev->lock, flags);
@@ -2150,8 +2110,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				test_bit(A_AIDL_BDIS, &dev->tmouts)) {
 			pr_debug("id_f/b/c || a_bus_drop ||"
 					"a_aidl_bdis_tmout\n");
-			printk(KERN_DEBUG "%s: id_f/b/c || a_bus_drop ||"
-					"a_aidl_bdis_tmout\n", __func__);//MTD-CONN-EH-LOG-03*
 			if (test_bit(A_AIDL_BDIS, &dev->tmouts))
 				msm_otg_send_event(&dev->otg,
 					OTG_EVENT_HNP_FAILED);
@@ -2170,7 +2128,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_set_power(&dev->otg, 0);
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
 			pr_debug("!a_vbus_vld\n");
-			printk(KERN_DEBUG "%s: !a_vbus_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_del_timer(dev);
 			clear_bit(B_CONN, &dev->inputs);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -2182,7 +2139,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		} else if (!test_bit(B_CONN, &dev->inputs) &&
 				dev->otg.host->b_hnp_enable) {
 			pr_debug("!b_conn && b_hnp_enable");
-			printk(KERN_DEBUG "%s: !b_conn && b_hnp_enable\n", __func__);//MTD-CONN-EH-LOG-03*
 			/* Clear AIDL_BDIS timer */
 			msm_otg_del_timer(dev);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -2206,7 +2162,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		} else if (!test_bit(B_CONN, &dev->inputs) &&
 				!dev->otg.host->b_hnp_enable) {
 			pr_debug("!b_conn && !b_hnp_enable");
-			printk(KERN_DEBUG "%s: !b_conn && !b_hnp_enable\n", __func__);//MTD-CONN-EH-LOG-03*
 			/* bus request is dropped during suspend.
 			 * acquire again for next device.
 			 */
@@ -2233,7 +2188,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 				!test_bit(ID_A, &dev->inputs)) ||
 				test_bit(A_BUS_DROP, &dev->inputs)) {
 			pr_debug("id _f/b/c || a_bus_drop\n");
-			printk(KERN_DEBUG "%s: id _f/b/c || a_bus_drop\n", __func__);//MTD-CONN-EH-LOG-03*
 			/* Clear BIDL_ADIS timer */
 			msm_otg_del_timer(dev);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -2252,7 +2206,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_set_power(&dev->otg, 0);
 		} else if (!test_bit(A_VBUS_VLD, &dev->inputs)) {
 			pr_debug("!a_vbus_vld\n");
-			printk(KERN_DEBUG "%s: !a_vbus_vld\n", __func__);//MTD-CONN-EH-LOG-03*
 			/* Clear BIDL_ADIS timer */
 			msm_otg_del_timer(dev);
 			spin_lock_irqsave(&dev->lock, flags);
@@ -2264,7 +2217,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_start_host(&dev->otg, REQUEST_STOP);
 		} else if (test_bit(A_BIDL_ADIS, &dev->tmouts)) {
 			pr_debug("a_bidl_adis_tmout\n");
-			printk(KERN_DEBUG "%s: a_bidl_adis_tmout\n", __func__);//MTD-CONN-EH-LOG-03*
 			msm_otg_start_peripheral(&dev->otg, 0);
 			dev->otg.gadget->is_a_peripheral = 0;
 
@@ -2312,7 +2264,6 @@ static void msm_otg_sm_work(struct work_struct *w)
 		break;
 	default:
 		pr_err("invalid OTG state\n");
-		printk(KERN_DEBUG "%s: invalid OTG state\n", __func__);//MTD-CONN-EH-LOG-03*
 	}
 
 	if (work)
@@ -2592,11 +2543,9 @@ static int otg_debugfs_init(struct msm_otg *dev)
 	if (!otg_debug_root)
 		return -ENOENT;
 
-	/*MTD-CONN-EH-FS_PERMISSION-00*{*/
-	otg_debug_mode = debugfs_create_file("mode", 0220,
+	otg_debug_mode = debugfs_create_file("mode", 0222,
 						otg_debug_root, dev,
 						&otgfs_fops);
-	/*MTD-CONN-EH-FS_PERMISSION-00*}*/
 	if (!otg_debug_mode)
 		goto free_root;
 

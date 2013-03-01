@@ -146,8 +146,10 @@ static struct sdcc_gpio sdcc_cfg_data[] = {
 		.size = ARRAY_SIZE(sdc4_cfg_data),
 	},
 };
-
-static int gpio_sdc1_hw_det = 85;
+/* << WilliamHu,2012/04/20,BU1,Change uSD Detection from GPIO 85 Harry to GPIO 17 Nanhu_PDP  */
+static int gpio_sdc1_hw_det = 17;
+ //static int gpio_sdc1_hw_det = 85;
+/* >> WilliamHu,2012/04/20,BU1,Change uSD Detection from GPIO 85 Harry to  GPIO 17 Nanhu_PDP  */
 static void gpio_sdc1_config(void)
 {
 	if (machine_is_msm7627a_qrd1())
@@ -161,7 +163,10 @@ static int msm_sdcc_setup_gpio(int dev_id, unsigned int enable)
 	struct sdcc_gpio *curr;
 
 	curr = &sdcc_cfg_data[dev_id - 1];
-	if (!(test_bit(dev_id, &gpio_sts)^enable))
+/* << WilliamHu,2012/03/28,BU1,Fix: Unstable to switch COM Port into Download mode  */
+  if (!(test_bit(dev_id, &gpio_sts)^enable)||(3 == dev_id))
+	//if (!(test_bit(dev_id, &gpio_sts)^enable))
+/* >> WilliamHu,2012/03/28,BU1,Fix: Unstable to switch COM Port into Download mode  */
 		return rc;
 
 	if (enable) {
@@ -257,7 +262,14 @@ static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
 		}
 		gpio_free(gpio_sdc1_hw_det);
 	}
+//<<FerryWu,2011/09/20,BU1,sdcard config for WhartonLiteA
+#if 1  // WilliamHu, 2012/04/20, Nanhu-uSD Detection in: Low, uSD out: High
+//#if 0  // WilliamHu, 2012/03/15, Harry35A-uSD Detection in: High, uSD out: Low
+	return !status;
+#else
 	return status;
+#endif
+//>>FerryWu,2011/09/20,BU1,sdcard config for WhartonLiteA
 }
 #endif
 
@@ -286,9 +298,7 @@ static struct mmc_platform_data sdc2_plat_data = {
 	.ocr_mask       = MMC_VDD_28_29 | MMC_VDD_165_195,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 	.sdiowakeup_irq = MSM_GPIO_TO_INT(66),
-#endif
 	.msmsdcc_fmin   = 144000,
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,
