@@ -174,10 +174,10 @@ static struct dsi_cmd_desc ilitek_video_on_cmds[] = {
 /* FIH-SW-MM-VH-DISPLAY-24*] */
 /* FIH-SW-MM-VH-DISPLAY-20*[ */
 static struct dsi_cmd_desc ilitek_video_off_cmds[] = {
-/* FIH-SW-MM-VH-DISPLAY-49*[ */
-	{DTYPE_DCS_WRITE1, 1, 0, 0, 15,
+/* FIH-SW-MM-VH-DISPLAY-48*[ */
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 10,
 		sizeof(write_ctrl_displayDD0), write_ctrl_displayDD0},
-/* FIH-SW-MM-VH-DISPLAY-49*] */
+/* FIH-SW-MM-VH-DISPLAY-48*] */
 	{DTYPE_DCS_WRITE, 1, 0, 0, 10,
 		sizeof(display_off), display_off}
 };

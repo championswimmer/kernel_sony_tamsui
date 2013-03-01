@@ -322,9 +322,6 @@ static int csw_hack_sent;
 #endif
 /*-------------------------------------------------------------------------*/
 
-extern unsigned int fih_get_power_on_cause(void);/*MTD-CONN-EH-POWEROFFCHARGING-01+*/
-#define PWR_ON_EVENT_USB_CHG 0x20/*MTD-CONN-EH-POWEROFFCHARGING-01+*/
-
 //MTD-CONN-MW-SUT-00+{
 #define SC_READ_NV              		0xf0
 
@@ -2283,7 +2280,7 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 	/* If the medium isn't mounted and the command needs to access
 	 * it, return an error. */
 	if (curlun && !fsg_lun_is_open(curlun) && needs_medium) {
-		if(curlun->attached_external_storage && (fih_get_power_on_cause() != PWR_ON_EVENT_USB_CHG)) {/*MTD-CONN-EH-POWEROFFCHARGING-01**/
+		if(curlun->attached_external_storage) {
 			printk(KERN_INFO "SCSI command:%s WARNING SS_SCSI_SENSE_OPERATION_IN_PROGRESS\n", __func__);
 		    curlun->sense_data = SS_SCSI_SENSE_OPERATION_IN_PROGRESS;
 		}else {

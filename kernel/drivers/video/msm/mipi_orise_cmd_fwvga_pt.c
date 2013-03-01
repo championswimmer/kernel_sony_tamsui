@@ -87,9 +87,9 @@ static int __init mipi_cmd_orise_pt_init(void)
 	pinfo.mipi.stream = 0;	/* dma_p */
 	pinfo.mipi.mdp_trigger = DSI_CMD_TRIGGER_SW;
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
-/* FIH-SW-MM-VH-DISPLAY-50*[ */
-	pinfo.mipi.frame_rate = 63;
-/* FIH-SW-MM-VH-DISPLAY-50*] */
+/* FIH-SW-MM-VH-DISPLAY-43*[ */
+	pinfo.mipi.frame_rate = 61;
+/* FIH-SW-MM-VH-DISPLAY-43*] */
 	pinfo.mipi.dsi_phy_db = &dsi_cmd_mode_phy_db;
 	pinfo.mipi.dlane_swap = 0x01;
 	pinfo.mipi.xres_pad = 0;

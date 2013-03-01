@@ -1314,9 +1314,9 @@ void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd, struct mdp_blit
 		mdp_ppp_waiting = TRUE;
 		outpdw(MDP_BASE + 0x30, 0x1000);
 /* FIH-SW-MM-VH-DISPLAY-44*[ */
-/* FIH-SW-MM-VH-DISPLAY-49*[ */
+/* FIH-SW-MM-VH-DISPLAY-49.1*[ */
 		if(!wait_for_completion_killable_timeout(&mdp_ppp_comp, 5* HZ)) {
-/* FIH-SW-MM-VH-DISPLAY-49*] */
+/* FIH-SW-MM-VH-DISPLAY-49.1*] */
 			if(unlikely(req == NULL)){
 				printk(KERN_ERR "[DISPLAY]req == NULL\n");
 			}else{

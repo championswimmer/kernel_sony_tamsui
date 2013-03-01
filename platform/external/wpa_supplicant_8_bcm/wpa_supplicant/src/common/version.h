@@ -5,6 +5,6 @@
 #define VERSION_STR_POSTFIX ""
 #endif /* VERSION_STR_POSTFIX */
 
-#define VERSION_STR "0.8.x" VERSION_STR_POSTFIX
+#define VERSION_STR "0.8.x_1" VERSION_STR_POSTFIX
 
 #endif /* VERSION_H */

@@ -2939,7 +2939,7 @@ struct isx006_i2c_reg_conf isx006_preload2_2nd_settings[] = {
     { 0x01BD, 0x01, BYTE_LEN, 0 },// MAXFRMEXP_TYPE1
     { 0x01BE, 0x02, BYTE_LEN, 0 },// MAXFRMEXP_TYPE2
     { 0x01BF, 0x03, BYTE_LEN, 0 },// MAXFRMEXP_TYPE3
-    { 0x01C0, 0x04, BYTE_LEN, 0 },// MAXFRMEXP_TYPE4
+    { 0x01C0, 0x08, BYTE_LEN, 0 },// MAXFRMEXP_TYPE4
     
     ////////////////////////////////////////
     ////////////// Cat. : AWB //////////////

@@ -93,10 +93,6 @@ static uint16_t C_NR = 0xFFFF;
 static uint16_t C_NB = 0xFFFF; 
 static uint16_t C_PR = 0xFFFF; 
 static uint16_t C_PB = 0xFFFF; 
-static uint16_t NORMR = 0xFFFF;   
-static uint16_t NORMB = 0xFFFF; 
-static uint16_t AWB_PRER = 0xFFFF; 
-static uint16_t AWB_PREB = 0xFFFF;  
 static uint16_t Shading_index = 0xFFFF;
 
 static uint8_t vendor_id = 0x00; 
@@ -1475,7 +1471,6 @@ int isx006_set_camera_mode(enum isx006_mode new_mode, const char *tag)
     int rc = 0;
     uint16_t v_read;
     uint16_t v_temp;
-	uint16_t byte_value = 0xFF; /* MTD-MM-SL-CheckCMFail-00+ */
 
     /* Clear interrupt status */
     /* FIH-SW3-MM-UW-performance tuning-00+*/
@@ -1494,14 +1489,7 @@ int isx006_set_camera_mode(enum isx006_mode new_mode, const char *tag)
     cam_msleep(10);   
     /* FIH-SW3-MM-UW-performance tuning-00-*/
 
-	/* MTD-MM-SL-CheckCMFail-00*{*/
-	rc = isx006_i2c_read_parallel(isx006_client->addr, 0x0004, &byte_value, BYTE_LEN);
-    if (rc < 0) {
-        pr_err("isx006_set_camera_mode: Try to get current mode failed !\n");
-        return rc;
-    }
-    printk("isx006_set_camera_mode: pre set camera mode to %s, REG_0x0004 = 0x%x\n", tag, byte_value);
-	/* MTD-MM-SL-CheckCMFail-00*}*/
+    printk("isx006_set_camera_mode: pre set camera mode to %s\n", tag);
     rc = isx006_i2c_write_parallel(isx006_client->addr, 0x0011, new_mode, BYTE_LEN);
     if (rc < 0) {
         pr_err("isx006_set_camera_mode: isx006_i2c_write_parallel(0x0011) failed !\n");
@@ -1516,19 +1504,22 @@ error:
     return rc;
 }
 
-/* FIH-SW3-MM-UW-read vendor id-02+*/
 /* FIH-SW3-MM-UW-read vendor id-00+*/
 /* FIH-SW3-MM-UW-add touch AF-00+*/
 /* FIH-SW3-MM-UW-write OTP setting-00+*/
-int isx006_OTP_get(void) 
+int isx006_OTP_setting(void) 
 {
     int rc = 0;
     uint32_t read_value;
 
-    uint16_t I_NORMR;    
-    uint16_t I_NORMB;
-    uint16_t I_AWB_PRER;
-    uint16_t I_AWB_PREB;  
+    uint16_t I_NORMR = 0x10BD;    
+    uint16_t I_NORMB = 0x0EE0;
+    uint16_t I_AWB_PRER = 0x0146;
+    uint16_t I_AWB_PREB = 0x0239;    
+    uint16_t NORMR;    
+    uint16_t NORMB;
+    uint16_t AWB_PRER;
+    uint16_t AWB_PREB;    
     
     isx006_i2c_read_parallel_32bit(slave_add, 0x0250, &read_value);    
     OTP_0_value = read_value;    
@@ -1551,24 +1542,16 @@ int isx006_OTP_get(void)
     printk("isx006_OTP_setting:AF_A_value = %d\n", AF_A_value);
     printk("isx006_OTP_setting:AF_B_value = %d\n", AF_B_value);    
 
+    /*MM-UW-reduce knocking noise-00+*/
     AF_F_value = 8; //coarse search
     AF_C_value = (AF_B_value - AF_A_value) / (AF_F_value - 2) + 1;
     printk("isx006_OTP_setting+: AF_C_value =%d \n", AF_C_value);
-    /* Pre-White Balance -----------------------------------------*/  
-    if(!vendor_id) //KMOT
-    {
-        I_NORMR = 0x10FB;    
-        I_NORMB = 0x10AB;
-        I_AWB_PRER = 0x013C;
-        I_AWB_PREB = 0x0241;   
-    }else
-    {
-        I_NORMR = 0x10BD;    
-        I_NORMB = 0x0EE0;
-        I_AWB_PRER = 0x0146;
-        I_AWB_PREB = 0x0239;   
-    }
     
+    isx006_i2c_write_parallel(isx006_client->addr, 0x495E, AF_B_value - AF_C_value, WORD_LEN);
+    isx006_i2c_write_parallel(isx006_client->addr, 0x4960, AF_A_value , WORD_LEN);  
+    isx006_i2c_write_parallel(isx006_client->addr, 0x4962, AF_A_value + AF_C_value, WORD_LEN); 
+    /*MM-UW-reduce knocking noise-00-*/
+    /* Pre-White Balance -----------------------------------------*/    
     C_NR = (uint16_t) (((OTP_1_value << 6 ) & 0x000000C0) | ((OTP_0_value >> 26  ) & 0x0000003F));    
     C_NB = (uint16_t) ((OTP_1_value >> 2 ) & 0x000000FF);
     C_PR = (uint16_t) ((OTP_1_value >> 10 ) & 0x000000FF);
@@ -1587,58 +1570,40 @@ int isx006_OTP_get(void)
     printk("isx006_OTP_setting: AWB_PRER = 0x%x\n", AWB_PRER);        
     printk("isx006_OTP_setting: AWB_PREB = 0x%x\n", AWB_PREB);    
 
-    /* Lens Shading ----------------------------------------------*/
-    Shading_index = (uint16_t) ((OTP_2_value >> 20 ) & 0x0000000F);		
-    printk("isx006_OTP_setting:Shading_index = %d\n", Shading_index);	
-
-    return rc;    
-}
-/* FIH-SW3-MM-UW-add touch AF-00-*/
-/* FIH-SW3-MM-UW-read vendor id-00-*/
-/* FIH-SW3-MM-UW-read vendor id-02-*/
-
-int isx006_OTP_setting(void) 
-{
-    int rc = 0;
-    
-    /* AF position -----------------------------------------------*/      
-    isx006_i2c_write_parallel(slave_add, 0x495E, AF_B_value - AF_C_value, WORD_LEN); //reduce knocking noise
-    isx006_i2c_write_parallel(slave_add, 0x4960, AF_A_value , WORD_LEN);  
-    isx006_i2c_write_parallel(slave_add, 0x4962, AF_A_value + AF_C_value, WORD_LEN); 
-    
-    /* Pre-White Balance -----------------------------------------*/    
     isx006_i2c_write_parallel(slave_add, 0x4A04, NORMR, WORD_LEN);
     isx006_i2c_write_parallel(slave_add, 0x4A06, NORMB, WORD_LEN);
     isx006_i2c_write_parallel(slave_add, 0x4A08, AWB_PRER, WORD_LEN);
     isx006_i2c_write_parallel(slave_add, 0x4A0A, AWB_PREB, WORD_LEN);
 
     /* Lens Shading ----------------------------------------------*/
+    Shading_index = (uint16_t) ((OTP_2_value >> 20 ) & 0x0000000F);		
+    printk("isx006_OTP_setting:Shading_index = %d\n", Shading_index);	
+
     if(!vendor_id) //KMOT
     {
         printk("isx006_OTP_setting:write shading table \n");	
         switch (Shading_index) {
         case SHD_MIN:
-        	rc = isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_SHD_MIN_2nd,
+        	isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_SHD_MIN_2nd,
                    isx006_regs.reg_SHD_MIN_2nd_size);
         	break;	 
      
         case SHD_TYP:	
-        	rc = isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_SHD_TYP_2nd,
+        	isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_SHD_TYP_2nd,
                    isx006_regs.reg_SHD_TYP_2nd_size);
         	break;
      
         case SHD_MAX: 	
-        	rc = isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_SHD_MAX_2nd,
+        	isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_SHD_MAX_2nd,
                    isx006_regs.reg_SHD_MAX_2nd_size);
         	break;
        }
     }
-    if(rc < 0)
-        printk("isx006_OTP_setting:write shading table fail\n");
 
     return rc;    
 }
-
+/* FIH-SW3-MM-UW-add touch AF-00-*/
+/* FIH-SW3-MM-UW-read vendor id-00-*/
 
 int isx006_change_slave_address(void)
 {
@@ -1707,13 +1672,11 @@ error:
     return rc;
 }
 
-/* FIH-SW3-MM-UW-read vendor id-02+*/
 /* FIH-SW3-MM-UW-write OTP setting-00+*/
 int isx006_init_sensor(void)
 {
     int rc = 0;
 
-    /* <0>. Pre-Sleep mode ---------------------------- */  
     rc = isx006_check_om(slave_add, "For change to PreSleep mode");
     if (rc < 0) {
         pr_err("isx006_init_sensor: isx006_check_om(For change to PreSleep mode) failed !\n");
@@ -1727,7 +1690,7 @@ int isx006_init_sensor(void)
         goto error;
     }
 
-    /* <0-1>. Write init setting */   
+    /* <2>. Pre-Sleep mode */   
     rc = isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_init, isx006_regs.reg_init_size); 
     if (rc < 0) {
         pr_err("isx006_init_sensor: Write Period1 table failed !\n");
@@ -1735,8 +1698,7 @@ int isx006_init_sensor(void)
     }
     printk("isx006_init_sensor: Sensor init done.\n");
     cam_msleep(1);//0.2ms//T3 duration(max)
-
-    /* <1>. Pre-Sleep mode ---------------------------- */  
+    
     rc = isx006_check_om(slave_add, "For change to Sleep mode");
     if (rc < 0) {
         pr_err("isx006_init_sensor: isx006_check_om(For change to Sleep mode) failed !\n");
@@ -1750,7 +1712,6 @@ int isx006_init_sensor(void)
         goto error;
     }
 
-    /* <1-1>. Write preload2 setting */   
     if(!vendor_id) //KMOT
     {
         printk("isx006_init_sensor: Sensor Period2 for 2nd source.\n");
@@ -1768,7 +1729,6 @@ int isx006_init_sensor(void)
     printk("isx006_init_sensor: Sensor Period2 done.\n");
     cam_msleep(5);
 
-    /* <1-2>. Write preload2 setting */   
     if(!vendor_id) //KMOT
     {
         printk("isx006_init_sensor: Sensor Period3 for 2nd source.\n");
@@ -1785,15 +1745,6 @@ int isx006_init_sensor(void)
     }
     printk("isx006_init_sensor: Sensor Period3 done.\n");
     cam_msleep(5); 
-
-    /* <1-3>. Write OTP setting */  
-    if(slave_add == isx006_client->addr)
-    {
-        rc = isx006_OTP_setting();
-        if (rc < 0) {
-            pr_err("isx006_reg_init_task: OTP read/save value failed !\n");
-        }
-    }
     
     printk("isx006_init_sensor: Success.\n");   
     return rc;
@@ -1803,7 +1754,6 @@ error:
     return rc;
 }
 /* FIH-SW3-MM-UW-write OTP setting-00-*/
-/* FIH-SW3-MM-UW-read vendor id-02-*/
 
 /* FIH-SW3-MM-UW-AF power-00+*/
 /*MM-UW-support AF+++*/
@@ -2241,7 +2191,6 @@ error:
 //FIH-SW-MM-MC-ImplementTouchFocusAndCAF-00+}
 /* FIH-SW3-MM-UW-modify touch AF-00-*/
 
-/* FIH-SW3-MM-UW-2nd night mode AF fail-00+*/
 /* FIH-SW3-MM-UW-read vendor id-00+*/
 /* FIH-SW3-MM-UW-fix Macro AF fail-00+*/
 /* FIH-SW3-MM-UW-flash tuning-06+*/
@@ -2427,11 +2376,11 @@ int isx006_set_AF_Range(int af_mode)
         if (rc < 0)
            goto error;
         
-        rc = isx006_i2c_write_parallel(isx006_client->addr, 0x4880, AF_A_value + (AF_C_value * 7), WORD_LEN); //AF_AREA_HIGH_TYPE3
+        rc = isx006_i2c_write_parallel(isx006_client->addr, 0x4880, AF_A_value + (AF_C_value * 5), WORD_LEN); //AF_AREA_HIGH_TYPE3
         if (rc < 0)
            goto error;
 
-        rc = isx006_i2c_write_parallel(isx006_client->addr, 0x4844, AF_C_value * 3, WORD_LEN);
+        rc = isx006_i2c_write_parallel(isx006_client->addr, 0x4844, AF_C_value * 2, WORD_LEN);
         if (rc < 0)
            goto error;
 
@@ -2487,9 +2436,7 @@ error:
 /* FIH-SW3-MM-UW-flash tuning-06-*/
 /* FIH-SW3-MM-UW-fix Macro AF fail-00-*/
 /* FIH-SW3-MM-UW-read vendor id-00-*/
-/* FIH-SW3-MM-UW-2nd night mode AF fail-00-*/
 
-/* FIH-SW3-MM-UW-2nd night mode AF fail-00+*/
 /* FIH-SW3-MM-UW-read vendor id-00-01+*/
 /* FIH-SW3-MM-UW-modify touch AF-00+*/
 /* FIH-SW3-MM-UW-fix Macro AF fail-00+*/
@@ -2660,8 +2607,6 @@ static long isx006_set_AF(int af_mode)
                 for(i = 0; i < 150; i++)
                 {
                     rc = isx006_check_AF(isx006_client->addr, "check AF polling status");
-                    if(!rc)
-                        break;
                 }
                 rc = isx006_get_AF_state(isx006_client->addr, "check AF result");
             }
@@ -2693,7 +2638,6 @@ error:
 /* FIH-SW3-MM-UW-fast AF-01-*/
 /* FIH-SW3-MM-UW-fix Macro AF fail-00-*/
 /* FIH-SW3-MM-UW-modify touch AF-00-*/
-/* FIH-SW3-MM-UW-2nd night mode AF fail-00-*/
 
 /* FIH-SW3-MM-UW-add reduce_red_eye-00-*/
 /*MM-UW-add auto flash 00-*/
@@ -3754,14 +3698,12 @@ init_probe_done:
 }
 /* FIH-SW3-MM-UW-write OTP setting-00-*/
 
-/* FIH-SW3-MM-UW-read vendor id-02+*/
 /* FIH-SW3-MM-UW-read vendor id-01+*/
 /* FIH-SW3-MM-UW-read vendor id-00+*/
 int isx006_sensor_open_init(const struct msm_camera_sensor_info *data)
 {
     int32_t rc = 0;
     uint16_t chipid = 0xFFFF;//FIH-SW-MM-MC-ImplementSensorReSetForIsx006-02+
-    int count = 0;//FIH-SW-MM-MC-ImplementSensorReSetForIsx006-04+
 
     printk("Calling isx006_sensor_open_init\n");
 
@@ -3806,23 +3748,10 @@ int isx006_sensor_open_init(const struct msm_camera_sensor_info *data)
     //FIH-SW-MM-MC-ImplementSensorReSetForMt9v115-00+{
     //FIH-SW-MM-MC-ImplementSensorReSetForIsx006-02+{
     //Read chip ID to check that I2C bus is normal.
-    //FIH-SW-MM-MC-ImplementSensorReSetForIsx006-04+{
-    #define ISX006_ID_RETRY_COUNT 2 //FIH-SW-MM-MC-EnableHWStandby-00+
-    do
-    {
-        if (STARTUP == 0)
-            rc = isx006_i2c_read_parallel(slave_add, ISX006_CID_REG, &chipid, WORD_LEN);
-        else
-            rc = isx006_i2c_read_parallel(isx006_client->addr, ISX006_CID_REG, &chipid, WORD_LEN);
-
-        if (rc < 0)
-        {
-            cam_msleep(50);//Wait for I2C stable.
-            printk ("isx006_sensor_open_init: Waiting for I2C bus stable...(50ms), count = %d .\n", count);
-        }
-        count++;
-    } while( (rc < 0) && (count < ISX006_ID_RETRY_COUNT));
-    //FIH-SW-MM-MC-ImplementSensorReSetForIsx006-04+}
+    if (STARTUP == 0)
+        rc = isx006_i2c_read_parallel(slave_add, ISX006_CID_REG, &chipid, WORD_LEN);
+    else
+        rc = isx006_i2c_read_parallel(isx006_client->addr, ISX006_CID_REG, &chipid, WORD_LEN);
     //FIH-SW-MM-MC-ImplementSensorReSetForMt9v115-00+}
     if (rc < 0)
     {
@@ -3839,7 +3768,6 @@ int isx006_sensor_open_init(const struct msm_camera_sensor_info *data)
             return rc;
         }  
         //FIH-SW-MM-MC-ImplementSensorReSetForMt9v115-00+}
-        cam_msleep(10);//FIH-SW-MM-MC-ImplementSensorReSetForIsx006-04+
 
         //03. Power off.
         rc = isx006_power_off();
@@ -3847,7 +3775,7 @@ int isx006_sensor_open_init(const struct msm_camera_sensor_info *data)
             printk("isx006_sensor_open_init: isx006_power_off for reset failed !\n");
             return rc;
         }
-        cam_msleep(100);//Wait power off done. //FIH-SW-MM-MC-ImplementSensorReSetForIsx006-04*
+        cam_msleep(50);//Wait power off done.
 
         //04. Power on.
         rc = isx006_power_on(isx006_info);
@@ -3872,7 +3800,7 @@ int isx006_sensor_open_init(const struct msm_camera_sensor_info *data)
         printk("isx006_reg_init_task: Start OTP read/save value. \n");
         if(slave_add == isx006_client->addr)
         {
-            rc = isx006_OTP_get();
+            rc = isx006_OTP_setting();
             if (rc < 0) {
                 pr_err("isx006_reg_init_task: OTP read/save value failed !\n");
             }
@@ -3891,6 +3819,7 @@ int isx006_sensor_open_init(const struct msm_camera_sensor_info *data)
 
     if(!vendor_id) //KMOT
         rc = isx006_i2c_write_table_parallel(slave_add, isx006_regs.reg_preload3_reload, isx006_regs.reg_preload3_reload_size);
+
     
     if (rc < 0)
         goto init_fail;
@@ -3907,7 +3836,6 @@ init_done:
 }
 /* FIH-SW3-MM-UW-read vendor id-00-*/
 /* FIH-SW3-MM-UW-read vendor id-01-*/
-/* FIH-SW3-MM-UW-read vendor id-02-*/
 
 static int isx006_init_client(struct i2c_client *client)
 {

@@ -986,55 +986,28 @@ static int set_android_listeners(fd_set *set, int *maxfdp) {
 static int check_android_listeners(fd_set *set) {
     if (FD_ISSET(STDIN_FILENO, set)) {
         char buffer[1024];
-        int rc = 0, used = 0;
-	    char *next_cmd = buffer;
-
-	    memset(buffer, 0x0, sizeof(buffer));
+        int rc;
 
         if ((rc = read(STDIN_FILENO, buffer, sizeof(buffer) -1)) < 0) {
             my_syslog(LOG_ERR, _("Error reading from stdin (%s)"), strerror(errno));
             return -1;
         }
         buffer[rc] = '\0';
-		used = rc;
-		
-        //MTD-Connectivity-FY-FixMultiCommandInPipe
-	    while (used > 0) {
-	        char *next = next_cmd;
-	        char *cmd;
-		    int cmd_len = strlen(next_cmd);
-		
-	        my_syslog(LOG_WARNING, _("next_cmd(%s), used(%d), cmd_len(%d)"), next_cmd, used, cmd_len);
+        char *next = buffer;
+        char *cmd;
 
-	        if (!(cmd = strsep(&next, ":"))) {
-	            my_syslog(LOG_ERR, _("Malformatted msg '%s'"), buffer);
-	            return -1;
-	        }
+        if (!(cmd = strsep(&next, ":"))) {
+            my_syslog(LOG_ERR, _("Malformatted msg '%s'"), buffer);
+            return -1;
+        }
 
-	        if (!strcmp(next_cmd, "update_dns")) {
-	            set_servers(&next_cmd[11]);
-	            check_servers();
-		    used -= cmd_len + 1;
-		    next_cmd += cmd_len + 1;
-	        } else {
-	            int dump_num = 0;
-				char dump_str[1024] = {0};
-				char *pDump_str = dump_str;
-				int dump_remind = 1024;
-	            my_syslog(LOG_ERR, _("Unknown cmd '%s'"), cmd);
-				//MTD-Connectivity-FY-DumpCommandBuffer
-				my_syslog(LOG_ERR, _("Dump(%d)="), rc);
-				while( dump_num < rc || dump_remind <= 0) {
-					
-					snprintf( pDump_str, dump_remind,"%02X ", buffer[dump_num]);
-					dump_remind -= 3;
-					pDump_str += 3;
-					dump_num++;
-				}
-				my_syslog(LOG_ERR, _("%s"), dump_str);
-	            return -1;
-	        }
-	    }
+        if (!strcmp(buffer, "update_dns")) {
+            set_servers(&buffer[11]);
+            check_servers();
+        } else {
+            my_syslog(LOG_ERR, _("Unknown cmd '%s'"), cmd);
+            return -1;
+        }
     }
     return 0;
 }

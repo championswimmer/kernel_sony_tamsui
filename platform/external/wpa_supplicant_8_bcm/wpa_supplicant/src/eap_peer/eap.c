@@ -997,7 +997,8 @@ static int eap_sm_imsi_identity(struct eap_sm *sm,
 static int eap_sm_set_scard_pin(struct eap_sm *sm,
 				struct eap_peer_config *conf)
 {
-#if defined(PCSC_FUNCS) || defined(PCSC_FUNCS_SEMC)
+#if defined(PCSC_FUNCS)
+
 	if (scard_set_pin(sm->scard_ctx, conf->pin)) {
 		/*
 		 * Make sure the same PIN is not tried again in order to avoid
@@ -1011,8 +1012,8 @@ static int eap_sm_set_scard_pin(struct eap_sm *sm,
 		return -1;
 	}
 	return 0;
-#elif defined(PCSC_FUNCS_FIH) /* PCSC_FUNCS || PCSC_FUNCS_SEMC */
-     wpa_printf(MSG_WARNING, "FIH solution skip PIN validation");
+#elif defined(PCSC_FUNCS_FIH) || defined(PCSC_FUNCS_SEMC) /* PCSC_FUNCS || PCSC_FUNCS_SEMC */
+    wpa_printf(MSG_WARNING, "FIH solution skip PIN validation");
      return 0;
 #else  
 	return -1;

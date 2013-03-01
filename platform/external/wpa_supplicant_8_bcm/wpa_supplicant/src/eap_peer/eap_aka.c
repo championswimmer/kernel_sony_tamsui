@@ -824,6 +824,10 @@ static struct wpabuf * eap_aka_process_challenge(struct eap_sm *sm,
 	os_memcpy(data->autn, attr->autn, EAP_AKA_AUTN_LEN);
 
 	res = eap_aka_umts_auth(sm, data);
+	if(res != 0) {
+		wpa_printf(MSG_ERROR, "EAP-AKA: No more data send to APDU server");
+		//SCardDisconnect(0,0);
+	}
 	if (res == -1) {
 		wpa_printf(MSG_WARNING, "EAP-AKA: UMTS authentication "
 			   "failed (AUTN)");

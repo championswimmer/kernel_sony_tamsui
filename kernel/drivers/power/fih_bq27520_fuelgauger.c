@@ -886,7 +886,7 @@ void bq27520_resch_change_polling_timeout(int second, int modify_timeout)
 {
 	int polling_timeout;
 
-	dev_info(bq27520_di->dev, "%s(%d %d) %lu", __func__, second, modify_timeout, jiffies);
+	dev_info(bq27520_di->dev, "%s(%d %d)", __func__, second, modify_timeout);
 	
 	polling_timeout = second * HZ;
 
